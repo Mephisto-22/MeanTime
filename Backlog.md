@@ -1,0 +1,28 @@
+# Backlog
+
+- Containers
+    - Frontend - Nuxt/Vue3
+        - PrimeVue components
+    - Backend - Django Ninja
+    - Database - PostgreSQL
+- Users
+    - Model
+    - DB columns
+    - api endpoints
+    - Profile page
+- Authentication
+    - Logging in
+    - Signing up
+    - Logging out
+- Authorization 
+    - Access to individual data and no one else's
+- Kanban Dashboard
+    - Add tasks
+    - Move tasks between columns
+    - Drag and drop
+- Timer
+    - Start
+    - Stop
+    - Reset
+    - Connect to tasks
+    - Analytics?
