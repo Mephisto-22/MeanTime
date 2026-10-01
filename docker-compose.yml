@@ -58,6 +58,7 @@ services:
       PORT: 3000
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     volumes:
