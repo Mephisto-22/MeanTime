@@ -1,0 +1,17 @@
+[project]
+name = "meantime-backend"
+version = "0.1.0"
+description = "MeanTime backend API service"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=5.2",
+    "django-ninja>=1.6",
+    "psycopg[binary]>=3.2",
+    "uvicorn[standard]>=0.34",
+    "watchfiles>=1.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
