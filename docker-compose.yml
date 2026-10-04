@@ -56,7 +56,6 @@ services:
       NODE_ENV: development
       HOST: 0.0.0.0
       PORT: 3000
-      WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
     ports:

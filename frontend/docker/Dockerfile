@@ -14,13 +14,10 @@ ENV NODE_ENV=development \
 
 EXPOSE 3000
 
-# Copy package manifests first for efficient Docker layer caching
+# Copy package manifests for potential build-time cache
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
 
-# Install dependencies
-RUN pnpm install
-
-# Copy application source
+# Copy application source (entrypoint handles node_modules on container start)
 COPY . .
 
 # Copy and setup entrypoint script with Unix line endings
