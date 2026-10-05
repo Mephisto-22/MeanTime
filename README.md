@@ -50,7 +50,6 @@ For specialized guides on adding code and framework conventions, consult the sub
 
 - 📘 **[Backend Developer Guide](backend/README.md)**: Django Ninja setup, creating Django apps, database models, migrations lifecycle, schema definitions, and router registration.
 - 🎨 **[Frontend Developer Guide](frontend/README.md)**: Nuxt 4 app structure, page routing, auto-imported components, centralized HTTP client (`app/services/ApiService.ts`), domain APIs (`app/api/`), Pinia stores (`app/stores/`), and PrimeVue styling.
-- 🏛️ **[Architecture Decision Records](docs/adr/0001-containerized-development-architecture.md)**: Context and rationale for container architecture, Nitro proxy, and hoisted IDE mounts.
 
 ---
 
