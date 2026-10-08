@@ -73,6 +73,21 @@ class UserModelTests(TestCase):
                 display_name="Second",
             )
 
+    def test_case_insensitive_duplicate_email_raises_integrity_error(self):
+        """Case-insensitive duplicate emails must trigger database integrity error even on direct create."""
+        User.objects.create(
+            email="Duplicate@Example.com",
+            password="password",
+            display_name="First",
+        )
+        with self.assertRaises(IntegrityError):
+            User.objects.create(
+                email="duplicate@example.COM",
+                password="password",
+                display_name="Second",
+            )
+
+
     def test_create_superuser_successful(self):
         """create_superuser sets is_staff and is_superuser to True."""
         admin = User.objects.create_superuser(

@@ -22,3 +22,12 @@ class UserAdminTests(TestCase):
         self.assertEqual(user_admin.search_fields, ("email", "display_name"))
         self.assertEqual(user_admin.ordering, ("email",))
         self.assertIn("created_at", user_admin.readonly_fields)
+
+    def test_user_admin_forms_bound_to_custom_user_model(self):
+        """UserAdmin add_form and form must use the custom User model without errors."""
+        user_admin = admin.site._registry[User]
+        add_form_class = user_admin.add_form
+        change_form_class = user_admin.form
+        self.assertEqual(add_form_class._meta.model, User)
+        self.assertEqual(change_form_class._meta.model, User)
+

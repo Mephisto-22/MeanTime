@@ -24,6 +24,23 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         db_table = "users"
         ordering = ["email"]
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower("email"),
+                name="unique_user_email_case_insensitive",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.email:
+            self.email = self.email.lower()
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.lower()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
+
