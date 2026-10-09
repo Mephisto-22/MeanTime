@@ -88,7 +88,10 @@
       </li>
     </ul>
 
-    <!-- TODO: Mount the create/edit dialog here, driven by isDialogOpen and dashboardBeingEdited. -->
+    <DashboardFormDialog
+      v-model:visible="isDialogOpen"
+      :dashboard="dashboardBeingEdited"
+    />
   </div>
 </template>
 
@@ -106,8 +109,8 @@ const {status, error, refresh} = await useAsyncData(
   },
 );
 
-// State the create/edit dialog will read. A null dashboardBeingEdited means
-// the dialog is creating a new dashboard.
+// State for the create/edit dialog. A null dashboardBeingEdited means the
+// dialog is creating a new dashboard.
 const isDialogOpen = ref(false);
 const dashboardBeingEdited = ref<Dashboard | null>(null);
 
