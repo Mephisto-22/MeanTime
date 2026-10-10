@@ -16,7 +16,7 @@ Containerized Vue 3 / Nuxt 4 application styled with PrimeVue 5 (Aura preset), T
 - **Centralized HTTP Client**: [`ApiService`](app/services/ApiService.ts) in `app/services/` encapsulates HTTP requests (`get`, `post`, `put`, `delete`), query serialization, payload parsing, and error normalization around `$fetch`.
 - **Domain API Layer**: Feature-specific endpoints and typed contracts are organized in `app/api/` (e.g., [`health.ts`](app/api/health.ts)) and consume `apiService`.
 - **File Watching & HMR**: Vite watcher configured with polling enabled (`usePolling: true`) for instant hot module replacement across Windows host filesystem mounts.
-- **Host IDE Independence**: Direct host bind-mount using pnpm's hoisted linker (`nodeLinker: hoisted`), ensuring flat packages and `.nuxt` types are automatically available on the host for IDE autocomplete without requiring `pnpm` or `node` installed on the host.
+- **High-Performance Volume & Host IDE Synchronization**: Container uses a dedicated named Docker volume (`frontend_node_modules`) for lightning-fast Linux ext4 package access, resolving Windows bind-mount I/O bottlenecks. The container automatically synchronizes installed packages and types to the host's `./frontend/node_modules` via hash-gated `rsync` on startup, providing full host IDE IntelliSense and autocompletion without requiring `pnpm` or `node` on the host.
 
 ---
 
@@ -362,11 +362,38 @@ The application will be accessible at: `http://localhost:3000`.
 
 ---
 
-## Zero-Install Host IDE Autocompletion
+## Zero-Install Host IDE Autocompletion & Package Management
 
 No host-level installations of `node`, `pnpm`, or `npm` are required on your developer machine:
-- During container startup, dependencies (`node_modules`) and auto-generated types (`.nuxt/tsconfig.json`) are automatically installed and compiled directly onto the host mount using pnpm's hoisted linker.
-- Your host IDE (VS Code, WebStorm, Cursor) automatically reads the host `node_modules` and `.nuxt` directories for complete TypeScript intellisense, Vue component resolution, Pinia store types, and auto-import support.
+
+- **High-Performance Container Runtime**: The container runs against a dedicated named Docker volume (`frontend_node_modules:/app/node_modules`), allowing Vite, Nuxt, and Rollup to operate directly on native Linux ext4 filesystem speeds rather than traversing the slow Windows host mount (`9P`/`virtiofs`).
+- **Automated Host Synchronization**: The host directory `./frontend/node_modules` is mounted to `/host_node_modules` in the container. The container's startup script (`entrypoint.sh`) checks a SHA256 checksum of the dependency manifests (`package.json`, `pnpm-lock.yaml`, etc.):
+  - **Instant Restarts**: If the hash matches and the host directory is populated, `entrypoint.sh` starts Nuxt immediately in ~1–2 seconds with zero file operations.
+  - **Automated Updates**: If a package is added, removed, or updated, or upon a fresh clone, the container installs dependencies into the internal volume, synchronizes the changes to `./frontend/node_modules` via `rsync -a --delete`, and regenerates Nuxt types.
+- **Host IDE Support**: Your host IDE (VS Code, WebStorm, Cursor) automatically reads the host's `./frontend/node_modules` and `.nuxt/` directories for complete TypeScript intellisense, Vue component resolution, Pinia store types, and auto-import support.
+
+### Adding or Updating Dependencies
+
+To add or update frontend dependencies, use either of the following approaches:
+
+1. **Option 1 (Recommended — Zero Host Tools)**:  
+   Edit `frontend/package.json` directly in your host IDE, then restart the frontend container:
+   ```bash
+   docker compose restart frontend
+   # or:
+   docker compose up -d
+   ```
+   The container entrypoint will detect the manifest change, install the new dependency into the volume, update `pnpm-lock.yaml`, sync to your host `node_modules`, and regenerate `.nuxt` types.
+
+2. **Option 2 (Via Docker Exec)**:  
+   Run `pnpm add` directly inside the running container:
+   ```bash
+   docker compose exec frontend pnpm add <package-name>
+   ```
+   Followed by restarting the container to sync the new package to the host filesystem:
+   ```bash
+   docker compose restart frontend
+   ```
 
 > [!CAUTION]
-> **Do not run `pnpm install` or `npm install` on the host machine**: Running package managers on the host is unnecessary and risks overwriting container Linux binaries with host OS binaries. All dependency management is handled automatically within Docker.
+> **Do not run `pnpm install` or `npm install` on the Windows host machine**: Running package managers on the host is unnecessary and risks introducing platform-specific Windows binaries or breaking Docker symlinks. All dependency management is handled automatically within Docker.
