@@ -352,6 +352,14 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+### Authentication frontend
+
+- `/login` submits a username and password, stores the returned access and refresh tokens in `app/stores/useAuthStore.ts`, and navigates to `/`.
+- `/register` submits a username, email, and password, then navigates to login on success.
+- Both pages display API errors and prevent duplicate submissions while a request is pending.
+- `app/api/auth.ts` uses the existing `ApiService`. The **provisional** backend contract is `POST /api/auth/login` returning `{ "access": "...", "refresh": "..." }`, and `POST /api/auth/register` returning any successful 2xx response. The current backend checkout does not implement these endpoints; align the routes and response fields when backend authentication is available.
+- Tokens are held in memory only and are cleared on a full page reload. `setTokens` replaces both tokens and `clearTokens` removes them. Persistence, attaching bearer tokens to protected API requests, automatic refresh, and route protection are not implemented yet.
+
 Run via Docker Compose at the project root:
 
 ```bash
