@@ -2,11 +2,11 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex w-72 sm:w-80 flex-shrink-0 flex-col rounded-xl border border-surface-200 bg-surface-100 p-3 shadow-xs dark:border-surface-700/60 dark:bg-surface-800/40"
+    class="flex w-72 shrink-0 flex-col rounded-lg bg-surface-100 p-3 dark:bg-surface-800"
   >
     <!-- Column Header -->
-    <div class="mb-3 flex items-center justify-between px-1">
-      <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-100">
+    <div class="mb-3 flex items-center justify-between">
+      <h3 class="text-sm font-semibold">
         {{ column.name }}
       </h3>
       <Tag
@@ -14,7 +14,6 @@
         :value="column.tasks.length"
         severity="secondary"
         rounded
-        class="px-2 py-0.5 text-xs font-semibold"
       />
     </div>
 
@@ -22,13 +21,13 @@
     <div
       v-if="sortedTasks.length === 0"
       data-testid="column-empty-placeholder"
-      class="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-surface-300 text-xs font-medium text-surface-500 dark:border-surface-700 dark:text-surface-400"
+      class="flex h-20 items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 dark:border-surface-600"
     >
       No tasks
     </div>
 
     <!-- Task List -->
-    <div v-else class="flex max-h-[calc(100vh-220px)] flex-col gap-2.5 overflow-y-auto pr-0.5">
+    <div v-else class="flex flex-col gap-2 overflow-y-auto">
       <template v-for="task in sortedTasks" :key="task.id">
         <slot name="task" :task="task">
           <KanbanTask :task="task" :columns="columns" />
@@ -39,7 +38,8 @@
 </template>
 
 <script setup lang="ts">
-import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/types/kanban'
+import { computed } from 'vue'
+import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/api/kanban'
 
 const props = defineProps<{
   column: KanbanColumnDto

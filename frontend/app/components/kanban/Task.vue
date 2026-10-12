@@ -2,35 +2,26 @@
   <Card
     data-testid="kanban-task"
     :data-task-id="task.id"
-    class="rounded-lg border border-surface-200 bg-surface-0 shadow-xs hover:shadow-sm dark:border-surface-800 dark:bg-surface-900"
-    :pt="{
-      body: { class: 'p-3' },
-      content: { class: 'p-0' },
-    }"
+    :pt="{ body: 'p-2.5', content: 'p-0' }"
   >
     <template #content>
       <div class="flex items-center justify-between gap-2">
-        <span class="break-words text-sm font-medium text-surface-800 dark:text-surface-100">
-          {{ task.name }}
-        </span>
-        <div class="flex-shrink-0">
-          <Button
-            data-testid="task-action-menu-button"
-            icon="pi pi-ellipsis-v"
-            severity="secondary"
-            text
-            rounded
-            size="small"
-            aria-label="Task actions"
-            class="!h-7 !w-7 p-0 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200"
-            @click="toggleMenu"
-          />
-          <Menu
-            ref="menuRef"
-            :model="menuItems"
-            :popup="true"
-          />
-        </div>
+        <span class="text-sm font-medium">{{ task.name }}</span>
+        <Button
+          data-testid="task-action-menu-button"
+          icon="pi pi-ellipsis-v"
+          severity="secondary"
+          text
+          rounded
+          size="small"
+          aria-label="Task actions"
+          @click="toggleMenu"
+        />
+        <Menu
+          ref="menuRef"
+          :model="menuItems"
+          :popup="true"
+        />
       </div>
     </template>
   </Card>
@@ -38,8 +29,8 @@
 
 <script setup lang="ts">
 import { ref, computed, inject } from 'vue'
-import type { KanbanColumnSummary, KanbanTaskDto, TaskMoveRequest } from '~/types/kanban'
-import { kanbanContextKey } from '~/types/kanban'
+import type { KanbanColumnSummary, KanbanTaskDto, TaskMoveRequest } from '~/api/kanban'
+import { kanbanContextKey } from '~/api/kanban'
 
 const props = defineProps<{
   task: KanbanTaskDto

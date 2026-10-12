@@ -1,4 +1,4 @@
-import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto } from '~/types/kanban'
+import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto } from '~/api/kanban'
 
 export const mockTasks: KanbanTaskDto[] = [
   { id: 'task-1', name: 'Design responsive layout', order: 0, columnId: 'col-1' },

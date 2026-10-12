@@ -1,14 +1,14 @@
 <template>
-  <div data-testid="kanban-board" class="flex w-full flex-col gap-6">
+  <div data-testid="kanban-board" class="flex flex-col gap-4">
     <!-- Board Header -->
-    <div v-if="board.name || board.description" class="flex flex-col gap-1">
-      <h2 data-testid="board-title" class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-50">
+    <div v-if="board.name || board.description">
+      <h2 data-testid="board-title" class="text-2xl font-bold">
         {{ board.name }}
       </h2>
       <p
         v-if="board.description"
         data-testid="board-description"
-        class="text-sm text-surface-600 dark:text-surface-400"
+        class="text-sm text-surface-500"
       >
         {{ board.description }}
       </p>
@@ -17,7 +17,7 @@
     <!-- Horizontal Column Track -->
     <div
       data-testid="kanban-columns-track"
-      class="flex items-start gap-4 overflow-x-auto pb-4"
+      class="flex gap-4 overflow-x-auto pb-4"
     >
       <template v-for="column in sortedColumns" :key="column.id">
         <slot name="column" :column="column">
@@ -40,9 +40,8 @@ import type {
   KanbanColumnSummary,
   KanbanTaskDto,
   TaskMoveRequest,
-} from '~/types/kanban'
-import { kanbanContextKey } from '~/types/kanban'
-import { kanbanApi } from '~/api/kanban'
+} from '~/api/kanban'
+import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
 const props = defineProps<{
   board: KanbanBoardDto
