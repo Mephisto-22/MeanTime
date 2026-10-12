@@ -26,6 +26,21 @@ class UserModelTests(TestCase):
         self.assertTrue(user.check_password("securePassword123!"))
         self.assertNotEqual(user.password, "securePassword123!")
 
+    def test_user_password_uses_bcrypt_with_12_rounds(self):
+        """New user passwords should be hashed using BCryptSHA256PasswordHasher with 12 rounds."""
+        user = User.objects.create_user(
+            email="bcrypt_test@example.com",
+            password="myBcryptPassword123!",
+            display_name="Bcrypt User",
+        )
+        self.assertTrue(user.password.startswith("bcrypt_sha256$"))
+        self.assertTrue(user.check_password("myBcryptPassword123!"))
+        # In Django's BCryptSHA256PasswordHasher, the format is bcrypt_sha256$$<bcrypt_hash>
+        # where the bcrypt hash begins with $2b$12$
+        parts = user.password.split("$")
+        self.assertIn("12", parts)
+
+
     def test_create_user_default_timezone(self):
         """Timezone should default to UTC when unspecified."""
         user = User.objects.create_user(
