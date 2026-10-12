@@ -1,4 +1,4 @@
-import type { KanbanBoardDto } from '~/types/kanban'
+import type { KanbanBoardDto, TaskMoveRequest } from '~/types/kanban'
 import { mockKanbanBoard } from '~/mocks/kanban'
 
 export class KanbanApi {
@@ -10,6 +10,14 @@ export class KanbanApi {
    */
   async getBoard(_id: string | number): Promise<KanbanBoardDto> {
     return Promise.resolve(JSON.parse(JSON.stringify(mockKanbanBoard)))
+  }
+
+  /**
+   * Asynchronously persists a task relocation across columns.
+   * Simulates asynchronous persistence; designed to transition to apiService.patch/post.
+   */
+  async moveTask(_req: TaskMoveRequest): Promise<void> {
+    return Promise.resolve()
   }
 }
 
