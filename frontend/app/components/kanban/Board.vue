@@ -14,9 +14,9 @@
       </p>
     </div>
 
-    <!-- Horizontal Lane Track -->
+    <!-- Horizontal Column Track -->
     <div
-      data-testid="kanban-lane-track"
+      data-testid="kanban-columns-track"
       class="flex items-start gap-4 overflow-x-auto pb-4"
     >
       <template v-for="column in sortedColumns" :key="column.id">
@@ -48,10 +48,6 @@ const props = defineProps<{
   board: KanbanBoardDto
 }>()
 
-const emit = defineEmits<{
-  (e: 'task-move', payload: TaskMoveRequest): void
-}>()
-
 defineSlots<{
   column?: (props: { column: KanbanColumnDto }) => any
   task?: (props: { task: KanbanTaskDto }) => any
@@ -79,6 +75,12 @@ const columnRegistry = computed<KanbanColumnSummary[]>(() => {
   }))
 })
 
+const reindexTasks = (tasks: KanbanTaskDto[]): void => {
+  tasks.forEach((t, i) => {
+    t.order = i
+  })
+}
+
 const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
   const fromCol = localColumns.value.find(col => col.id === req.fromColumnId)
   const toCol = localColumns.value.find(col => col.id === req.toColumnId)
@@ -100,17 +102,14 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
   task.order = toCol.tasks.length
   toCol.tasks.push(task)
 
-  fromCol.tasks.forEach((t, i) => {
-    t.order = i
-  })
-  toCol.tasks.forEach((t, i) => {
-    t.order = i
-  })
-
-  emit('task-move', req)
+  reindexTasks(fromCol.tasks)
+  reindexTasks(toCol.tasks)
 
   try {
-    await kanbanApi.moveTask(req)
+    await kanbanApi.moveTask({
+      ...req,
+      targetOrder: task.order,
+    })
   } catch (err) {
     console.error('Failed to persist task movement:', err)
   }

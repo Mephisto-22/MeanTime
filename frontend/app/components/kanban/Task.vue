@@ -84,13 +84,13 @@ const handleMoveTo = (toColumnId: string | number) => {
     taskId: props.task.id,
     fromColumnId: props.task.columnId,
     toColumnId,
-    targetOrder: 9999,
+    targetOrder: 0,
   }
 
   if (kanbanContext) {
     kanbanContext.moveTask(payload)
+  } else {
+    emit('move', payload)
   }
-
-  emit('move', payload)
 }
 </script>

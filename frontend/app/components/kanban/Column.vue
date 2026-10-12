@@ -28,10 +28,10 @@
     </div>
 
     <!-- Task List -->
-    <div v-else class="flex flex-col gap-2.5">
+    <div v-else class="flex max-h-[calc(100vh-220px)] flex-col gap-2.5 overflow-y-auto pr-0.5">
       <template v-for="task in sortedTasks" :key="task.id">
         <slot name="task" :task="task">
-          <KanbanTask :task="task" />
+          <KanbanTask :task="task" :columns="columns" />
         </slot>
       </template>
     </div>
@@ -39,10 +39,11 @@
 </template>
 
 <script setup lang="ts">
-import type { KanbanColumnDto, KanbanTaskDto } from '~/types/kanban'
+import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/types/kanban'
 
 const props = defineProps<{
   column: KanbanColumnDto
+  columns?: KanbanColumnSummary[]
 }>()
 
 defineSlots<{
