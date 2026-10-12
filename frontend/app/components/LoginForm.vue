@@ -1,11 +1,11 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" @submit.prevent="submit">
     <div class="flex flex-col gap-2">
-      <label for="login-username">Username</label>
-      <InputText id="login-username" v-model="username" name="username" autocomplete="username" required />
+      <Label for="login-email">Email</Label>
+      <InputText id="login-email" v-model="email" name="email" type="email" autocomplete="username" required />
     </div>
     <div class="flex flex-col gap-2">
-      <label for="login-password">Password</label>
+      <Label for="login-password">Password</Label>
       <InputText id="login-password" v-model="password" name="password" type="password" autocomplete="current-password" required />
     </div>
     <Button type="submit" label="Log in" :loading="loading" :disabled="loading" />
@@ -16,7 +16,7 @@
 import type { LoginRequest } from '~/api/auth'
 
 const props = defineProps<{ loading?: boolean }>()
-const username = ref('')
+const email = ref('')
 const password = ref('')
 
 const emit = defineEmits<{
@@ -25,6 +25,6 @@ const emit = defineEmits<{
 
 function submit() {
   if (props.loading) return
-  emit('submit', { username: username.value, password: password.value })
+  emit('submit', { email: email.value, password: password.value })
 }
 </script>

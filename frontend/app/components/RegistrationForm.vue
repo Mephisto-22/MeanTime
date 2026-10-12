@@ -1,15 +1,15 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" @submit.prevent="submit">
     <div class="flex flex-col gap-2">
-      <label for="register-username">Username</label>
-      <InputText id="register-username" v-model="username" name="username" autocomplete="username" required />
+      <Label for="register-username">Display name</Label>
+      <InputText id="register-username" v-model="username" name="username" autocomplete="nickname" required />
     </div>
     <div class="flex flex-col gap-2">
-      <label for="register-email">Email</label>
+      <Label for="register-email">Email</Label>
       <InputText id="register-email" v-model="email" name="email" type="email" autocomplete="email" required />
     </div>
     <div class="flex flex-col gap-2">
-      <label for="register-password">Password</label>
+      <Label for="register-password">Password</Label>
       <InputText id="register-password" v-model="password" name="password" type="password" autocomplete="new-password" required />
     </div>
     <Button type="submit" label="Register" :loading="loading" :disabled="loading" />

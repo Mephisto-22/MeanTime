@@ -1,15 +1,19 @@
 <template>
   <div class="mx-auto max-w-md px-6 py-8">
-    <h1 class="mb-6 text-2xl font-bold">Log in</h1>
-    <p v-if="route.query.registered === '1'" role="status" class="mb-4">
-      Account created. Please log in.
-    </p>
-    <LoginForm :loading="loading" @submit="login" />
-    <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
-    <p class="mt-4">
-      Need an account?
-      <NuxtLink to="/register" class="text-primary underline">Register</NuxtLink>
-    </p>
+    <Card>
+      <template #title><h2 class="text-2xl font-bold">Log in</h2></template>
+      <template #content>
+        <p v-if="route.query.registered === '1'" role="status" class="mb-4">
+          Account created. Please log in.
+        </p>
+        <LoginForm :loading="loading" @submit="login" />
+        <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
+        <p class="mt-4">
+          Need an account?
+          <NuxtLink to="/register" class="text-primary underline">Register</NuxtLink>
+        </p>
+      </template>
+    </Card>
   </div>
 </template>
 

@@ -1,12 +1,13 @@
 import { apiService } from '~/services/ApiService'
+import type { User } from '~/stores/useAuthStore'
 
 export interface LoginRequest {
-  username: string
+  email: string
   password: string
 }
 
 export interface RegistrationRequest extends LoginRequest {
-  email: string
+  username: string
 }
 
 export interface AuthTokens {
@@ -14,12 +15,16 @@ export interface AuthTokens {
   refresh: string
 }
 
+export interface LoginResponse extends AuthTokens {
+  user: User
+}
+
 // Provisional contract: align these routes and token keys with the backend auth API.
 export class AuthApi {
   readonly endpoint = '/api/auth'
 
-  login(credentials: LoginRequest): Promise<AuthTokens> {
-    return apiService.post<AuthTokens>(`${this.endpoint}/login`, credentials)
+  login(credentials: LoginRequest): Promise<LoginResponse> {
+    return apiService.post<LoginResponse>(`${this.endpoint}/login`, credentials)
   }
 
   async register(details: RegistrationRequest): Promise<void> {

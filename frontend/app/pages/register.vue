@@ -1,12 +1,16 @@
 <template>
   <div class="mx-auto max-w-md px-6 py-8">
-    <h1 class="mb-6 text-2xl font-bold">Register</h1>
-    <RegistrationForm :loading="loading" @submit="register" />
-    <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
-    <p class="mt-4">
-      Already have an account?
-      <NuxtLink to="/login" class="text-primary underline">Log in</NuxtLink>
-    </p>
+    <Card>
+      <template #title><h2 class="text-2xl font-bold">Register</h2></template>
+      <template #content>
+        <RegistrationForm :loading="loading" @submit="register" />
+        <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
+        <p class="mt-4">
+          Already have an account?
+          <NuxtLink to="/login" class="text-primary underline">Log in</NuxtLink>
+        </p>
+      </template>
+    </Card>
   </div>
 </template>
 
