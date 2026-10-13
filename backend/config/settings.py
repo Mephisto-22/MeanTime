@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "ninja_jwt",
     "users.apps.UsersConfig",
+    "kanban",
 ]
 
 AUTH_USER_MODEL = "users.User"
