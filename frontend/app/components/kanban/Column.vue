@@ -2,10 +2,10 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex w-72 shrink-0 flex-col rounded-lg bg-surface-100 p-3 dark:bg-surface-800"
+    class="flex h-[50vh] w-72 min-w-72 shrink-0 flex-col rounded-lg bg-surface-100 p-3 dark:bg-surface-800"
   >
     <!-- Column Header -->
-    <div class="mb-3 flex items-center justify-between">
+    <div class="mb-3 flex shrink-0 items-center justify-between">
       <h3 class="text-sm font-semibold">
         {{ column.name }}
       </h3>
@@ -21,13 +21,13 @@
     <div
       v-if="sortedTasks.length === 0"
       data-testid="column-empty-placeholder"
-      class="flex h-20 items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 dark:border-surface-600"
+      class="flex flex-1 items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 dark:border-surface-600"
     >
       No tasks
     </div>
 
     <!-- Task List -->
-    <div v-else class="flex flex-col gap-2 overflow-y-auto">
+    <div v-else class="flex flex-1 flex-col gap-2 overflow-y-auto">
       <template v-for="task in sortedTasks" :key="task.id">
         <slot name="task" :task="task">
           <KanbanTask :task="task" :columns="columns" />

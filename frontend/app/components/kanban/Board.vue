@@ -1,35 +1,29 @@
 <template>
-  <div data-testid="kanban-board" class="flex flex-col gap-4">
-    <!-- Board Header -->
-    <div v-if="board.name || board.description">
-      <h2 data-testid="board-title" class="text-2xl font-bold">
-        {{ board.name }}
-      </h2>
-      <p
-        v-if="board.description"
-        data-testid="board-description"
-        class="text-sm text-surface-500"
+  <Card data-testid="kanban-board">
+    <template v-if="board.name" #title>
+      <span data-testid="board-title">{{ board.name }}</span>
+    </template>
+    <template v-if="board.description" #subtitle>
+      <span data-testid="board-description">{{ board.description }}</span>
+    </template>
+    <template #content>
+      <!-- Horizontal Column Track -->
+      <div
+        data-testid="kanban-columns-track"
+        class="flex items-start gap-4 overflow-x-auto pb-2"
       >
-        {{ board.description }}
-      </p>
-    </div>
-
-    <!-- Horizontal Column Track -->
-    <div
-      data-testid="kanban-columns-track"
-      class="flex gap-4 overflow-x-auto pb-4"
-    >
-      <template v-for="column in sortedColumns" :key="column.id">
-        <slot name="column" :column="column">
-          <KanbanColumn :column="column">
-            <template v-if="$slots.task" #task="taskSlotProps">
-              <slot name="task" v-bind="taskSlotProps" />
-            </template>
-          </KanbanColumn>
-        </slot>
-      </template>
-    </div>
-  </div>
+        <template v-for="column in sortedColumns" :key="column.id">
+          <slot name="column" :column="column">
+            <KanbanColumn :column="column">
+              <template v-if="$slots.task" #task="taskSlotProps">
+                <slot name="task" v-bind="taskSlotProps" />
+              </template>
+            </KanbanColumn>
+          </slot>
+        </template>
+      </div>
+    </template>
+  </Card>
 </template>
 
 <script setup lang="ts">
