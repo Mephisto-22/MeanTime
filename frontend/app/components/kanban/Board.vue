@@ -10,7 +10,7 @@
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
-        class="flex items-start gap-4 overflow-x-auto pb-2"
+        class="flex items-start gap-4 overflow-x-auto overflow-y-hidden pb-2"
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">
