@@ -2,12 +2,16 @@ from asgiref.sync import sync_to_async
 from django.db import connection
 from ninja import NinjaAPI, Schema
 
+from kanban.api import router as kanban_router
+
 api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
     description="MeanTime API service with Django Ninja",
 )
 
+# router registrations (import above)
+api.add_router("/kanban/", kanban_router)
 
 class HealthResponse(Schema):
     status: str
