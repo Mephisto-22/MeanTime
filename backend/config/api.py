@@ -2,12 +2,14 @@ from asgiref.sync import sync_to_async
 from django.db import connection
 from ninja import NinjaAPI, Schema
 from ninja_extra.exceptions import APIException
+from ninja_jwt.authentication import JWTAuth
 from users.api import auth_router
 
 api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
     description="MeanTime API service with Django Ninja",
+    auth=JWTAuth(),
 )
 
 
@@ -45,7 +47,7 @@ def _check_database() -> bool:
         return row is not None and row[0] == 1
 
 
-@api.get("/health", response={200: HealthResponse, 503: HealthResponse})
+@api.get("/health", response={200: HealthResponse, 503: HealthResponse}, auth=None)
 async def health_check(request):
     """Health check endpoint verifying API and database operational status asynchronously."""
     try:

@@ -32,6 +32,7 @@ class AuthAPITests(TestCase):
         self.assertEqual(data["display_name"], "New User")
         self.assertEqual(data["timezone"], "America/New_York")
         self.assertIn("id", data)
+        self.assertIsInstance(data["id"], int)
         self.assertIn("created_at", data)
         self.assertNotIn("password", data)
 
@@ -39,6 +40,20 @@ class AuthAPITests(TestCase):
         user = User.objects.get(email="newuser@example.com")
         self.assertTrue(user.check_password("SecurePassword123!"))
         self.assertNotEqual(user.password, "SecurePassword123!")
+
+    def test_register_invalid_email_format(self):
+        """Malformed email string returns 422 Unprocessable Entity."""
+        payload = {
+            "email": "not-a-valid-email",
+            "password": "SecurePassword123!",
+            "display_name": "Invalid Email",
+        }
+        response = self.client.post(
+            self.register_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 422)
 
     def test_register_duplicate_email_conflict(self):
         """Attempting to register with an existing email returns 409 Conflict."""
@@ -120,6 +135,7 @@ class AuthAPITests(TestCase):
         self.assertEqual(data["user"]["email"], "login@example.com")
         self.assertEqual(data["user"]["display_name"], "Login User")
         self.assertEqual(data["user"]["timezone"], "America/Chicago")
+        self.assertIsInstance(data["user"]["id"], int)
 
     def test_login_invalid_password(self):
         """Incorrect password returns 401 Unauthorized."""

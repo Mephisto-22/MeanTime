@@ -1,4 +1,3 @@
-import uuid
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
@@ -15,7 +14,7 @@ class UserModelTests(TestCase):
             display_name="Test User",
             timezone="America/Chicago",
         )
-        self.assertIsInstance(user.id, uuid.UUID)
+        self.assertIsInstance(user.id, int)
         self.assertEqual(user.email, "test@example.com")
         self.assertEqual(user.display_name, "Test User")
         self.assertEqual(user.timezone, "America/Chicago")

@@ -3,7 +3,6 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from ninja import Router
-from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.tokens import RefreshToken
 
 from users.schemas import (
@@ -111,7 +110,6 @@ def refresh_token(request, payload: RefreshIn):
 @auth_router.get(
     "/me",
     response={200: UserOut, 401: ErrorDetail},
-    auth=JWTAuth(),
     summary="Get current authenticated user profile",
 )
 def me(request):

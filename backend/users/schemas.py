@@ -1,18 +1,31 @@
-import uuid
 import zoneinfo
 from datetime import datetime
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from ninja import Schema
-from pydantic import EmailStr, Field, field_validator
+from pydantic import Field, field_validator
 
 
 class RegisterIn(Schema):
     """Payload for user registration."""
 
-    email: EmailStr
+    email: str
     password: str = Field(..., min_length=8, max_length=128)
     display_name: str = Field(..., min_length=1, max_length=50)
     timezone: str = "UTC"
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Email is required.")
+        normalized = v.strip().lower()
+        try:
+            validate_email(normalized)
+        except DjangoValidationError as err:
+            raise ValueError("Enter a valid email address.") from err
+        return normalized
 
     @field_validator("timezone")
     @classmethod
@@ -25,8 +38,15 @@ class RegisterIn(Schema):
 class LoginIn(Schema):
     """Payload for user login."""
 
-    email: EmailStr
+    email: str
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_login_email(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Email is required.")
+        return v.strip().lower()
 
 
 class RefreshIn(Schema):
@@ -38,7 +58,7 @@ class RefreshIn(Schema):
 class UserOut(Schema):
     """Public user profile returned in responses."""
 
-    id: uuid.UUID
+    id: int
     email: str
     display_name: str
     timezone: str

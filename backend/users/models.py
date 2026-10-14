@@ -1,4 +1,3 @@
-import uuid
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 
@@ -8,7 +7,6 @@ from users.managers import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     """Custom User model for MeanTime."""
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, max_length=254, db_index=True)
     display_name = models.CharField(max_length=50)
     timezone = models.CharField(max_length=63, default="UTC")
@@ -43,4 +41,3 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
-
