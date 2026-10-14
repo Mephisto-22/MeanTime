@@ -18,38 +18,40 @@
     </div>
 
     <!-- Draggable Tasks Container -->
-    <VueDraggable
-      v-model="tasks"
-      data-testid="kanban-tasks-container"
-      :data-column-id="column.id"
-      group="kanban-tasks"
-      :animation="150"
-      draggable="[data-testid='kanban-task']"
-      ghost-class="kanban-task-ghost"
-      drag-class="kanban-task-drag"
-      chosen-class="kanban-task-chosen"
-      :delay="200"
-      :delay-on-touch-only="true"
-      :empty-insert-threshold="10"
-      class="flex flex-1 min-h-[120px] flex-col gap-2 overflow-y-auto"
-      @update="onUpdate"
-      @add="onAdd"
-    >
+    <div class="relative flex flex-1 min-h-[120px] flex-col overflow-y-auto">
       <!-- Empty State Placeholder (Non-draggable, hidden by CSS when ghost hovers) -->
       <div
         v-if="tasks.length === 0"
         data-testid="column-empty-placeholder"
-        class="flex flex-1 min-h-[100px] items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-600"
+        class="absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-600"
       >
         No tasks
       </div>
 
-      <template v-for="task in tasks" :key="task.id">
-        <slot name="task" :task="task">
-          <KanbanTask :task="task" />
-        </slot>
-      </template>
-    </VueDraggable>
+      <VueDraggable
+        v-model="tasks"
+        data-testid="kanban-tasks-container"
+        :data-column-id="column.id"
+        group="kanban-tasks"
+        :animation="150"
+        draggable="[data-testid='kanban-task']"
+        ghost-class="kanban-task-ghost"
+        drag-class="kanban-task-drag"
+        chosen-class="kanban-task-chosen"
+        :delay="200"
+        :delay-on-touch-only="true"
+        :empty-insert-threshold="10"
+        class="flex flex-1 min-h-[120px] flex-col gap-2"
+        @update="onUpdate"
+        @add="onAdd"
+      >
+        <KanbanTask
+          v-for="task in tasks"
+          :key="task.id"
+          :task="task"
+        />
+      </VueDraggable>
+    </div>
   </div>
 </template>
 

@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, provide } from 'vue'
+import { ref, computed, watch, provide, nextTick } from 'vue'
 import type {
   KanbanBoardDto,
   KanbanColumnDto,
@@ -77,6 +77,8 @@ const reindexTasks = (tasks: KanbanTaskDto[]): void => {
 }
 
 const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
+  await nextTick()
+
   const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
   const toCol = localColumns.value.find(col => sameId(col.id, req.toColumnId))
 
@@ -109,15 +111,21 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
     reindexTasks(fromCol.tasks)
   } else {
     const fromIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
+    const toIndex = toCol.tasks.findIndex(t => sameId(t.id, req.taskId))
+
     if (fromIndex !== -1) {
       fromCol.tasks.splice(fromIndex, 1)
     }
-    const toIndex = toCol.tasks.findIndex(t => sameId(t.id, req.taskId))
-    if (toIndex !== -1) {
+
+    if (toIndex === -1) {
+      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
+      toCol.tasks.splice(targetIdx, 0, task)
+    } else if (toIndex !== req.targetOrder) {
       toCol.tasks.splice(toIndex, 1)
+      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
+      toCol.tasks.splice(targetIdx, 0, task)
     }
-    const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
-    toCol.tasks.splice(targetIdx, 0, task)
+
     task.columnId = req.toColumnId
 
     reindexTasks(fromCol.tasks)

@@ -38,6 +38,8 @@
 }
 
 /* Hide empty placeholder when a task ghost is inside the column */
+[data-testid="kanban-column"]:has(.kanban-task-ghost) [data-testid="column-empty-placeholder"],
+[data-testid="kanban-column"]:has(.sortable-ghost) [data-testid="column-empty-placeholder"],
 [data-testid="kanban-tasks-container"]:has(.kanban-task-ghost) [data-testid="column-empty-placeholder"],
 [data-testid="kanban-tasks-container"]:has(.sortable-ghost) [data-testid="column-empty-placeholder"] {
   display: none !important;
