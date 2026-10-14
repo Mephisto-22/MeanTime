@@ -40,6 +40,11 @@ class AuthAPITests(TestCase):
         user = User.objects.get(email="newuser@example.com")
         self.assertTrue(user.check_password("SecurePassword123!"))
         self.assertNotEqual(user.password, "SecurePassword123!")
+        self.assertTrue(
+            user.password.startswith("bcrypt_sha256$$2b$12$")
+            or user.password.startswith("bcrypt$$2b$12$"),
+            f"Expected bcrypt with salt 12, got: {user.password[:30]}",
+        )
 
     def test_register_invalid_email_format(self):
         """Malformed email string returns 422 Unprocessable Entity."""

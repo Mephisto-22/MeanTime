@@ -24,6 +24,11 @@ class UserModelTests(TestCase):
         self.assertIsNotNone(user.created_at)
         self.assertTrue(user.check_password("securePassword123!"))
         self.assertNotEqual(user.password, "securePassword123!")
+        self.assertTrue(
+            user.password.startswith("bcrypt_sha256$$2b$12$")
+            or user.password.startswith("bcrypt$$2b$12$"),
+            f"Expected bcrypt with salt 12, got: {user.password[:30]}",
+        )
 
     def test_create_user_default_timezone(self):
         """Timezone should default to UTC when unspecified."""

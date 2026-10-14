@@ -6,27 +6,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Read required environment variables without default fallback credentials
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
-USE_SQLITE_FOR_TESTS = os.environ.get("USE_SQLITE_FOR_TESTS") == "1"
-
 db_name = os.environ.get("POSTGRES_DB")
 db_user = os.environ.get("POSTGRES_USER")
 db_password = os.environ.get("POSTGRES_PASSWORD")
 db_host = os.environ.get("POSTGRES_HOST")
 db_port = os.environ.get("POSTGRES_PORT")
 
-if USE_SQLITE_FOR_TESTS:
-    required_vars = [("DJANGO_SECRET_KEY", SECRET_KEY)]
-else:
-    required_vars = [
+missing_vars = [
+    var for var, val in [
         ("DJANGO_SECRET_KEY", SECRET_KEY),
         ("POSTGRES_DB", db_name),
         ("POSTGRES_USER", db_user),
         ("POSTGRES_PASSWORD", db_password),
         ("POSTGRES_HOST", db_host),
         ("POSTGRES_PORT", db_port),
-    ]
-
-missing_vars = [var for var, val in required_vars if not val]
+    ] if not val
+]
 if missing_vars:
     raise RuntimeError(
         f"Missing required environment variables in settings: {', '.join(missing_vars)}. "
@@ -85,25 +80,25 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# Database configuration: PostgreSQL with psycopg3 (or SQLite for local test runs)
-if USE_SQLITE_FOR_TESTS:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
-        }
+# Database configuration: PostgreSQL with psycopg3
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": db_name,
+        "USER": db_user,
+        "PASSWORD": db_password,
+        "HOST": db_host,
+        "PORT": db_port,
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": db_name,
-            "USER": db_user,
-            "PASSWORD": db_password,
-            "HOST": db_host,
-            "PORT": db_port,
-        }
-    }
+}
+
+# Password hashing: bcrypt with salt rounds/work factor of 12
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.BCryptPasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
 
 NINJA_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
