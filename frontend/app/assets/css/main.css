@@ -12,7 +12,7 @@
 /* Kanban Drag and Drop Styles */
 .kanban-task-ghost {
   opacity: 0.4 !important;
-  border: 2px dashed #3b82f6 !important;
+  border: 2px dashed var(--p-primary-500, #3b82f6) !important;
   background-color: rgba(59, 130, 246, 0.08) !important;
   box-shadow: none !important;
   border-radius: 0.5rem !important;
@@ -31,10 +31,9 @@
 }
 
 /* Hovered column active drop-target highlight */
-[data-testid="kanban-column"].is-drop-target,
 [data-testid="kanban-column"]:has(.kanban-task-ghost),
 [data-testid="kanban-column"]:has(.sortable-ghost) {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--p-primary-500, #3b82f6);
   outline-offset: -2px;
 }
 

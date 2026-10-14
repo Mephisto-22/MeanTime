@@ -69,24 +69,24 @@ function setupBoard(initialBoard, { mockMoveTask } = {}) {
   }
 }
 
-test('Task card: renders task name and grab cursor without three-dot menu button or popup menu', () => {
+test('Task component: renders task name and grab cursor without three-dot menu button or popup menu', () => {
   assert.equal(
     taskSource.includes('task-action-menu-button'),
     false,
-    'Task card should no longer render task-action-menu-button',
+    'Task component should no longer render task-action-menu-button',
   )
   assert.equal(
     taskSource.includes('<Menu'),
     false,
-    'Task card should no longer render PrimeVue Menu component',
+    'Task component should no longer render PrimeVue Menu component',
   )
   assert.ok(
     taskSource.includes('cursor-grab'),
-    'Task card should include cursor-grab class for tactile cue',
+    'Task component should include cursor-grab class for tactile cue',
   )
   assert.ok(
     taskSource.includes('data-testid="kanban-task"'),
-    'Task card must retain data-testid="kanban-task"',
+    'Task component must retain data-testid="kanban-task"',
   )
 })
 
@@ -346,7 +346,7 @@ test('Column component: configured with VueDraggable, animations, touch delay, g
     'Column must provide empty placeholder with data-testid="column-empty-placeholder"',
   )
   assert.ok(
-    columnSource.includes('is-drop-target') || columnSource.includes('ring-') || columnSource.includes('border-primary'),
+    readFileSync(resolve(__dirname, '../app/assets/css/main.css'), 'utf8').includes('[data-testid="kanban-column"]:has(.kanban-task-ghost)'),
     'Column must support drop-target highlight',
   )
 })
@@ -451,28 +451,23 @@ test('Column component event dispatching: onAdd across columns dispatches moveTa
   })
 })
 
-test('Column drag states: dragenter activates drop-target highlight and hides empty placeholder; dragleave resets state', () => {
-  const emptyColumnData = {
-    id: 'col-empty',
-    name: 'Empty Column',
-    order: 2,
-    boardId: 'b1',
-    tasks: [],
-  }
-
-  const { instance } = setupColumn(emptyColumnData)
-
-  assert.equal(instance.isDropTarget.value, false)
-  assert.equal(instance.isGhostHovering.value, false)
-
-  // Drag enters empty column
-  instance.onDragEnter()
-  assert.equal(instance.isDropTarget.value, true)
-  assert.equal(instance.isGhostHovering.value, true)
-
-  // Drag leaves empty column
-  instance.onDragLeave()
-  assert.equal(instance.isDropTarget.value, false)
-  assert.equal(instance.isGhostHovering.value, false)
+test('Column drag states and placeholder styling: CSS hides empty placeholder when ghost card is present and activates drop target outline', () => {
+  const cssSource = readFileSync(resolve(__dirname, '../app/assets/css/main.css'), 'utf8')
+  assert.ok(
+    cssSource.includes(':has(.kanban-task-ghost)') && cssSource.includes('[data-testid="column-empty-placeholder"]'),
+    'main.css must hide column-empty-placeholder when a ghost card is hovering',
+  )
+  assert.ok(
+    cssSource.includes('[data-testid="kanban-column"]:has(.kanban-task-ghost)'),
+    'main.css must apply drop-target outline when a ghost card is hovering over the column',
+  )
+  assert.ok(
+    cssSource.includes('.kanban-task-ghost') && cssSource.includes('dashed'),
+    'main.css must define dashed translucent ghost placeholder',
+  )
+  assert.ok(
+    cssSource.includes('.kanban-task-drag') && cssSource.includes('rotate'),
+    'main.css must define active dragged card tilt and elevated shadow',
+  )
 })
 

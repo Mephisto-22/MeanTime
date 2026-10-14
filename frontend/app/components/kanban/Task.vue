@@ -14,10 +14,9 @@
 </template>
 
 <script setup lang="ts">
-import type { KanbanColumnSummary, KanbanTaskDto } from '~/api/kanban'
+import type { KanbanTaskDto } from '~/api/kanban'
 
 defineProps<{
   task: KanbanTaskDto
-  columns?: KanbanColumnSummary[]
 }>()
 </script>

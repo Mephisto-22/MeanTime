@@ -68,6 +68,8 @@ const columnRegistry = computed<KanbanColumnSummary[]>(() => {
   }))
 })
 
+const sameId = (a: string | number, b: string | number): boolean => String(a) === String(b)
+
 const reindexTasks = (tasks: KanbanTaskDto[]): void => {
   tasks.forEach((t, i) => {
     t.order = i
@@ -75,20 +77,20 @@ const reindexTasks = (tasks: KanbanTaskDto[]): void => {
 }
 
 const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
-  const fromCol = localColumns.value.find(col => String(col.id) === String(req.fromColumnId))
-  const toCol = localColumns.value.find(col => String(col.id) === String(req.toColumnId))
+  const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
+  const toCol = localColumns.value.find(col => sameId(col.id, req.toColumnId))
 
   if (!fromCol || !toCol) {
     return
   }
 
-  let task = fromCol.tasks.find(t => String(t.id) === String(req.taskId))
+  let task = fromCol.tasks.find(t => sameId(t.id, req.taskId))
   if (!task) {
-    task = toCol.tasks.find(t => String(t.id) === String(req.taskId))
+    task = toCol.tasks.find(t => sameId(t.id, req.taskId))
   }
   if (!task) {
     for (const col of localColumns.value) {
-      task = col.tasks.find(t => String(t.id) === String(req.taskId))
+      task = col.tasks.find(t => sameId(t.id, req.taskId))
       if (task) break
     }
   }
@@ -97,8 +99,8 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
     return
   }
 
-  if (String(req.fromColumnId) === String(req.toColumnId)) {
-    const currentIndex = fromCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+  if (sameId(req.fromColumnId, req.toColumnId)) {
+    const currentIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
     if (currentIndex !== -1 && currentIndex !== req.targetOrder) {
       fromCol.tasks.splice(currentIndex, 1)
       const targetIdx = Math.max(0, Math.min(req.targetOrder, fromCol.tasks.length))
@@ -106,11 +108,11 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
     }
     reindexTasks(fromCol.tasks)
   } else {
-    const fromIndex = fromCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+    const fromIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
     if (fromIndex !== -1) {
       fromCol.tasks.splice(fromIndex, 1)
     }
-    const toIndex = toCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+    const toIndex = toCol.tasks.findIndex(t => sameId(t.id, req.taskId))
     if (toIndex !== -1) {
       toCol.tasks.splice(toIndex, 1)
     }
