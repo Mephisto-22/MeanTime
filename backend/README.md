@@ -255,12 +255,30 @@ Django Ninja automatically inspects your type annotations, docstrings, and schem
 
 ---
 
+## Managing Dependencies & Rebuilding Containers
+
+Backend dependencies are declared in `pyproject.toml`. Because packages are installed into the container image during the Docker build process, **whenever dependencies are added or modified (such as `django-ninja-jwt`), you must rebuild the container**:
+
+```bash
+# Rebuild and restart only the backend container:
+docker compose up -d --build backend
+
+# Or rebuild all containers across the stack:
+docker compose up -d --build
+```
+
+> [!IMPORTANT]
+> **Keep Dependencies Minimal**: Prefer built-in Python and Django standard library tools whenever possible (e.g., `django.core.validators.validate_email` and `zoneinfo` instead of adding unnecessary third-party packages).
+
+---
+
 ## Common Development Commands
 
 All development commands should be executed inside the running container using `docker compose exec`:
 
 | Action | Command |
 |---|---|
+| **Rebuild Backend Container** | `docker compose up -d --build backend` |
 | **Create a new Django app** | `docker compose exec backend python manage.py startapp <app_name>` |
 | **Generate migration files** | `docker compose exec backend python manage.py makemigrations` |
 | **Apply migrations** | `docker compose exec backend python manage.py migrate` |
