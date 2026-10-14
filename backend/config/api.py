@@ -1,12 +1,38 @@
 from asgiref.sync import sync_to_async
 from django.db import connection
 from ninja import NinjaAPI, Schema
+from ninja_extra.exceptions import APIException
+from ninja_jwt.authentication import JWTAuth
+from users.api import auth_router
 
 api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
     description="MeanTime API service with Django Ninja",
+    auth=JWTAuth(),
 )
+
+
+@api.exception_handler(APIException)
+def api_exception_handler(request, exc):
+    """Handle exceptions raised by ninja_extra and ninja_jwt components."""
+    headers = {}
+    if getattr(exc, "auth_header", None):
+        headers["WWW-Authenticate"] = exc.auth_header
+    detail = getattr(exc, "detail", str(exc))
+    if isinstance(detail, dict) and "detail" in detail:
+        detail = detail["detail"]
+    elif not isinstance(detail, (str, dict, list)):
+        detail = str(exc)
+    return api.create_response(
+        request,
+        {"detail": detail},
+        status=getattr(exc, "status_code", 400),
+        headers=headers,
+    )
+
+
+api.add_router("/auth", auth_router, tags=["Authentication"])
 
 
 class HealthResponse(Schema):
@@ -21,7 +47,7 @@ def _check_database() -> bool:
         return row is not None and row[0] == 1
 
 
-@api.get("/health", response={200: HealthResponse, 503: HealthResponse})
+@api.get("/health", response={200: HealthResponse, 503: HealthResponse}, auth=None)
 async def health_check(request):
     """Health check endpoint verifying API and database operational status asynchronously."""
     try:
