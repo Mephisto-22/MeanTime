@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import type { LoginRequest } from '~/api/auth'
-import { useAuthStore } from '~/stores/useAuthStore'
+import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
 const route = useRoute()

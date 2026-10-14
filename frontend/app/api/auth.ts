@@ -1,5 +1,5 @@
 import { apiService } from '~/services/ApiService'
-import type { User } from '~/stores/useAuthStore'
+import type { User } from '~/stores/auth'
 
 export interface LoginRequest {
   email: string
@@ -7,19 +7,27 @@ export interface LoginRequest {
 }
 
 export interface RegistrationRequest extends LoginRequest {
-  username: string
+  display_name: string
+  timezone?: string
 }
 
 export interface AuthTokens {
-  access: string
-  refresh: string
+  access_token: string
+  refresh_token: string
 }
 
 export interface LoginResponse extends AuthTokens {
-  user: User
+  token_type: string
+  expires_in: number
 }
 
-// Provisional contract: align these routes and token keys with the backend auth API.
+export interface RefreshResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+}
+
+// Matches backend/users/schemas.py; user profiles are fetched separately via /me.
 export class AuthApi {
   readonly endpoint = '/api/auth'
 
@@ -27,8 +35,18 @@ export class AuthApi {
     return apiService.post<LoginResponse>(`${this.endpoint}/login`, credentials)
   }
 
-  async register(details: RegistrationRequest): Promise<void> {
-    await apiService.post(`${this.endpoint}/register`, details)
+  register(details: RegistrationRequest): Promise<User> {
+    return apiService.post<User>(`${this.endpoint}/register`, details)
+  }
+
+  refresh(refreshToken: string): Promise<RefreshResponse> {
+    return apiService.post<RefreshResponse>(`${this.endpoint}/refresh`, { refresh_token: refreshToken })
+  }
+
+  me(accessToken: string): Promise<User> {
+    return apiService.get<User>(`${this.endpoint}/me`, undefined, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
   }
 }
 

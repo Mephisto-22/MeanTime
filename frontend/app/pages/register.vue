@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import type { RegistrationRequest } from '~/api/auth'
-import { useAuthStore } from '~/stores/useAuthStore'
+import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
 const loading = ref(false)
