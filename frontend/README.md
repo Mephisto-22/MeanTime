@@ -352,6 +352,16 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+### Authentication frontend
+
+- `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates home only after that succeeds.
+- `/register` submits `display_name`, email, and password (optional `timezone`, default UTC), then redirects to login.
+- `app/api/auth.ts` matches `backend/users/schemas.py`: login returns `access_token`, `refresh_token`, `token_type`, and `expires_in`; registration and `/me` return `UserOut`. The frontend does not rely on the backend's current extra login `user` field.
+- `app/stores/auth.ts` exports `useAuthStore`, `User`, and `AuthState`. Only access and refresh tokens persist under `meantime.auth`. User details and `isAuthenticated` are never stored locally. Old saved profiles are discarded on restoration.
+- After client hydration, the store restores tokens and fetches `/me` with a bearer header. A 401 triggers `/refresh` with `refresh_token`, persists the new access token, and retries `/me` once. Rejected credentials clear the session. Temporary network errors retain tokens for retry while leaving the user unauthenticated.
+- `setUser` stores profiles in memory; `clearTokens` removes the whole session. General protected-page middleware and automatic retries for other API services remain future tasks.
+- Run auth tests with `node --test tests/auth-store.test.cjs` inside the frontend container.
+
 Run via Docker Compose at the project root:
 
 ```bash
