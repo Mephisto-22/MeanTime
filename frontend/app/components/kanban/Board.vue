@@ -75,41 +75,72 @@ const reindexTasks = (tasks: KanbanTaskDto[]): void => {
 }
 
 const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
-  const fromCol = localColumns.value.find(col => col.id === req.fromColumnId)
-  const toCol = localColumns.value.find(col => col.id === req.toColumnId)
+  const fromCol = localColumns.value.find(col => String(col.id) === String(req.fromColumnId))
+  const toCol = localColumns.value.find(col => String(col.id) === String(req.toColumnId))
 
   if (!fromCol || !toCol) {
     return
   }
 
-  const taskIndex = fromCol.tasks.findIndex(t => t.id === req.taskId)
-  if (taskIndex === -1) {
-    return
+  let task = fromCol.tasks.find(t => String(t.id) === String(req.taskId))
+  if (!task) {
+    task = toCol.tasks.find(t => String(t.id) === String(req.taskId))
+  }
+  if (!task) {
+    for (const col of localColumns.value) {
+      task = col.tasks.find(t => String(t.id) === String(req.taskId))
+      if (task) break
+    }
   }
 
-  const [task] = fromCol.tasks.splice(taskIndex, 1)
   if (!task) {
     return
   }
-  task.columnId = req.toColumnId
-  task.order = toCol.tasks.length
-  toCol.tasks.push(task)
 
-  reindexTasks(fromCol.tasks)
-  reindexTasks(toCol.tasks)
+  if (String(req.fromColumnId) === String(req.toColumnId)) {
+    const currentIndex = fromCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+    if (currentIndex !== -1 && currentIndex !== req.targetOrder) {
+      fromCol.tasks.splice(currentIndex, 1)
+      const targetIdx = Math.max(0, Math.min(req.targetOrder, fromCol.tasks.length))
+      fromCol.tasks.splice(targetIdx, 0, task)
+    }
+    reindexTasks(fromCol.tasks)
+  } else {
+    const fromIndex = fromCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+    if (fromIndex !== -1) {
+      fromCol.tasks.splice(fromIndex, 1)
+    }
+    const toIndex = toCol.tasks.findIndex(t => String(t.id) === String(req.taskId))
+    if (toIndex !== -1) {
+      toCol.tasks.splice(toIndex, 1)
+    }
+    const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
+    toCol.tasks.splice(targetIdx, 0, task)
+    task.columnId = req.toColumnId
+
+    reindexTasks(fromCol.tasks)
+    reindexTasks(toCol.tasks)
+  }
 
   try {
     await kanbanApi.moveTask({
-      ...req,
-      targetOrder: task.order,
+      taskId: req.taskId,
+      fromColumnId: req.fromColumnId,
+      toColumnId: req.toColumnId,
+      targetOrder: req.targetOrder,
     })
   } catch (err) {
-    console.error('Failed to persist task movement:', err)
+    console.warn('Failed to persist task movement:', err)
   }
 }
 
 provide(kanbanContextKey, {
   columns: columnRegistry,
   moveTask: handleMoveTask,
+})
+
+defineExpose({
+  localColumns,
+  handleMoveTask,
 })
 </script>
