@@ -41,7 +41,6 @@ def get_owned_task(user, task_id: int) -> Task:
     )
 
 
-
 # -----------------
 # Board Endpoints
 # -----------------

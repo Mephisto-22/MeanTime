@@ -7,6 +7,8 @@ from users.api import auth_router
 
 from kanban.api import router as kanban_router
 
+from kanban.api import router as kanban_router
+
 api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
