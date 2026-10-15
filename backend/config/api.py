@@ -15,7 +15,7 @@ api = NinjaAPI(
 )
 
 # router registrations (import above)
-api.add_router("/kanban/", kanban_router)
+api.add_router("/kanban", kanban_router)
 
 @api.exception_handler(APIException)
 def api_exception_handler(request, exc):

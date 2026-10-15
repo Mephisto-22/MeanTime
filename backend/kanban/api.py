@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from ninja_jwt.authentication import JWTAuth
+from django.db.models import Prefetch
 from ninja import Router
 from .models import Board, BoardColumn, Task, TaskTimeEntry
 from .schemas import (
@@ -11,7 +13,7 @@ from .schemas import (
     TaskMoveIn,
 )
 
-router = Router(tags=["Kanban"])
+router = Router(tags=["Kanban"], auth=JWTAuth())
 
 # Helpers
 
@@ -25,7 +27,7 @@ def get_owned_board(user, board_id: int) -> Board:
 def get_owned_column(user, column_id: int) -> BoardColumn:
     """Retrieve a column belonging to the authenticated user."""
     return get_object_or_404(
-        BoardColumn.objects.filter(board_owner=user),
+        BoardColumn.objects.filter(board__owner=user),
         id=column_id
     )
 
@@ -37,6 +39,7 @@ def get_owned_task(user, task_id: int) -> Task:
         ),
         id=task_id
     )
+
 
 
 # -----------------
@@ -59,10 +62,13 @@ def create_board(request, payload: BoardIn):
 @router.get("/boards/{board_id}", response=BoardOut)
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
-    # TODO: require authentication
+    board = get_object_or_404(
+        Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks"),
+        id=board_id,
+    )
+    return board
     # TODO: fetch only a board owned by the authenticated user
-    # TODO: use prefetch_related("columns_tasks")
-    pass
+    # TODO: use prefetch_related("columns__tasks")
 
 
 @router.patch("/boards/{board_id}", response=BoardOut)
@@ -84,7 +90,7 @@ def delete_board(request, board_id: int):
 # Column Endpoints
 # -----------------
 
-@router.post("boards/{board_id}/columns", response=BoardColumnOut)
+@router.post("/boards/{board_id}/columns", response=BoardColumnOut)
 def create_column(request, board_id: int, payload: BoardColumnIn):
     """Create a column on a board owned by the authenticated user."""
     # TODO: require authentication
@@ -134,7 +140,7 @@ def delete_task(request, task_id: int):
     # TODO: delete the task
     return {"success": True}
 
-router.post("/tasks/{task_id}/move", response=TaskOut)
+@router.post("/tasks/{task_id}/move", response=TaskOut)
 def move_task(request, task_id: int, payload: TaskMoveIn):
     """Move a task to another column and position."""
     # TODO: require authentication and verify task ownership
