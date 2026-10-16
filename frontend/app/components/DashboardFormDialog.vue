@@ -97,6 +97,7 @@ interface Props {
   dashboard: Dashboard | null;
 }
 
+// Matches the max_length of Board.title in backend/kanban/models.py.
 const NAME_MAX_LENGTH = 100;
 
 const props = defineProps<Props>();

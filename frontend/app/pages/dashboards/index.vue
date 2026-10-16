@@ -100,6 +100,11 @@ import {dashboardApi, type Dashboard} from '~/api';
 
 const dashboardsStore = useDashboardsStore();
 
+// TODO: Once the list comes from the backend, it needs the user's access
+// token. The token is only restored in the browser after the page loads
+// (plugins/auth.client.ts), so this server-side load would be rejected. Load
+// the list on the client instead (useAsyncData's `server: false` option), and
+// send logged-out users to /login.
 const {status, error, refresh} = await useAsyncData(
   'dashboards-list',
   async () => {
