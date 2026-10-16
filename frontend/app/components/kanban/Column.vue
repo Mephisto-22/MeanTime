@@ -1,0 +1,56 @@
+<template>
+  <div
+    data-testid="kanban-column"
+    :data-column-id="column.id"
+    class="flex h-[50vh] flex-1 min-w-64 max-w-xs flex-col rounded-lg bg-surface-100 p-3 dark:bg-surface-800"
+  >
+    <!-- Column Header -->
+    <div class="mb-3 flex shrink-0 items-center justify-between">
+      <h3 class="text-sm font-semibold">
+        {{ column.name }}
+      </h3>
+      <Tag
+        data-testid="column-task-count"
+        :value="column.tasks.length"
+        severity="secondary"
+        rounded
+      />
+    </div>
+
+    <!-- Empty State Placeholder -->
+    <div
+      v-if="sortedTasks.length === 0"
+      data-testid="column-empty-placeholder"
+      class="flex flex-1 items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 dark:border-surface-600"
+    >
+      No tasks
+    </div>
+
+    <!-- Task List -->
+    <div v-else class="flex flex-1 flex-col gap-2 overflow-y-auto">
+      <template v-for="task in sortedTasks" :key="task.id">
+        <slot name="task" :task="task">
+          <KanbanTask :task="task" :columns="columns" />
+        </slot>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/api/kanban'
+
+const props = defineProps<{
+  column: KanbanColumnDto
+  columns?: KanbanColumnSummary[]
+}>()
+
+defineSlots<{
+  task?: (props: { task: KanbanTaskDto }) => any
+}>()
+
+const sortedTasks = computed(() => {
+  return [...props.column.tasks].sort((a, b) => a.order - b.order)
+})
+</script>

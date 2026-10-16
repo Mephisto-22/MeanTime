@@ -1,7 +1,7 @@
 FROM node:22-alpine
 
-# Install curl for container inspection and libc6-compat for native binary compatibility
-RUN apk add --no-cache curl libc6-compat
+# Install curl for container inspection, libc6-compat for native binary compatibility, and rsync for host synchronization
+RUN apk add --no-cache curl libc6-compat rsync
 
 # Install pnpm pinned to modern release
 RUN npm install -g pnpm@12.8.1
