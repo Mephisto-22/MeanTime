@@ -1,8 +1,15 @@
 import { useAuthStore } from '~/stores/auth'
+import { apiService } from '~/services/ApiService'
 
 export default defineNuxtPlugin((nuxtApp) => {
-  // Restore after hydration so client markup initially matches the server.
+  const auth = useAuthStore()
+  apiService.setAuthHandler({
+    getAccessToken: () => auth.accessToken,
+    refresh: () => auth.refresh(),
+    expireSession: () => auth.expireSession(),
+  })
+  // Middleware initializes before protected navigation; public pages restore too.
   nuxtApp.hook('app:mounted', async () => {
-    await useAuthStore().restoreSession()
+    await auth.initializeSession()
   })
 })

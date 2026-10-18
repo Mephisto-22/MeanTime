@@ -21,6 +21,8 @@
 import type { LoginRequest } from '~/api/auth'
 import { useAuthStore } from '~/stores/auth'
 
+definePageMeta({ public: true })
+
 const authStore = useAuthStore()
 const route = useRoute()
 const loading = ref(false)
@@ -32,7 +34,12 @@ async function login(credentials: LoginRequest) {
   error.value = ''
   try {
     await authStore.login(credentials)
-    await navigateTo('/')
+    const redirect = route.query.redirect
+    // Only allow same-app paths; never navigate to an external redirect target.
+    const destination = typeof redirect === 'string' && redirect.startsWith('/') &&
+      !redirect.startsWith('//') && !redirect.includes('\\') &&
+      !/^\/(login|register)(?:[/?#]|$)/.test(redirect) ? redirect : '/'
+    await navigateTo(destination)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to log in. Please try again.'
   } finally {

@@ -6,6 +6,14 @@
 
 export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'method' | 'body' | 'query'> {
   headers?: Record<string, string>
+  /** Disable automatic bearer authentication for public/authentication endpoints. */
+  auth?: boolean
+}
+
+export interface ApiAuthHandler {
+  getAccessToken(): string | null
+  refresh(): Promise<void>
+  expireSession(): Promise<void>
 }
 
 export class ApiError extends Error {
@@ -21,6 +29,12 @@ export class ApiError extends Error {
 }
 
 export class ApiService {
+  private authHandler?: ApiAuthHandler
+
+  setAuthHandler(handler: ApiAuthHandler) {
+    this.authHandler = handler
+  }
+
   /**
    * Base request executor with uniform error normalization and default headers.
    */
@@ -31,18 +45,43 @@ export class ApiService {
     options: ApiRequestOptions = {},
   ): Promise<T> {
     const isBodyMethod = method === 'POST' || method === 'PUT'
+    const { auth = true, headers, ...fetchOptions } = options
+    // Never send application tokens to arbitrary external URLs.
+    const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
+    const sentToken = handler?.getAccessToken()
+    const execute = (token?: string | null) => $fetch<T>(endpoint, {
+      ...fetchOptions,
+      method,
+      retry: 0,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: isBodyMethod ? data : undefined,
+      query: !isBodyMethod ? data : undefined,
+    })
 
     try {
-      return await $fetch<T>(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        body: isBodyMethod ? data : undefined,
-        query: !isBodyMethod ? data : undefined,
-        ...options,
-      })
+      try {
+        return await execute(sentToken)
+      } catch (error: any) {
+        if (!handler || (error.statusCode || error.response?.status) !== 401) throw error
+        if (!sentToken || !handler.getAccessToken()) {
+          await handler.expireSession()
+          throw error
+        }
+        // Another concurrent request may have already refreshed this token.
+        if (handler.getAccessToken() === sentToken) await handler.refresh()
+        const updatedToken = handler.getAccessToken()
+        if (!updatedToken) throw error
+        try {
+          return await execute(updatedToken)
+        } catch (retryError: any) {
+          if ((retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
+          throw retryError
+        }
+      }
     } catch (err: any) {
       const statusCode = err.statusCode || err.response?.status || 500
       const errorData = err.data || err.response?._data

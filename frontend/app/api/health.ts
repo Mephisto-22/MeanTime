@@ -16,7 +16,7 @@ export class HealthApi {
    * Asynchronously calls GET /api/health to retrieve API and database health status.
    */
   async checkHealth(params?: HealthRequest): Promise<HealthResponse> {
-    return await apiService.get<HealthResponse>(this.endpoint, params)
+    return await apiService.get<HealthResponse>(this.endpoint, params, { auth: false })
   }
 }
 
