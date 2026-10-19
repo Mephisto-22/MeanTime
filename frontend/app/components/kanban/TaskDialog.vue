@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { KanbanTaskDto } from '~/api/kanban'
+import type { KanbanTaskDto, TaskDialogSavePayload } from '~/api/kanban'
 
 interface Props {
   visible?: boolean
@@ -75,13 +75,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
-  (e: 'save', payload: {
-    title: string
-    description: string
-    mode: 'create' | 'edit'
-    columnId?: string | number | null
-    taskId?: string | number | null
-  }): void
+  (e: 'save', payload: TaskDialogSavePayload): void
   (e: 'cancel'): void
 }>()
 

@@ -24,7 +24,7 @@
       </div>
 
       <!-- Centralized Task Dialog -->
-      <TaskDialog
+      <KanbanTaskDialog
         v-model:visible="isTaskDialogOpen"
         :mode="dialogMode"
         :task="activeTask"
@@ -43,6 +43,7 @@ import type {
   KanbanColumnSummary,
   KanbanTaskDto,
   TaskMoveContext,
+  TaskDialogSavePayload,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -210,13 +211,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
   }
 }
 
-const handleSaveTask = async (savePayload: {
-  title: string
-  description: string
-  mode: 'create' | 'edit'
-  columnId?: string | number | null
-  taskId?: string | number | null
-}): Promise<void> => {
+const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
   if (savePayload.mode === 'create' && savePayload.columnId != null) {
     await handleCreateTask(savePayload.columnId, {
       title: savePayload.title,

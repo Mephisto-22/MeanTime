@@ -46,6 +46,14 @@ export interface TaskMoveContext {
   targetPosition: number
 }
 
+export interface TaskDialogSavePayload {
+  title: string
+  description: string
+  mode: 'create' | 'edit'
+  columnId?: string | number | null
+  taskId?: string | number | null
+}
+
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
   moveTask: (req: TaskMoveContext) => Promise<void> | void

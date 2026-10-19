@@ -326,3 +326,51 @@ test('Board openEditTaskDialog initializes edit state and discard issues zero ba
   assert.equal(exposed.localColumns.value[0].tasks[0].title, 'Original Task Title')
   assert.equal(exposed.localColumns.value[0].tasks[0].description, 'Original Description')
 })
+
+test('TaskDialog opening and closing transitions reset form cleanly on reopen', async () => {
+  const { exposed, props } = setupTaskDialog({
+    visible: true,
+    mode: 'create',
+    columnId: 'col-1',
+    task: null,
+  })
+
+  // Dirty fields in create mode
+  exposed.title.value = 'Abandoned draft'
+  exposed.description.value = 'Abandoned note'
+
+  // Transition to closed
+  props.visible = false
+  await vue.nextTick()
+  assert.equal(exposed.isVisible.value, false)
+
+  // Re-open in create mode
+  props.visible = true
+  await vue.nextTick()
+  assert.equal(exposed.isVisible.value, true)
+  assert.equal(exposed.title.value, '', 'Re-opening create mode must reset title to blank')
+  assert.equal(exposed.description.value, '', 'Re-opening create mode must reset description to blank')
+  assert.equal(exposed.isSaveDisabled.value, true, 'Save button must be disabled upon reopen')
+})
+
+test('TaskDialog updates form dynamically when active task prop changes while dialog is open', async () => {
+  const task1 = { id: 't-1', title: 'Task 1', description: 'Desc 1', position: 0, columnId: 'col-1' }
+  const task2 = { id: 't-2', title: 'Task 2', description: 'Desc 2', position: 1, columnId: 'col-1' }
+
+  const { exposed, props } = setupTaskDialog({
+    visible: true,
+    mode: 'edit',
+    columnId: 'col-1',
+    task: task1,
+  })
+
+  assert.equal(exposed.title.value, 'Task 1')
+  assert.equal(exposed.description.value, 'Desc 1')
+
+  // Switch active task prop while open
+  props.task = task2
+  await vue.nextTick()
+  assert.equal(exposed.title.value, 'Task 2')
+  assert.equal(exposed.description.value, 'Desc 2')
+})
+
