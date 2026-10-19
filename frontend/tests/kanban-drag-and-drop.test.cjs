@@ -120,12 +120,12 @@ test('Vertical drag within column: reorders task at designated index, re-indexes
 
   const { context, apiCalls, exposed } = setupBoard(initialBoard)
 
-  // Move t-3 (originally at index 2) to top (targetOrder: 0)
+  // Move t-3 (originally at index 2) to top (targetPosition: 0)
   await context.moveTask({
     taskId: 't-3',
     fromColumnId: 'col-1',
     toColumnId: 'col-1',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 
   const calls = normalize(apiCalls)
@@ -176,12 +176,12 @@ test('Horizontal drag between columns: moves task to target column at index, upd
 
   const { context, apiCalls, exposed } = setupBoard(initialBoard)
 
-  // Drag t-1 from col-1 to col-2 between t-3 and t-4 (targetOrder: 1)
+  // Drag t-1 from col-1 to col-2 between t-3 and t-4 (targetPosition: 1)
   await context.moveTask({
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-2',
-    targetOrder: 1,
+    targetPosition: 1,
   })
 
   const calls = normalize(apiCalls)
@@ -239,7 +239,7 @@ test('Empty column drop mechanics: dropping task into empty column places it at 
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-empty',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 
   const calls = normalize(apiCalls)
@@ -303,7 +303,7 @@ test('Persistence failure: logs warning without throwing or breaking local board
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-2',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 
   assert.equal(warnings.length, 1)
@@ -422,7 +422,7 @@ test('Column component event dispatching: onUpdate within column dispatches move
     taskId: 't-2',
     fromColumnId: 'col-1',
     toColumnId: 'col-1',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 })
 
@@ -453,7 +453,7 @@ test('Column component event dispatching: onAdd across columns dispatches moveTa
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-2',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 })
 

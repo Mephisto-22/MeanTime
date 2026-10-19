@@ -81,13 +81,13 @@ const tasks = computed({
 
 const onUpdate = (event: any) => {
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
-  const targetOrder = event.newDraggableIndex ?? event.newIndex
-  if (taskId !== undefined && targetOrder !== undefined && kanbanContext) {
+  const targetPosition = event.newDraggableIndex ?? event.newIndex
+  if (taskId !== undefined && targetPosition !== undefined && kanbanContext) {
     kanbanContext.moveTask({
       taskId,
       fromColumnId: props.column.id,
       toColumnId: props.column.id,
-      targetOrder,
+      targetPosition,
     })
   }
 }
@@ -97,14 +97,14 @@ const onAdd = (event: any) => {
   const fromColumnId =
     event.from?.getAttribute('data-column-id') ||
     event.from?.closest('[data-column-id]')?.getAttribute('data-column-id')
-  const targetOrder = event.newDraggableIndex ?? event.newIndex
+  const targetPosition = event.newDraggableIndex ?? event.newIndex
 
-  if (taskId !== undefined && fromColumnId !== undefined && targetOrder !== undefined && kanbanContext) {
+  if (taskId !== undefined && fromColumnId !== undefined && targetPosition !== undefined && kanbanContext) {
     kanbanContext.moveTask({
       taskId,
       fromColumnId,
       toColumnId: props.column.id,
-      targetOrder,
+      targetPosition,
     })
   }
 }

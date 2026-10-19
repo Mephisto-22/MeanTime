@@ -5,7 +5,7 @@ const { resolve } = require('node:path')
 const { runInNewContext } = require('node:vm')
 const ts = require('typescript')
 
-function setupKanbanApi() {
+function setupKanbanApi({ mockApiService } = {}) {
   const calls = []
   const exports = {}
   const source = readFileSync(resolve(__dirname, '../app/api/kanban.ts'), 'utf8')
@@ -13,7 +13,7 @@ function setupKanbanApi() {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
 
-  const mockApiService = {
+  const service = mockApiService || {
     get(url, query, options) {
       calls.push({ method: 'GET', url, data: query, options })
       return Promise.resolve({ url, query, options })
@@ -37,7 +37,7 @@ function setupKanbanApi() {
     Symbol,
     require(name) {
       if (name === '~/services/ApiService') {
-        return { apiService: mockApiService }
+        return { apiService: service }
       }
       if (name === 'vue') {
         return { computed: () => {}, ref: () => {} }
@@ -164,6 +164,70 @@ test('KanbanApi routes all 4 Task methods including move to correct paths, verbs
     data: { to_column_id: 102, target_position: 1 },
     options: undefined,
   })
+})
+
+test('KanbanApi integrates with ApiService to dispatch bearer authorization and JSON headers across all verbs', async () => {
+  const fetchCalls = []
+  const apiServiceSource = readFileSync(resolve(__dirname, '../app/services/ApiService.ts'), 'utf8')
+  const compiledApiService = ts.transpileModule(apiServiceSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+
+  const apiServiceExports = {}
+  runInNewContext(compiledApiService, {
+    exports: apiServiceExports,
+    async $fetch(url, options) {
+      fetchCalls.push({ url, options })
+      return { id: 1, ok: true }
+    },
+  })
+
+  const realApiService = apiServiceExports.apiService
+  realApiService.setAuthHandler({
+    getAccessToken: () => 'valid-bearer-token',
+    async refresh() {},
+    async expireSession() {},
+  })
+
+  const { kanbanApi } = setupKanbanApi({ mockApiService: realApiService })
+
+  // GET
+  await kanbanApi.listBoards()
+  const getCall = fetchCalls[fetchCalls.length - 1]
+  assert.equal(getCall.options.method, 'GET')
+  assert.equal(getCall.options.headers.Authorization, 'Bearer valid-bearer-token')
+  assert.equal(getCall.options.headers['Content-Type'], 'application/json')
+
+  // POST
+  await kanbanApi.createBoard({ title: 'New Board' })
+  const postCall = fetchCalls[fetchCalls.length - 1]
+  assert.equal(postCall.options.method, 'POST')
+  assert.equal(postCall.options.headers.Authorization, 'Bearer valid-bearer-token')
+  assert.equal(postCall.options.headers['Content-Type'], 'application/json')
+  assert.deepEqual(postCall.options.body, { title: 'New Board' })
+
+  // PATCH
+  await kanbanApi.updateBoard(1, { title: 'Updated Board' })
+  const patchCall = fetchCalls[fetchCalls.length - 1]
+  assert.equal(patchCall.options.method, 'PATCH')
+  assert.equal(patchCall.options.headers.Authorization, 'Bearer valid-bearer-token')
+  assert.equal(patchCall.options.headers['Content-Type'], 'application/json')
+  assert.deepEqual(patchCall.options.body, { title: 'Updated Board' })
+
+  // DELETE
+  await kanbanApi.deleteBoard(1)
+  const deleteCall = fetchCalls[fetchCalls.length - 1]
+  assert.equal(deleteCall.options.method, 'DELETE')
+  assert.equal(deleteCall.options.headers.Authorization, 'Bearer valid-bearer-token')
+  assert.equal(deleteCall.options.headers['Content-Type'], 'application/json')
+
+  // MOVE (POST)
+  await kanbanApi.moveTask(1, { to_column_id: 2, target_position: 0 })
+  const moveCall = fetchCalls[fetchCalls.length - 1]
+  assert.equal(moveCall.options.method, 'POST')
+  assert.equal(moveCall.options.headers.Authorization, 'Bearer valid-bearer-token')
+  assert.equal(moveCall.options.headers['Content-Type'], 'application/json')
+  assert.deepEqual(moveCall.options.body, { to_column_id: 2, target_position: 0 })
 })
 
 test('frontend/app/api/kanban.ts does not import or contain mock fixtures or simulated delays', () => {

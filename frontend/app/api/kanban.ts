@@ -7,8 +7,6 @@ export interface KanbanTaskDto {
   description?: string
   position: number
   columnId: string | number
-  created_at?: string
-  updated_at?: string
 }
 
 export interface KanbanColumnDto {
@@ -17,8 +15,6 @@ export interface KanbanColumnDto {
   position: number
   boardId: string | number
   tasks: KanbanTaskDto[]
-  created_at?: string
-  updated_at?: string
 }
 
 export interface KanbanBoardDto {
@@ -26,8 +22,6 @@ export interface KanbanBoardDto {
   title: string
   description?: string
   columns: KanbanColumnDto[]
-  created_at?: string
-  updated_at?: string
 }
 
 export interface BoardCreateRequest {
@@ -75,17 +69,16 @@ export interface KanbanColumnSummary {
   position: number
 }
 
-export interface TaskRelocationContextRequest {
+export interface TaskMoveContext {
   taskId: string | number
   fromColumnId: string | number
   toColumnId: string | number
-  targetOrder?: number
-  targetPosition?: number
+  targetPosition: number
 }
 
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
-  moveTask: (req: TaskRelocationContextRequest) => Promise<void> | void
+  moveTask: (req: TaskMoveContext) => Promise<void> | void
 }
 
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')
