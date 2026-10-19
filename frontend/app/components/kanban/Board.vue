@@ -7,6 +7,17 @@
       <span data-testid="board-description">{{ board.description }}</span>
     </template>
     <template #content>
+      <!-- Error Notification Banner -->
+      <Message
+        v-if="errorMessage"
+        data-testid="kanban-error-banner"
+        severity="error"
+        class="mb-3"
+        @close="errorMessage = null"
+      >
+        {{ errorMessage }}
+      </Message>
+
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
@@ -162,6 +173,7 @@ const isTaskDialogOpen = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const activeTask = ref<KanbanTaskDto | null>(null)
 const activeColumnId = ref<string | number | null>(null)
+const errorMessage = ref<string | null>(null)
 
 const openCreateTaskDialog = (columnId: string | number): void => {
   dialogMode.value = 'create'
@@ -185,9 +197,43 @@ const handleCreateTask = async (
   columnId: string | number,
   payload: Partial<KanbanTaskDto>,
 ): Promise<void> => {
+  const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
+  if (!targetCol) return
+
+  errorMessage.value = null
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const optimisticTask: KanbanTaskDto = {
+    id: tempId,
+    title: payload.title ?? '',
+    description: payload.description ?? '',
+    position: targetCol.tasks.length,
+    columnId,
+  }
+  targetCol.tasks.push(optimisticTask)
+
   try {
-    await kanbanApi.createTask(columnId, payload)
+    const createdTask = await kanbanApi.createTask(columnId, {
+      title: payload.title,
+      description: payload.description,
+    })
+
+    const taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
+    if (taskInCol && createdTask) {
+      taskInCol.id = createdTask.id
+      if (createdTask.position !== undefined) {
+        taskInCol.position = createdTask.position
+      }
+    }
   } catch (err) {
+    const taskIndex = targetCol.tasks.findIndex(t => sameId(t.id, tempId))
+    if (taskIndex !== -1) {
+      targetCol.tasks.splice(taskIndex, 1)
+      reindexTasks(targetCol.tasks)
+    }
+    const message = (err as any)?.message
+      ? `Failed to create task: ${(err as any).message}`
+      : 'Failed to create task'
+    errorMessage.value = message
     console.warn('Failed to create task:', err)
   }
 }
@@ -242,6 +288,7 @@ defineExpose({
   dialogMode,
   activeTask,
   activeColumnId,
+  errorMessage,
   openCreateTaskDialog,
   openEditTaskDialog,
   closeTaskDialog,
