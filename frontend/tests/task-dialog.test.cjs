@@ -374,3 +374,78 @@ test('TaskDialog updates form dynamically when active task prop changes while di
   assert.equal(exposed.description.value, 'Desc 2')
 })
 
+test('TaskDialog renders "Delete Task" button in edit mode and hides it in create mode', () => {
+  const taskDialogSource = readFileSync(taskDialogPath, 'utf8')
+  assert.ok(
+    taskDialogSource.includes('data-testid="task-delete-button"'),
+    'TaskDialog template must contain data-testid="task-delete-button"',
+  )
+
+  const createDialog = setupTaskDialog({
+    visible: true,
+    mode: 'create',
+    columnId: 'col-1',
+    task: null,
+  })
+  assert.equal(createDialog.props.mode, 'create')
+
+  const editDialog = setupTaskDialog({
+    visible: true,
+    mode: 'edit',
+    columnId: 'col-1',
+    task: { id: 't-123', title: 'Task to Delete', position: 0, columnId: 'col-1' },
+  })
+  assert.equal(editDialog.props.mode, 'edit')
+  assert.equal(editDialog.exposed.isConfirmingDelete.value, false)
+})
+
+test('TaskDialog delete confirmation flow: initiating delete prompts confirmation, cancelling resets, and confirming emits delete event', () => {
+  const sampleTask = {
+    id: 'task-to-remove-1',
+    title: 'Deletable Task',
+    description: 'Soon to be deleted',
+    position: 0,
+    columnId: 'col-1',
+  }
+
+  const { exposed, emitted, props } = setupTaskDialog({
+    visible: true,
+    mode: 'edit',
+    columnId: 'col-1',
+    task: sampleTask,
+  })
+
+  // Initially not confirming delete
+  assert.equal(exposed.isConfirmingDelete.value, false)
+
+  // Step 1: Click "Delete Task"
+  exposed.initiateDelete()
+  assert.equal(exposed.isConfirmingDelete.value, true, 'isConfirmingDelete must become true on initiateDelete')
+
+  // Step 2: Cancel confirmation
+  exposed.cancelDelete()
+  assert.equal(exposed.isConfirmingDelete.value, false, 'isConfirmingDelete must become false on cancelDelete')
+  assert.equal(props.visible, true, 'Dialog must remain open when delete is cancelled')
+  assert.equal(emitted.filter((e) => e.event === 'delete').length, 0, 'No delete event emitted on cancel')
+
+  // Step 3: Re-initiate and confirm delete
+  exposed.initiateDelete()
+  assert.equal(exposed.isConfirmingDelete.value, true)
+
+  exposed.confirmDelete()
+  assert.equal(props.visible, false, 'Confirming delete must close dialog')
+  assert.equal(exposed.isConfirmingDelete.value, false)
+
+  const deleteEvents = emitted.filter((e) => e.event === 'delete')
+  assert.equal(deleteEvents.length, 1, 'delete event must be emitted once')
+  assert.equal(deleteEvents[0].args[0], 'task-to-remove-1', 'delete event must carry taskId')
+})
+
+test('Board binds @delete handler to TaskDialog', () => {
+  const boardSource = readFileSync(boardSourcePath, 'utf8')
+  assert.ok(
+    boardSource.includes('@delete="handleDeleteTask"'),
+    'Board.vue must bind @delete="handleDeleteTask" on TaskDialog',
+  )
+})
+
