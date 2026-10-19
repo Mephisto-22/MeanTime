@@ -5,6 +5,9 @@ from ninja_extra.exceptions import APIException
 from ninja_jwt.authentication import JWTAuth
 from users.api import auth_router
 
+from kanban.api import router as kanban_router
+
+
 api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
@@ -12,6 +15,8 @@ api = NinjaAPI(
     auth=JWTAuth(),
 )
 
+# router registrations (import above)
+api.add_router("/kanban", kanban_router)
 
 @api.exception_handler(APIException)
 def api_exception_handler(request, exc):
