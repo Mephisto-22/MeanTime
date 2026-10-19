@@ -1,7 +1,7 @@
 <template>
   <Card data-testid="kanban-board">
-    <template v-if="board.name" #title>
-      <span data-testid="board-title">{{ board.name }}</span>
+    <template v-if="board.title" #title>
+      <span data-testid="board-title">{{ board.title }}</span>
     </template>
     <template v-if="board.description" #subtitle>
       <span data-testid="board-description">{{ board.description }}</span>
@@ -57,14 +57,14 @@ watch(
 )
 
 const sortedColumns = computed(() => {
-  return [...localColumns.value].sort((a, b) => a.order - b.order)
+  return [...localColumns.value].sort((a, b) => a.position - b.position)
 })
 
 const columnRegistry = computed<KanbanColumnSummary[]>(() => {
   return sortedColumns.value.map(col => ({
     id: col.id,
-    name: col.name,
-    order: col.order,
+    title: col.title,
+    position: col.position,
   }))
 })
 
@@ -72,7 +72,7 @@ const sameId = (a: string | number, b: string | number): boolean => String(a) ==
 
 const reindexTasks = (tasks: KanbanTaskDto[]): void => {
   tasks.forEach((t, i) => {
-    t.order = i
+    t.position = i
   })
 }
 

@@ -3,22 +3,23 @@ import { mockKanbanBoard } from '~/mocks/kanban'
 
 export interface KanbanTaskDto {
   id: string | number
-  name: string
-  order: number
+  title: string
+  description?: string
+  position: number
   columnId: string | number
 }
 
 export interface KanbanColumnDto {
   id: string | number
-  name: string
-  order: number
+  title: string
+  position: number
   boardId: string | number
   tasks: KanbanTaskDto[]
 }
 
 export interface KanbanBoardDto {
   id: string | number
-  name: string
+  title: string
   description?: string
   columns: KanbanColumnDto[]
 }
@@ -32,8 +33,8 @@ export interface TaskMoveRequest {
 
 export interface KanbanColumnSummary {
   id: string | number
-  name: string
-  order: number
+  title: string
+  position: number
 }
 
 export interface KanbanContext {
