@@ -13,6 +13,12 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
   ],
+  routeRules: {
+    // Keep login/register pre-rendered/SSR if desired, or set ssr: false for protected routes
+    '/login': { ssr: true },
+    '/register': { ssr: true },
+    '/**': { ssr: false } // SPA mode for the dashboard
+  },
   nitro: {
     routeRules: {
       '/api/**': {

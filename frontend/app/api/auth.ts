@@ -44,10 +44,7 @@ export class AuthApi {
   }
 
   me(accessToken: string): Promise<User> {
-    return apiService.get<User>(`${this.endpoint}/me`, undefined, {
-      auth: false,
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    return apiService.get<User>(`${this.endpoint}/me`, undefined)
   }
 }
 

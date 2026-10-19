@@ -4,10 +4,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Tokens live in browser storage. Protected page content is client-only so
   // neither its markup nor its setup/data requests execute on the server.
   if (import.meta.server) return
-  const auth = useAuthStore()
-  await auth.initializeSession()
   if (to.meta.public === true) return
+  const auth = useAuthStore()
+  if (!auth.sessionInitialized) {
+    await auth.initializeSession()
+  }
   if (!auth.isAuthenticated) {
-    return navigateTo({ path: '/login', query: { redirect: to.fullPath } }, { replace: true })
+    return navigateTo({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
   }
 })
