@@ -36,6 +36,7 @@ class BoardColumn(models.Model):
             models.UniqueConstraint(
                 fields=["board","position"],
                 name="unique_column_position_per_board",
+                deferrable=models.Deferrable.DEFERRED,
             ),
         ]
 
@@ -60,6 +61,7 @@ class Task(models.Model):
             models.UniqueConstraint(
                 fields=["column", "position"],
                 name="unique_task_position_per_column",
+                deferrable=models.Deferrable.DEFERRED,
             ),
         ]
 

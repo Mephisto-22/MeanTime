@@ -1,6 +1,8 @@
 from django.shortcuts import get_object_or_404
 from ninja_jwt.authentication import JWTAuth
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Max
+from django.db import transaction
+from ninja.errors import HttpError
 from ninja import Router
 from .models import Board, BoardColumn, Task, TaskTimeEntry
 from .schemas import (
@@ -40,6 +42,13 @@ def get_owned_task(user, task_id: int) -> Task:
         id=task_id
     )
 
+def _reindex(items):
+    """Rewrite position 0..n-1."""
+    for i, obj in enumerate(items):
+        obj.position = i
+        obj.save()
+
+
 
 # -----------------
 # Board Endpoints
@@ -48,15 +57,13 @@ def get_owned_task(user, task_id: int) -> Task:
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by the authenticated user/"""
-    # TODO: require authentication
-    pass
+    return Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks")
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
     """Create a board for the authenticated user"""
-    # TODO: require authentication
-    pass
-
+    board = Board.objects.create(owner=request.auth, **payload.dict())
+    return 201, board
 
 @router.get("/boards/{board_id}", response=BoardOut)
 def get_board(request, board_id: int):
@@ -66,22 +73,20 @@ def get_board(request, board_id: int):
         id=board_id,
     )
     return board
-    # TODO: fetch only a board owned by the authenticated user
-    # TODO: use prefetch_related("columns__tasks")
-
 
 @router.patch("/boards/{board_id}", response=BoardOut)
 def update_board(request, board_id: int, payload: BoardIn):
     """Update a board's title and description."""
-    # TODO: require authentication
-    # TODO: apply the changes and save
-    pass
+    board = get_owned_board(request.auth, board_id)
+    board.title = payload.title
+    board.description = payload.description
+    board.save()
+    return board
 
 @router.delete("/boards/{board_id}")
 def delete_board(request, board_id: int):
     """Delete a board and its related columns and tasks."""
-    # TODO: Require authentication and verify ownership
-    # TODO: Delete the board
+    get_owned_board(request.auth, board_id).delete()
     return {"success": True}
 
 
@@ -92,24 +97,34 @@ def delete_board(request, board_id: int):
 @router.post("/boards/{board_id}/columns", response=BoardColumnOut)
 def create_column(request, board_id: int, payload: BoardColumnIn):
     """Create a column on a board owned by the authenticated user."""
-    # TODO: require authentication
-    # TODO: assign next available position
-    # TODO: create and return the column
-    pass
+    board = get_owned_board(request.auth, board_id)
+    last = board.columns.aggregate(m=Max("position"))["m"]
+    return BoardColumn.objects.create(
+        board=board,
+        title=payload.title,
+        position=0 if last is None else last + 1,
+    )
 
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
 def update_column(request, column_id: int, payload: BoardColumnIn):
     """Update a column's title or position."""
-    # TODO: require authentication and verify ownership through board
-    # TODO: update the supplied fields
-    # TODO: handle position changes
-    pass
+    column = get_owned_column(request.auth, column_id)
+    with transaction.atomic():
+        column.title = payload.title
+        others = [c for c in column.board.columns.all() if c.id != column.id]
+        idx = max(0, min(payload.position, len(others)))
+        others.insert(idx, column)
+        _reindex(others)
+    return column
 
 @router.delete("/columns/{column_id}")
 def delete_column(request, column_id: int):
     """Delete a column and its tasks."""
-    # TODO: require authentication and verify ownership through board
-    # TODO: delete the column
+    column = get_owned_column(request.auth, column_id)
+    board = column.board
+    with transaction.atomic():
+        column.delete()
+        _reindex(list(board.columns.all()))
     return {"success": True}
 
 
@@ -120,30 +135,50 @@ def delete_column(request, column_id: int):
 @router.post("/columns/{column_id}/tasks", response=TaskOut)
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
-    # TODO: require authentication and verify ownership through the board
-    # TODO: assign the next available position in the column
-    # TODO: create and return the task
-    pass
+    column = get_owned_column(request.auth, column_id)
+    last = column.tasks.aggregate(m=Max("position"))["m"]
+    return Task.objects.create(
+        column=column,
+        title=payload.title,
+        description=payload.description,
+        position=0 if last is None else last + 1,
+    )
 
 @router.patch("/tasks/{task_id}", response=TaskOut)
 def update_task(request, task_id: int, payload: TaskIn):
-    """Update a task's name and description"""
-    # TODO: require authentication and verify ownership through the board
-    # TODO: update the supplied fields
-    pass
+    """Update a task's name and description."""
+    task = get_owned_task(request.auth, task_id)
+    task.title = payload.title
+    task.description = payload.description
+    task.save()
+    return task
 
 @router.delete("/tasks/{task_id}")
 def delete_task(request, task_id: int):
     """Delete a task."""
-    # TODO: require authenticaiton and verify ownership through the board
-    # TODO: delete the task
+    task = get_owned_task(request.auth, task_id)
+    column = task.column
+    with transaction.atomic():
+        task.delete()
+        _reindex(list(column.tasks.all()))
     return {"success": True}
 
 @router.post("/tasks/{task_id}/move", response=TaskOut)
 def move_task(request, task_id: int, payload: TaskMoveIn):
     """Move a task to another column and position."""
-    # TODO: require authentication and verify task ownership
-    # TODO: Verify the destination column belongs to the same user's board
-    # TODO: use transaction.atomic() for the move and reordering
-    # TODO: update positions in the source and destination columns
-    pass
+    task = get_owned_task(request.auth, task_id)
+    src = task.column
+    dest = get_owned_column(request.auth, payload.to_column_id)
+    if dest.board_id != src.board.id:
+        raise HttpError(400, "Column on different board")
+
+    with transaction.atomic():
+        src_tasks = [t for t in src.tasks.all() if t.id != task.id]
+        dest_tasks = src_tasks if dest.id == src.id else list(dest.tasks.all())
+        idx = max(0, min(payload.target_position, len(dest_tasks)))
+        task.column = dest
+        dest_tasks.insert(idx, task)
+        if dest.id != src.id:
+            _reindex(src_tasks)
+        _reindex(dest_tasks)
+    return task
