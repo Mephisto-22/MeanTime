@@ -15,7 +15,7 @@ from .schemas import (
     TaskMoveIn,
 )
 
-router = Router(tags=["Kanban"], auth=JWTAuth())
+router = Router(tags=["Kanban"])
 
 # Helpers
 
