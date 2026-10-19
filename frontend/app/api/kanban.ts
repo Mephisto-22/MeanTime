@@ -49,6 +49,11 @@ export interface TaskMoveContext {
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
+  openCreateTaskDialog: (columnId: string | number) => void
+  openEditTaskDialog: (task: KanbanTaskDto) => void
+  createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
+  updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
+  deleteTask: (taskId: string | number) => Promise<void> | void
 }
 
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')
