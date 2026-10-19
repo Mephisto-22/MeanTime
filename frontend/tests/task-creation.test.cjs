@@ -142,8 +142,8 @@ function setupBoard(initialBoard, { mockCreateTask } = {}) {
   return { context: providedContext, exposed, apiCalls, props, boardSource }
 }
 
-test('Seam 2: Board optimistically appends task to column and dispatches kanbanApi.createTask', async () => {
-  const initialBoard = {
+function createTestBoard() {
+  return {
     id: 'b-1',
     title: 'Board 1',
     columns: [
@@ -156,8 +156,19 @@ test('Seam 2: Board optimistically appends task to column and dispatches kanbanA
           { id: 't-1', title: 'Task 1', description: 'Desc 1', position: 0, columnId: 'col-1' },
         ],
       },
+      {
+        id: 'col-2',
+        title: 'In Progress',
+        position: 1,
+        boardId: 'b-1',
+        tasks: [],
+      },
     ],
   }
+}
+
+test('Seam 2: Board optimistically appends task to column and dispatches kanbanApi.createTask', async () => {
+  const initialBoard = createTestBoard()
 
   let resolveApiCall
   const pendingPromise = new Promise((resolve) => {
@@ -207,21 +218,7 @@ test('Seam 2: Board optimistically appends task to column and dispatches kanbanA
 })
 
 test('Seam 3A: Successful creation reconciles temporary local task ID with server ID', async () => {
-  const initialBoard = {
-    id: 'b-1',
-    title: 'Board 1',
-    columns: [
-      {
-        id: 'col-1',
-        title: 'To Do',
-        position: 0,
-        boardId: 'b-1',
-        tasks: [
-          { id: 't-1', title: 'Task 1', description: 'Desc 1', position: 0, columnId: 'col-1' },
-        ],
-      },
-    ],
-  }
+  const initialBoard = createTestBoard()
 
   const { exposed } = setupBoard(initialBoard, {
     mockCreateTask: async (columnId, payload) => ({
@@ -249,21 +246,7 @@ test('Seam 3A: Successful creation reconciles temporary local task ID with serve
 })
 
 test('Seam 3B: Failed creation rolls back optimistic task, logs warning, and surfaces error notification', async () => {
-  const initialBoard = {
-    id: 'b-1',
-    title: 'Board 1',
-    columns: [
-      {
-        id: 'col-1',
-        title: 'To Do',
-        position: 0,
-        boardId: 'b-1',
-        tasks: [
-          { id: 't-1', title: 'Task 1', description: 'Desc 1', position: 0, columnId: 'col-1' },
-        ],
-      },
-    ],
-  }
+  const initialBoard = createTestBoard()
 
   const warnings = []
   const originalWarn = console.warn
@@ -278,8 +261,8 @@ test('Seam 3B: Failed creation rolls back optimistic task, logs warning, and sur
 
     // Verify Board template includes error banner for surfacing notification
     assert.ok(
-      boardSource.includes('data-testid="kanban-error-banner"'),
-      'Board.vue must contain an error banner element with data-testid="kanban-error-banner"',
+      boardSource.includes('data-testid="board-error-banner"'),
+      'Board.vue must contain an error banner element with data-testid="board-error-banner"',
     )
 
     await exposed.handleSaveTask({
@@ -316,5 +299,49 @@ test('Seam 3B: Failed creation rolls back optimistic task, logs warning, and sur
     console.warn = originalWarn
   }
 })
+
+test('Seam 3C: In-flight task movement reconciles database ID across columns', async () => {
+  const initialBoard = createTestBoard()
+
+  let resolveApiCall
+  const pendingPromise = new Promise((resolve) => {
+    resolveApiCall = resolve
+  })
+
+  const { exposed } = setupBoard(initialBoard, {
+    mockCreateTask: async () => pendingPromise,
+  })
+
+  const createPromise = exposed.handleSaveTask({
+    mode: 'create',
+    columnId: 'col-1',
+    title: 'Migrated Task',
+    description: 'Moved before server ack',
+  })
+
+  // Optimistic task is in col-1
+  assert.equal(exposed.localColumns.value[0].tasks.length, 2)
+  const tempTask = exposed.localColumns.value[0].tasks[1]
+
+  // Simulate user dragging the optimistic task to col-2 while in flight
+  exposed.localColumns.value[0].tasks.splice(1, 1)
+  tempTask.columnId = 'col-2'
+  exposed.localColumns.value[1].tasks.push(tempTask)
+
+  // Resolve server creation
+  resolveApiCall({
+    id: 999,
+    title: 'Migrated Task',
+    description: 'Moved before server ack',
+    position: 0,
+    columnId: 'col-1',
+  })
+  await createPromise
+
+  // Reconciled ID must be found in col-2
+  assert.equal(exposed.localColumns.value[1].tasks.length, 1)
+  assert.equal(exposed.localColumns.value[1].tasks[0].id, 999, 'Task moved across columns must be reconciled with database ID 999')
+})
+
 
 

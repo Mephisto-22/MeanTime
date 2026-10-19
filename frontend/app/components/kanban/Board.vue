@@ -10,7 +10,7 @@
       <!-- Error Notification Banner -->
       <Message
         v-if="errorMessage"
-        data-testid="kanban-error-banner"
+        data-testid="board-error-banner"
         severity="error"
         class="mb-3"
         @close="errorMessage = null"
@@ -217,7 +217,13 @@ const handleCreateTask = async (
       description: payload.description,
     })
 
-    const taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
+    let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
+    if (!taskInCol) {
+      for (const col of localColumns.value) {
+        taskInCol = col.tasks.find(t => sameId(t.id, tempId))
+        if (taskInCol) break
+      }
+    }
     if (taskInCol && createdTask) {
       taskInCol.id = createdTask.id
       if (createdTask.position !== undefined) {
@@ -225,10 +231,20 @@ const handleCreateTask = async (
       }
     }
   } catch (err) {
-    const taskIndex = targetCol.tasks.findIndex(t => sameId(t.id, tempId))
-    if (taskIndex !== -1) {
-      targetCol.tasks.splice(taskIndex, 1)
-      reindexTasks(targetCol.tasks)
+    let containingCol = targetCol
+    let taskPosition = containingCol.tasks.findIndex(t => sameId(t.id, tempId))
+    if (taskPosition === -1) {
+      for (const col of localColumns.value) {
+        taskPosition = col.tasks.findIndex(t => sameId(t.id, tempId))
+        if (taskPosition !== -1) {
+          containingCol = col
+          break
+        }
+      }
+    }
+    if (taskPosition !== -1) {
+      containingCol.tasks.splice(taskPosition, 1)
+      reindexTasks(containingCol.tasks)
     }
     const message = (err as any)?.message
       ? `Failed to create task: ${(err as any).message}`
