@@ -17,6 +17,9 @@ from .schemas import (
 
 router = Router(tags=["Kanban"])
 
+# Every new board starts with these columns, left to right.
+DEFAULT_COLUMN_TITLES = ("To Do", "In Progress", "Done")
+
 # Helpers
 
 def get_owned_board(user, board_id: int) -> Board:
@@ -61,8 +64,13 @@ def list_boards(request):
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
-    """Create a board for the authenticated user"""
-    board = Board.objects.create(owner=request.auth, **payload.dict())
+    """Create a board for the authenticated user, starting with the default columns."""
+    with transaction.atomic():
+        board = Board.objects.create(owner=request.auth, **payload.dict())
+        BoardColumn.objects.bulk_create(
+            BoardColumn(board=board, title=title, position=position)
+            for position, title in enumerate(DEFAULT_COLUMN_TITLES)
+        )
     return 201, board
 
 @router.get("/boards/{board_id}", response=BoardOut)

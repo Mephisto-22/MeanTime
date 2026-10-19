@@ -1,0 +1,152 @@
+<template>
+  <Dialog
+    v-model:visible="visible"
+    data-testid="board-form-dialog"
+    modal
+    :header="isEditing ? 'Edit board' : 'New board'"
+    :draggable="false"
+    class="w-[min(28rem,calc(100vw-2rem))]"
+  >
+    <form
+      class="flex flex-col gap-4"
+      novalidate
+      @submit.prevent="save"
+    >
+      <div class="flex flex-col gap-2">
+        <Label for="board-title-input">Name</Label>
+        <InputText
+          id="board-title-input"
+          v-model="title"
+          data-testid="board-title-input"
+          autofocus
+          fluid
+          :maxlength="TITLE_MAX_LENGTH"
+          :invalid="showTitleError"
+          :aria-describedby="showTitleError ? 'board-title-error' : undefined"
+        />
+        <Message
+          v-if="showTitleError"
+          id="board-title-error"
+          data-testid="board-title-error"
+          severity="error"
+          size="small"
+          variant="simple"
+        >
+          Enter a name for the board.
+        </Message>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <Label for="board-description-input">Description (optional)</Label>
+        <Textarea
+          id="board-description-input"
+          v-model="description"
+          data-testid="board-description-input"
+          rows="3"
+          fluid
+        />
+      </div>
+
+      <Message
+        v-if="saveFailed"
+        data-testid="board-save-error"
+        severity="error"
+        :closable="false"
+      >
+        We couldn't save the board. Try again.
+      </Message>
+
+      <div class="flex justify-end gap-2">
+        <Button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          text
+          :disabled="isSaving"
+          @click="visible = false"
+        />
+        <Button
+          type="submit"
+          data-testid="board-save-button"
+          :label="isEditing ? 'Save' : 'Create'"
+          :loading="isSaving"
+        />
+      </div>
+    </form>
+  </Dialog>
+</template>
+
+<script setup lang="ts">
+import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
+
+interface Props {
+  /** The board to edit, or null to create a new one. */
+  board: KanbanBoardDto | null;
+}
+
+interface Emits {
+  /** Fired after the backend has saved the board, so the page can re-fetch. */
+  saved: [board: KanbanBoardDto];
+}
+
+// Matches the max_length of Board.title in backend/kanban/models.py.
+const TITLE_MAX_LENGTH = 100;
+
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+/** Whether the dialog is open. Bound by the parent with v-model:visible. */
+const visible = defineModel<boolean>('visible', {required: true});
+
+const title = ref('');
+const description = ref('');
+const wasSubmitted = ref(false);
+const isSaving = ref(false);
+const saveFailed = ref(false);
+
+const isEditing = computed(() => props.board !== null);
+const trimmedTitle = computed(() => title.value.trim());
+const showTitleError = computed(
+  () => wasSubmitted.value && trimmedTitle.value === '',
+);
+
+// Start from a clean form every time the dialog opens, so values and errors
+// from the previous use never leak into the next one.
+watch(visible, isOpen => {
+  if (!isOpen) {
+    return;
+  }
+  title.value = props.board?.title ?? '';
+  description.value = props.board?.description ?? '';
+  wasSubmitted.value = false;
+  saveFailed.value = false;
+});
+
+async function save(): Promise<void> {
+  wasSubmitted.value = true;
+  if (trimmedTitle.value === '' || isSaving.value) {
+    return;
+  }
+
+  // The backend replaces both fields on every update, so always send both.
+  const payload = {
+    title: trimmedTitle.value,
+    description: description.value.trim(),
+  };
+
+  isSaving.value = true;
+  saveFailed.value = false;
+  try {
+    const saved =
+      props.board !== null
+        ? await kanbanApi.updateBoard(props.board.id, payload)
+        : await kanbanApi.createBoard(payload);
+    emit('saved', saved);
+    visible.value = false;
+  } catch {
+    saveFailed.value = true;
+  } finally {
+    isSaving.value = false;
+  }
+}
+</script>

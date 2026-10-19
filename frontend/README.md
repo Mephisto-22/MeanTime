@@ -13,7 +13,7 @@ Containerized Vue 3 / Nuxt 4 application styled with PrimeVue 5 (Aura preset), T
 - **Utility Styling**: [Tailwind CSS](https://tailwindcss.com/) (`~3.4.17`) and `tailwindcss-primeui` (`^0.6.1`).
 - **CSS Layering**: Explicit CSS layer ordering (`tailwind-base, primevue, tailwind-utilities`) defined in `app/assets/css/main.css` preventing style conflicts between Tailwind's preflight reset and PrimeVue components.
 - **API Proxy**: Nuxt Nitro engine proxies all `/api/**` traffic internally to the Django backend (`http://backend:8000/api/**`), allowing client and server to call relative endpoints without CORS configuration.
-- **Centralized HTTP Client**: [`ApiService`](app/services/ApiService.ts) in `app/services/` encapsulates HTTP requests (`get`, `post`, `put`, `delete`), query serialization, payload parsing, and error normalization around `$fetch`.
+- **Centralized HTTP Client**: [`ApiService`](app/services/ApiService.ts) in `app/services/` encapsulates HTTP requests (`get`, `post`, `put`, `patch`, `delete`), query serialization, payload parsing, and error normalization around `$fetch`.
 - **Domain API Layer**: Feature-specific endpoints and typed contracts are organized in `app/api/` (e.g., [`health.ts`](app/api/health.ts)) and consume `apiService`.
 - **File Watching & HMR**: Vite watcher configured with polling enabled (`usePolling: true`) for instant hot module replacement across Windows host filesystem mounts.
 - **High-Performance Volume & Host IDE Synchronization**: Container uses a dedicated named Docker volume (`frontend_node_modules`) for lightning-fast Linux ext4 package access, resolving Windows bind-mount I/O bottlenecks. The container automatically synchronizes installed packages and types to the host's `./frontend/node_modules` via hash-gated `rsync` on startup, providing full host IDE IntelliSense and autocompletion without requiring `pnpm` or `node` on the host.
@@ -40,7 +40,7 @@ frontend/
 │   ├── pages/
 │   │   └── index.vue            # Interactive homepage showcasing PrimeVue & Tailwind
 │   ├── services/                # Centralized network and infrastructure services
-│   │   ├── ApiService.ts        # Base HTTP service (get, post, put, delete, error parsing)
+│   │   ├── ApiService.ts        # Base HTTP service (get, post, put, patch, delete, error parsing)
 │   │   └── index.ts             # Services export point
 │   ├── stores/                  # Pinia state management stores (auto-imported)
 │   │   └── .gitkeep
