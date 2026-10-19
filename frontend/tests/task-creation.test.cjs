@@ -59,7 +59,7 @@ test('Seam 1: Column renders "+ Add Task" button and clicking invokes openCreate
     'Column.vue must render a button with data-testid="add-task-button"',
   )
   assert.ok(
-    columnSource.includes('+ Add Task'),
+    columnSource.includes('Add Task'),
     'Column.vue must render an "+ Add Task" button',
   )
 
@@ -79,6 +79,33 @@ test('Seam 1: Column renders "+ Add Task" button and clicking invokes openCreate
   handler()
   assert.equal(calls.length, 1, 'Clicking Add Task must invoke openCreateTaskDialog once')
   assert.equal(calls[0], 'col-xyz', 'openCreateTaskDialog must be called with column.id')
+})
+
+test('Column width flexibility: columns grow to fill available board space without max-w-xs clamp', () => {
+  const columnSource = readFileSync(columnSourcePath, 'utf8')
+  assert.ok(
+    columnSource.includes('flex-1') && columnSource.includes('min-w-64'),
+    'Column.vue must include flex-1 and min-w-64 to fill available board width',
+  )
+  assert.equal(
+    columnSource.includes('max-w-xs'),
+    false,
+    'Column.vue must not constrain column width with max-w-xs',
+  )
+})
+
+test('Add Task button styling: differentiated from column background with hover color feedback', () => {
+  const columnSource = readFileSync(columnSourcePath, 'utf8')
+  const cssSource = readFileSync(resolve(__dirname, '../app/assets/css/main.css'), 'utf8')
+
+  assert.ok(
+    columnSource.includes('bg-surface-200') && columnSource.includes('hover:bg-surface-300'),
+    'Column.vue add task button must have distinct background and hover styling',
+  )
+  assert.ok(
+    columnSource.includes('dark:bg-surface-700') && columnSource.includes('dark:hover:bg-surface-600'),
+    'Column.vue add task button must support dark mode contrast and hover styling',
+  )
 })
 
 function setupBoard(initialBoard, { mockCreateTask } = {}) {

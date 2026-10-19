@@ -2,7 +2,7 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex h-[50vh] flex-1 min-w-64 max-w-xs flex-col rounded-lg bg-surface-100 p-3 transition-colors duration-200 dark:bg-surface-800"
+    class="flex h-[50vh] flex-1 min-w-64 flex-col rounded-lg bg-surface-100 p-3 transition-colors duration-200 dark:bg-surface-800"
   >
     <!-- Column Header -->
     <div class="mb-3 flex shrink-0 items-center justify-between">
@@ -57,11 +57,11 @@
     <div class="mt-2 shrink-0 pt-1">
       <Button
         data-testid="add-task-button"
-        label="+ Add Task"
+        label="Add Task"
         severity="secondary"
-        text
+        icon="pi pi-plus"
         size="small"
-        class="w-full justify-center text-sm font-medium"
+        class="w-full justify-center bg-surface-200 hover:bg-surface-300 dark:bg-surface-700 dark:hover:bg-surface-600"
         @click="handleAddTask"
       />
     </div>
