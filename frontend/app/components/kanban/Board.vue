@@ -33,7 +33,7 @@ import type {
   KanbanColumnDto,
   KanbanColumnSummary,
   KanbanTaskDto,
-  TaskMoveRequest,
+  TaskRelocationContextRequest,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -76,9 +76,10 @@ const reindexTasks = (tasks: KanbanTaskDto[]): void => {
   })
 }
 
-const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
+const handleMoveTask = async (req: TaskRelocationContextRequest): Promise<void> => {
   await nextTick()
 
+  const targetIdx = req.targetPosition ?? req.targetOrder ?? 0
   const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
   const toCol = localColumns.value.find(col => sameId(col.id, req.toColumnId))
 
@@ -103,10 +104,10 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
 
   if (sameId(req.fromColumnId, req.toColumnId)) {
     const currentIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
-    if (currentIndex !== -1 && currentIndex !== req.targetOrder) {
+    if (currentIndex !== -1 && currentIndex !== targetIdx) {
       fromCol.tasks.splice(currentIndex, 1)
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, fromCol.tasks.length))
-      fromCol.tasks.splice(targetIdx, 0, task)
+      const clampedIdx = Math.max(0, Math.min(targetIdx, fromCol.tasks.length))
+      fromCol.tasks.splice(clampedIdx, 0, task)
     }
     reindexTasks(fromCol.tasks)
   } else {
@@ -118,12 +119,12 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
     }
 
     if (toIndex === -1) {
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
-      toCol.tasks.splice(targetIdx, 0, task)
-    } else if (toIndex !== req.targetOrder) {
+      const clampedIdx = Math.max(0, Math.min(targetIdx, toCol.tasks.length))
+      toCol.tasks.splice(clampedIdx, 0, task)
+    } else if (toIndex !== targetIdx) {
       toCol.tasks.splice(toIndex, 1)
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
-      toCol.tasks.splice(targetIdx, 0, task)
+      const clampedIdx = Math.max(0, Math.min(targetIdx, toCol.tasks.length))
+      toCol.tasks.splice(clampedIdx, 0, task)
     }
 
     task.columnId = req.toColumnId
@@ -133,11 +134,9 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
   }
 
   try {
-    await kanbanApi.moveTask({
-      taskId: req.taskId,
-      fromColumnId: req.fromColumnId,
-      toColumnId: req.toColumnId,
-      targetOrder: req.targetOrder,
+    await kanbanApi.moveTask(req.taskId, {
+      to_column_id: req.toColumnId,
+      target_position: targetIdx,
     })
   } catch (err) {
     console.warn('Failed to persist task movement:', err)

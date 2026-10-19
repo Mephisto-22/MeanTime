@@ -40,9 +40,9 @@ function setupBoard(initialBoard, { mockMoveTask } = {}) {
         return {
           kanbanContextKey: Symbol('kanbanContext'),
           kanbanApi: {
-            moveTask: async (req) => {
-              apiCalls.push(req)
-              if (mockMoveTask) return mockMoveTask(req)
+            moveTask: async (taskId, payload) => {
+              apiCalls.push(typeof taskId === 'object' ? taskId : { taskId, ...payload })
+              if (mockMoveTask) return mockMoveTask(taskId, payload)
             },
           },
         }
@@ -132,9 +132,8 @@ test('Vertical drag within column: reorders task at designated index, re-indexes
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-3',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-1',
-    targetOrder: 0,
+    to_column_id: 'col-1',
+    target_position: 0,
   })
 
   // Verify task reindexing in column 1
@@ -189,9 +188,8 @@ test('Horizontal drag between columns: moves task to target column at index, upd
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-1',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-2',
-    targetOrder: 1,
+    to_column_id: 'col-2',
+    target_position: 1,
   })
 
   // Verify col-1 tasks updated and re-indexed
@@ -248,9 +246,8 @@ test('Empty column drop mechanics: dropping task into empty column places it at 
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-1',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-empty',
-    targetOrder: 0,
+    to_column_id: 'col-empty',
+    target_position: 0,
   })
 
   // Source column is now empty
