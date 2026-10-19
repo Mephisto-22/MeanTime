@@ -32,21 +32,19 @@ export class AuthApi {
   readonly endpoint = '/api/auth'
 
   login(credentials: LoginRequest): Promise<LoginResponse> {
-    return apiService.post<LoginResponse>(`${this.endpoint}/login`, credentials)
+    return apiService.post<LoginResponse>(`${this.endpoint}/login`, credentials, { auth: false })
   }
 
   register(details: RegistrationRequest): Promise<User> {
-    return apiService.post<User>(`${this.endpoint}/register`, details)
+    return apiService.post<User>(`${this.endpoint}/register`, details, { auth: false })
   }
 
   refresh(refreshToken: string): Promise<RefreshResponse> {
-    return apiService.post<RefreshResponse>(`${this.endpoint}/refresh`, { refresh_token: refreshToken })
+    return apiService.post<RefreshResponse>(`${this.endpoint}/refresh`, { refresh_token: refreshToken }, { auth: false })
   }
 
   me(accessToken: string): Promise<User> {
-    return apiService.get<User>(`${this.endpoint}/me`, undefined, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    return apiService.get<User>(`${this.endpoint}/me`, undefined)
   }
 }
 

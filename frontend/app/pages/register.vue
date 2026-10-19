@@ -18,6 +18,8 @@
 import type { RegistrationRequest } from '~/api/auth'
 import { useAuthStore } from '~/stores/auth'
 
+definePageMeta({ public: true })
+
 const authStore = useAuthStore()
 const loading = ref(false)
 const error = ref('')

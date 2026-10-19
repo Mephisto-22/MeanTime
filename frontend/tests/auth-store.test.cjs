@@ -6,7 +6,7 @@ const { runInNewContext } = require('node:vm')
 const ts = require('typescript')
 const { createPinia, setActivePinia } = require('pinia')
 
-function setup({ client = true, unavailable = false, response, meError, refreshError, unavailableMe = false } = {}) {
+function setup({ client = true, unavailable = false, response, meError, refreshError, unavailableMe = false, refreshDelay, refreshResponse } = {}) {
   const values = new Map()
   const storage = {
     getItem(key) { if (unavailable) throw new Error('Storage unavailable'); return values.get(key) ?? null },
@@ -19,21 +19,23 @@ function setup({ client = true, unavailable = false, response, meError, refreshE
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
   const calls = []
+  const redirects = []
   const exports = {}
   runInNewContext(compiled, {
     exports, localStorage: storage,
+    async navigateTo(path) { redirects.push(path) },
     require(name) {
       if (name === '~/api/auth') return { authApi: {
         async login(payload) { calls.push(payload); if (response instanceof Error) throw response; return response },
         async register(payload) { calls.push(['register', payload]); return profile },
         async me(token) { calls.push(['me', token]); if (unavailableMe) throw new Error('Network unavailable'); if (meError && token !== 'new-access') throw meError; return profile },
-        async refresh(token) { calls.push(['refresh', token]); if (refreshError) throw refreshError; return { access_token: 'new-access' } },
+        async refresh(token) { calls.push(['refresh', token]); if (refreshDelay) await refreshDelay; if (refreshError) throw refreshError; return refreshResponse ?? { access_token: 'new-access' } },
       } }
       return require(name)
     },
   })
   setActivePinia(createPinia())
-  return { store: exports.useAuthStore(), values, key: exports.AUTH_STORAGE_KEY, calls }
+  return { store: exports.useAuthStore(), values, key: exports.AUTH_STORAGE_KEY, calls, redirects }
 }
 
 const profile = { id: 1, email: 'user@example.com', display_name: 'Display name', timezone: 'UTC', created_at: '2026-10-14T12:00:00Z' }
@@ -143,9 +145,69 @@ test('auth API uses backend paths, payloads, and bearer authentication', async (
   // JSON normalizes objects created in the VM's separate realm.
   const recorded = JSON.parse(JSON.stringify(calls))
   assert.deepEqual(recorded, [
-    ['POST', '/api/auth/login', { email: profile.email, password: 'password' }],
-    ['POST', '/api/auth/register', { email: profile.email, password: 'password', display_name: profile.display_name }],
-    ['POST', '/api/auth/refresh', { refresh_token: 'refresh-token' }],
-    ['GET', '/api/auth/me', null, { headers: { Authorization: 'Bearer access-token' } }],
+    ['POST', '/api/auth/login', { email: profile.email, password: 'password' }, { auth: false }],
+    ['POST', '/api/auth/register', { email: profile.email, password: 'password', display_name: profile.display_name }, { auth: false }],
+    ['POST', '/api/auth/refresh', { refresh_token: 'refresh-token' }, { auth: false }],
+    ['GET', '/api/auth/me', null, { auth: false, headers: { Authorization: 'Bearer access-token' } }],
   ])
+})
+
+
+test('concurrent initialization restores and validates only once', async () => {
+  const { store, values, key, calls } = setup()
+  values.set(key, JSON.stringify({ accessToken: 'a', refreshToken: 'r' }))
+  await Promise.all([store.initializeSession(), store.initializeSession()])
+  await store.initializeSession()
+  assert.equal(calls.filter(call => call[0] === 'me').length, 1)
+  assert.equal(store.sessionInitialized, true)
+  assert.equal(store.isAuthenticated, true)
+})
+
+test('concurrent refreshes share one request and persist the new access token', async () => {
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  const { store, calls, values, key } = setup({ refreshDelay: gate })
+  store.setTokens(tokens)
+  const first = store.refresh()
+  const second = store.refresh()
+  release()
+  await Promise.all([first, second])
+  assert.equal(calls.filter(call => call[0] === 'refresh').length, 1)
+  assert.equal(JSON.parse(values.get(key)).accessToken, 'new-access')
+  assert.equal(store.refreshToken, tokens.refresh_token)
+})
+
+test('rejected or malformed refresh clears credentials and redirects to login', async () => {
+  for (const options of [{ refreshError: unauthorized }, { refreshResponse: {} }]) {
+    const { store, values, redirects } = setup(options)
+    store.setTokens(tokens)
+    store.setUser(profile)
+    store.sessionInitialized = true
+    await assert.rejects(store.refresh())
+    assert.equal(store.isAuthenticated, false)
+    assert.equal(values.size, 0)
+    assert.deepEqual(redirects, ['/login'])
+  }
+})
+
+test('transient refresh errors do not clear tokens or redirect', async () => {
+  const { store, redirects } = setup({ refreshError: new Error('Network unavailable') })
+  store.setTokens(tokens)
+  store.sessionInitialized = true
+  await assert.rejects(store.refresh())
+  assert.equal(store.accessToken, tokens.access_token)
+  assert.equal(redirects.length, 0)
+})
+
+test('late refresh response cannot resurrect a cleared session', async () => {
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  const { store, values } = setup({ refreshDelay: gate })
+  store.setTokens(tokens)
+  const pending = store.refresh()
+  store.clearTokens()
+  release()
+  await assert.rejects(pending)
+  assert.equal(store.accessToken, null)
+  assert.equal(values.size, 0)
 })

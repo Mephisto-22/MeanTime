@@ -354,13 +354,23 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ### Authentication frontend
 
-- `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates home only after that succeeds.
+- `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates to the requested protected page (or home) only after that succeeds.
 - `/register` submits `display_name`, email, and password (optional `timezone`, default UTC), then redirects to login.
 - `app/api/auth.ts` matches `backend/users/schemas.py`: login returns `access_token`, `refresh_token`, `token_type`, and `expires_in`; registration and `/me` return `UserOut`. The frontend does not rely on the backend's current extra login `user` field.
 - `app/stores/auth.ts` exports `useAuthStore`, `User`, and `AuthState`. Only access and refresh tokens persist under `meantime.auth`. User details and `isAuthenticated` are never stored locally. Old saved profiles are discarded on restoration.
-- After client hydration, the store restores tokens and fetches `/me` with a bearer header. A 401 triggers `/refresh` with `refresh_token`, persists the new access token, and retries `/me` once. Rejected credentials clear the session. Temporary network errors retain tokens for retry while leaving the user unauthenticated.
-- `setUser` stores profiles in memory; `clearTokens` removes the whole session. General protected-page middleware and automatic retries for other API services remain future tasks.
-- Run auth tests with `node --test tests/auth-store.test.cjs` inside the frontend container.
+- Client navigation waits for session restoration and a `/me` check. A 401 triggers `/refresh` with `refresh_token`, persists the new access token, and retries once. Concurrent refreshes share one request. Rejected or malformed refresh credentials clear the session and redirect to login; network/server outages preserve tokens for retry.
+- Pages are protected by default through `app/middleware/auth.global.ts`; add `definePageMeta({ public: true })` for public pages. Login and registration are public. Protected content uses `ClientOnly` and waits for a validated session, so server HTML never contains protected page content. API endpoints still enforce authorization on the backend.
+- `ApiService` attaches the current bearer token to relative `/api/` requests, refreshes on 401, and retries once. Public endpoints use `{ auth: false }`; authentication routes opt out to avoid recursive refresh. A second 401 ends the session; a normal 403 permission error does not trigger refresh.
+- `setUser` stores profiles in memory; `clearTokens` removes the whole session. Only tokens are persisted, never the user or initialization state.
+- Run `pnpm typecheck` and `node --test tests/*.test.cjs` inside the frontend container. After `pnpm build`, run `node tests/protected-rendering.smoke.cjs` to check production HTML.
+
+Manual checks with the backend running:
+
+1. Open `/` without stored tokens: it should redirect to login without showing the protected page.
+2. Log in, then reload `/`: the store should restore tokens, fetch `/me`, and show the page.
+3. Replace only the saved access token with an expired token and reload: `/refresh` should update the access token in storage, then `/me` should succeed.
+4. Invalidate both saved tokens and reload: storage should be cleared and login should appear. Login and registration must remain accessible.
+5. For other protected API calls, inspect the bearer header and verify a 401 causes one refresh and one retry. Disconnecting the network should surface the request error without deleting valid credentials.
 
 Run via Docker Compose at the project root:
 
