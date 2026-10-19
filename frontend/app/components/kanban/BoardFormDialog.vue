@@ -13,12 +13,7 @@
       @submit.prevent="save"
     >
       <div class="flex flex-col gap-2">
-        <label
-          for="board-title-input"
-          class="font-medium"
-        >
-          Name
-        </label>
+        <Label for="board-title-input">Name</Label>
         <InputText
           id="board-title-input"
           v-model="title"
@@ -42,15 +37,7 @@
       </div>
 
       <div class="flex flex-col gap-2">
-        <label
-          for="board-description-input"
-          class="font-medium"
-        >
-          Description
-          <span class="font-normal text-surface-500 dark:text-surface-400">
-            (optional)
-          </span>
-        </label>
+        <Label for="board-description-input">Description (optional)</Label>
         <Textarea
           id="board-description-input"
           v-model="description"
