@@ -22,6 +22,15 @@
           </slot>
         </template>
       </div>
+
+      <!-- Centralized Task Dialog -->
+      <KanbanTaskDialog
+        v-model:visible="isTaskDialogOpen"
+        :mode="dialogMode"
+        :task="activeTask"
+        :column-id="activeColumnId"
+        @save="handleSaveTask"
+      />
     </template>
   </Card>
 </template>
@@ -34,6 +43,7 @@ import type {
   KanbanColumnSummary,
   KanbanTaskDto,
   TaskMoveContext,
+  TaskDialogSavePayload,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -148,13 +158,96 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
   }
 }
 
+const isTaskDialogOpen = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
+const activeTask = ref<KanbanTaskDto | null>(null)
+const activeColumnId = ref<string | number | null>(null)
+
+const openCreateTaskDialog = (columnId: string | number): void => {
+  dialogMode.value = 'create'
+  activeTask.value = null
+  activeColumnId.value = columnId
+  isTaskDialogOpen.value = true
+}
+
+const openEditTaskDialog = (task: KanbanTaskDto): void => {
+  dialogMode.value = 'edit'
+  activeTask.value = task
+  activeColumnId.value = task.columnId
+  isTaskDialogOpen.value = true
+}
+
+const closeTaskDialog = (): void => {
+  isTaskDialogOpen.value = false
+}
+
+const handleCreateTask = async (
+  columnId: string | number,
+  payload: Partial<KanbanTaskDto>,
+): Promise<void> => {
+  try {
+    await kanbanApi.createTask(columnId, payload)
+  } catch (err) {
+    console.warn('Failed to create task:', err)
+  }
+}
+
+const handleUpdateTask = async (
+  taskId: string | number,
+  payload: Partial<KanbanTaskDto>,
+): Promise<void> => {
+  try {
+    await kanbanApi.updateTask(taskId, payload)
+  } catch (err) {
+    console.warn('Failed to update task:', err)
+  }
+}
+
+const handleDeleteTask = async (taskId: string | number): Promise<void> => {
+  try {
+    await kanbanApi.deleteTask(taskId)
+  } catch (err) {
+    console.warn('Failed to delete task:', err)
+  }
+}
+
+const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
+  if (savePayload.mode === 'create' && savePayload.columnId != null) {
+    await handleCreateTask(savePayload.columnId, {
+      title: savePayload.title,
+      description: savePayload.description,
+    })
+  } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
+    await handleUpdateTask(savePayload.taskId, {
+      title: savePayload.title,
+      description: savePayload.description,
+    })
+  }
+}
+
 provide(kanbanContextKey, {
   columns: columnRegistry,
   moveTask: handleMoveTask,
+  openCreateTaskDialog,
+  openEditTaskDialog,
+  createTask: handleCreateTask,
+  updateTask: handleUpdateTask,
+  deleteTask: handleDeleteTask,
 })
 
 defineExpose({
   localColumns,
   handleMoveTask,
+  isTaskDialogOpen,
+  dialogMode,
+  activeTask,
+  activeColumnId,
+  openCreateTaskDialog,
+  openEditTaskDialog,
+  closeTaskDialog,
+  handleCreateTask,
+  handleUpdateTask,
+  handleDeleteTask,
+  handleSaveTask,
 })
 </script>
