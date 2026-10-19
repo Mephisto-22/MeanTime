@@ -7,7 +7,7 @@
     <!-- Column Header -->
     <div class="mb-3 flex shrink-0 items-center justify-between">
       <h3 class="text-sm font-semibold">
-        {{ column.name }}
+        {{ column.title }}
       </h3>
       <Tag
         data-testid="column-task-count"
