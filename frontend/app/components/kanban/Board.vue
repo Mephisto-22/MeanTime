@@ -1,7 +1,7 @@
 <template>
   <Card data-testid="kanban-board">
-    <template v-if="board.name" #title>
-      <span data-testid="board-title">{{ board.name }}</span>
+    <template v-if="board.title" #title>
+      <span data-testid="board-title">{{ board.title }}</span>
     </template>
     <template v-if="board.description" #subtitle>
       <span data-testid="board-description">{{ board.description }}</span>
@@ -33,7 +33,7 @@ import type {
   KanbanColumnDto,
   KanbanColumnSummary,
   KanbanTaskDto,
-  TaskMoveRequest,
+  TaskMoveContext,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -57,14 +57,14 @@ watch(
 )
 
 const sortedColumns = computed(() => {
-  return [...localColumns.value].sort((a, b) => a.order - b.order)
+  return [...localColumns.value].sort((a, b) => a.position - b.position)
 })
 
 const columnRegistry = computed<KanbanColumnSummary[]>(() => {
   return sortedColumns.value.map(col => ({
     id: col.id,
-    name: col.name,
-    order: col.order,
+    title: col.title,
+    position: col.position,
   }))
 })
 
@@ -72,11 +72,20 @@ const sameId = (a: string | number, b: string | number): boolean => String(a) ==
 
 const reindexTasks = (tasks: KanbanTaskDto[]): void => {
   tasks.forEach((t, i) => {
-    t.order = i
+    t.position = i
   })
 }
 
-const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
+const insertTaskAtPosition = (
+  tasks: KanbanTaskDto[],
+  task: KanbanTaskDto,
+  targetPosition: number,
+): void => {
+  const clampedPosition = Math.max(0, Math.min(targetPosition, tasks.length))
+  tasks.splice(clampedPosition, 0, task)
+}
+
+const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
   await nextTick()
 
   const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
@@ -102,28 +111,25 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
   }
 
   if (sameId(req.fromColumnId, req.toColumnId)) {
-    const currentIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
-    if (currentIndex !== -1 && currentIndex !== req.targetOrder) {
-      fromCol.tasks.splice(currentIndex, 1)
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, fromCol.tasks.length))
-      fromCol.tasks.splice(targetIdx, 0, task)
+    const currentPosition = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
+    if (currentPosition !== -1 && currentPosition !== req.targetPosition) {
+      fromCol.tasks.splice(currentPosition, 1)
+      insertTaskAtPosition(fromCol.tasks, task, req.targetPosition)
     }
     reindexTasks(fromCol.tasks)
   } else {
-    const fromIndex = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
-    const toIndex = toCol.tasks.findIndex(t => sameId(t.id, req.taskId))
+    const fromPosition = fromCol.tasks.findIndex(t => sameId(t.id, req.taskId))
+    const toPosition = toCol.tasks.findIndex(t => sameId(t.id, req.taskId))
 
-    if (fromIndex !== -1) {
-      fromCol.tasks.splice(fromIndex, 1)
+    if (fromPosition !== -1) {
+      fromCol.tasks.splice(fromPosition, 1)
     }
 
-    if (toIndex === -1) {
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
-      toCol.tasks.splice(targetIdx, 0, task)
-    } else if (toIndex !== req.targetOrder) {
-      toCol.tasks.splice(toIndex, 1)
-      const targetIdx = Math.max(0, Math.min(req.targetOrder, toCol.tasks.length))
-      toCol.tasks.splice(targetIdx, 0, task)
+    if (toPosition === -1) {
+      insertTaskAtPosition(toCol.tasks, task, req.targetPosition)
+    } else if (toPosition !== req.targetPosition) {
+      toCol.tasks.splice(toPosition, 1)
+      insertTaskAtPosition(toCol.tasks, task, req.targetPosition)
     }
 
     task.columnId = req.toColumnId
@@ -133,11 +139,9 @@ const handleMoveTask = async (req: TaskMoveRequest): Promise<void> => {
   }
 
   try {
-    await kanbanApi.moveTask({
-      taskId: req.taskId,
-      fromColumnId: req.fromColumnId,
-      toColumnId: req.toColumnId,
-      targetOrder: req.targetOrder,
+    await kanbanApi.moveTask(req.taskId, {
+      to_column_id: req.toColumnId,
+      target_position: req.targetPosition,
     })
   } catch (err) {
     console.warn('Failed to persist task movement:', err)
