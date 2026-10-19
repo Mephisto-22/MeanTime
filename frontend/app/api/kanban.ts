@@ -24,36 +24,6 @@ export interface KanbanBoardDto {
   columns: KanbanColumnDto[]
 }
 
-export interface BoardCreateRequest {
-  title: string
-  description?: string
-}
-
-export interface BoardUpdateRequest {
-  title?: string
-  description?: string
-}
-
-export interface ColumnCreateRequest {
-  title: string
-  position?: number
-}
-
-export interface ColumnUpdateRequest {
-  title?: string
-  position?: number
-}
-
-export interface TaskCreateRequest {
-  title: string
-  description?: string
-}
-
-export interface TaskUpdateRequest {
-  title?: string
-  description?: string
-}
-
 export interface TaskMoveRequest {
   to_column_id: string | number
   target_position: number
@@ -98,11 +68,11 @@ export class KanbanApi {
     return apiService.get<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`)
   }
 
-  createBoard(payload: BoardCreateRequest): Promise<KanbanBoardDto> {
+  createBoard(payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
     return apiService.post<KanbanBoardDto>(`${this.endpoint}/boards`, payload)
   }
 
-  updateBoard(boardId: string | number, payload: BoardUpdateRequest): Promise<KanbanBoardDto> {
+  updateBoard(boardId: string | number, payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
     return apiService.patch<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`, payload)
   }
 
@@ -114,11 +84,11 @@ export class KanbanApi {
   // Column Endpoints
   // -----------------
 
-  createColumn(boardId: string | number, payload: ColumnCreateRequest): Promise<KanbanColumnDto> {
+  createColumn(boardId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
     return apiService.post<KanbanColumnDto>(`${this.endpoint}/boards/${boardId}/columns`, payload)
   }
 
-  updateColumn(columnId: string | number, payload: ColumnUpdateRequest): Promise<KanbanColumnDto> {
+  updateColumn(columnId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
     return apiService.patch<KanbanColumnDto>(`${this.endpoint}/columns/${columnId}`, payload)
   }
 
@@ -130,11 +100,11 @@ export class KanbanApi {
   // Task Endpoints
   // -----------------
 
-  createTask(columnId: string | number, payload: TaskCreateRequest): Promise<KanbanTaskDto> {
+  createTask(columnId: string | number, payload: Partial<KanbanTaskDto>): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/columns/${columnId}/tasks`, payload)
   }
 
-  updateTask(taskId: string | number, payload: TaskUpdateRequest): Promise<KanbanTaskDto> {
+  updateTask(taskId: string | number, payload: Partial<KanbanTaskDto>): Promise<KanbanTaskDto> {
     return apiService.patch<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}`, payload)
   }
 
