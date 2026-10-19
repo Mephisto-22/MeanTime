@@ -40,11 +40,11 @@ export class ApiService {
    */
   protected async request<T>(
     endpoint: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     data?: any,
     options: ApiRequestOptions = {},
   ): Promise<T> {
-    const isBodyMethod = method === 'POST' || method === 'PUT'
+    const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH'
     const { auth = true, headers, ...fetchOptions } = options
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
@@ -113,6 +113,13 @@ export class ApiService {
    */
   put<T>(url: string, body?: any, options?: ApiRequestOptions): Promise<T> {
     return this.request<T>(url, 'PUT', body, options)
+  }
+
+  /**
+   * Send a PATCH request with body payload.
+   */
+  patch<T>(url: string, body?: any, options?: ApiRequestOptions): Promise<T> {
+    return this.request<T>(url, 'PATCH', body, options)
   }
 
   /**
