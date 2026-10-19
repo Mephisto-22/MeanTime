@@ -10,7 +10,7 @@
           :to="`/boards/${board.id}`"
           class="min-w-0 break-words outline-none after:absolute after:inset-0 after:content-['']"
         >
-          {{ board.name }}
+          {{ board.title }}
         </NuxtLink>
         <!-- relative z-10 keeps the button above the stretched link so it stays clickable. -->
         <Button
@@ -20,7 +20,7 @@
           rounded
           size="small"
           class="relative z-10 shrink-0"
-          :aria-label="`Edit ${board.name}`"
+          :aria-label="`Edit ${board.title}`"
           @click="emit('edit', board)"
         />
       </div>
@@ -34,15 +34,15 @@
 </template>
 
 <script setup lang="ts">
-import type {KanbanBoardSummary} from '~/api/kanban';
+import type {KanbanBoardDto} from '~/api/kanban';
 
 interface Props {
-  board: KanbanBoardSummary;
+  board: KanbanBoardDto;
 }
 
 interface Emits {
   /** Fired when the user asks to edit this board. */
-  edit: [board: KanbanBoardSummary];
+  edit: [board: KanbanBoardDto];
 }
 
 defineProps<Props>();

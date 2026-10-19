@@ -97,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import {kanbanApi, type KanbanBoardSummary} from '~/api/kanban';
+import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 
 // The backend is the source of truth: after every create or edit the list is
 // fetched again rather than patched locally.
@@ -113,14 +113,14 @@ const {
 // State for the create/edit dialog. A null boardBeingEdited means the dialog
 // is creating a new board.
 const isDialogOpen = ref(false);
-const boardBeingEdited = ref<KanbanBoardSummary | null>(null);
+const boardBeingEdited = ref<KanbanBoardDto | null>(null);
 
 function openCreateDialog(): void {
   boardBeingEdited.value = null;
   isDialogOpen.value = true;
 }
 
-function openEditDialog(board: KanbanBoardSummary): void {
+function openEditDialog(board: KanbanBoardDto): void {
   boardBeingEdited.value = board;
   isDialogOpen.value = true;
 }

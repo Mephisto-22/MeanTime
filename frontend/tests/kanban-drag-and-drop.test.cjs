@@ -40,9 +40,9 @@ function setupBoard(initialBoard, { mockMoveTask } = {}) {
         return {
           kanbanContextKey: Symbol('kanbanContext'),
           kanbanApi: {
-            moveTask: async (req) => {
-              apiCalls.push(req)
-              if (mockMoveTask) return mockMoveTask(req)
+            moveTask: async (taskId, payload) => {
+              apiCalls.push(typeof taskId === 'object' ? taskId : { taskId, ...payload })
+              if (mockMoveTask) return mockMoveTask(taskId, payload)
             },
           },
         }
@@ -69,7 +69,7 @@ function setupBoard(initialBoard, { mockMoveTask } = {}) {
   }
 }
 
-test('Task component: renders task name and grab cursor without three-dot menu button or popup menu', () => {
+test('Task component: renders task title and grab cursor without three-dot menu button or popup menu', () => {
   assert.equal(
     taskSource.includes('task-action-menu-button'),
     false,
@@ -88,22 +88,31 @@ test('Task component: renders task name and grab cursor without three-dot menu b
     taskSource.includes('data-testid="kanban-task"'),
     'Task component must retain data-testid="kanban-task"',
   )
+  assert.ok(
+    taskSource.includes('task.title'),
+    'Task component must display task.title',
+  )
+  assert.equal(
+    taskSource.includes('task.name'),
+    false,
+    'Task component must not reference task.name',
+  )
 })
 
 test('Vertical drag within column: reorders task at designated index, re-indexes orders, and dispatches to API', async () => {
   const initialBoard = {
     id: 'board-1',
-    name: 'Board',
+    title: 'Board',
     columns: [
       {
         id: 'col-1',
-        name: 'To Do',
-        order: 0,
+        title: 'To Do',
+        position: 0,
         boardId: 'board-1',
         tasks: [
-          { id: 't-1', name: 'Task 1', order: 0, columnId: 'col-1' },
-          { id: 't-2', name: 'Task 2', order: 1, columnId: 'col-1' },
-          { id: 't-3', name: 'Task 3', order: 2, columnId: 'col-1' },
+          { id: 't-1', title: 'Task 1', position: 0, columnId: 'col-1' },
+          { id: 't-2', title: 'Task 2', position: 1, columnId: 'col-1' },
+          { id: 't-3', title: 'Task 3', position: 2, columnId: 'col-1' },
         ],
       },
     ],
@@ -111,56 +120,55 @@ test('Vertical drag within column: reorders task at designated index, re-indexes
 
   const { context, apiCalls, exposed } = setupBoard(initialBoard)
 
-  // Move t-3 (originally at index 2) to top (targetOrder: 0)
+  // Move t-3 (originally at index 2) to top (targetPosition: 0)
   await context.moveTask({
     taskId: 't-3',
     fromColumnId: 'col-1',
     toColumnId: 'col-1',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 
   const calls = normalize(apiCalls)
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-3',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-1',
-    targetOrder: 0,
+    to_column_id: 'col-1',
+    target_position: 0,
   })
 
   // Verify task reindexing in column 1
   const col1Tasks = normalize(exposed.localColumns.value[0].tasks)
   assert.equal(col1Tasks.length, 3)
-  assert.deepEqual(col1Tasks.map(t => ({ id: t.id, order: t.order })), [
-    { id: 't-3', order: 0 },
-    { id: 't-1', order: 1 },
-    { id: 't-2', order: 2 },
+  assert.deepEqual(col1Tasks.map(t => ({ id: t.id, position: t.position })), [
+    { id: 't-3', position: 0 },
+    { id: 't-1', position: 1 },
+    { id: 't-2', position: 2 },
   ])
 })
 
 test('Horizontal drag between columns: moves task to target column at index, updates columnId, re-indexes both columns, and dispatches API', async () => {
   const initialBoard = {
     id: 'board-1',
-    name: 'Board',
+    title: 'Board',
     columns: [
       {
         id: 'col-1',
-        name: 'To Do',
-        order: 0,
+        title: 'To Do',
+        position: 0,
         boardId: 'board-1',
         tasks: [
-          { id: 't-1', name: 'Task 1', order: 0, columnId: 'col-1' },
-          { id: 't-2', name: 'Task 2', order: 1, columnId: 'col-1' },
+          { id: 't-1', title: 'Task 1', position: 0, columnId: 'col-1' },
+          { id: 't-2', title: 'Task 2', position: 1, columnId: 'col-1' },
         ],
       },
       {
         id: 'col-2',
-        name: 'In Progress',
-        order: 1,
+        title: 'In Progress',
+        position: 1,
         boardId: 'board-1',
         tasks: [
-          { id: 't-3', name: 'Task 3', order: 0, columnId: 'col-2' },
-          { id: 't-4', name: 'Task 4', order: 1, columnId: 'col-2' },
+          { id: 't-3', title: 'Task 3', position: 0, columnId: 'col-2' },
+          { id: 't-4', title: 'Task 4', position: 1, columnId: 'col-2' },
         ],
       },
     ],
@@ -168,58 +176,57 @@ test('Horizontal drag between columns: moves task to target column at index, upd
 
   const { context, apiCalls, exposed } = setupBoard(initialBoard)
 
-  // Drag t-1 from col-1 to col-2 between t-3 and t-4 (targetOrder: 1)
+  // Drag t-1 from col-1 to col-2 between t-3 and t-4 (targetPosition: 1)
   await context.moveTask({
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-2',
-    targetOrder: 1,
+    targetPosition: 1,
   })
 
   const calls = normalize(apiCalls)
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-1',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-2',
-    targetOrder: 1,
+    to_column_id: 'col-2',
+    target_position: 1,
   })
 
   // Verify col-1 tasks updated and re-indexed
   const col1Tasks = normalize(exposed.localColumns.value[0].tasks)
   assert.equal(col1Tasks.length, 1)
-  assert.deepEqual(col1Tasks.map(t => ({ id: t.id, order: t.order })), [
-    { id: 't-2', order: 0 },
+  assert.deepEqual(col1Tasks.map(t => ({ id: t.id, position: t.position })), [
+    { id: 't-2', position: 0 },
   ])
 
   // Verify col-2 tasks updated with inserted task, columnId updated, and re-indexed
   const col2Tasks = normalize(exposed.localColumns.value[1].tasks)
   assert.equal(col2Tasks.length, 3)
-  assert.deepEqual(col2Tasks.map(t => ({ id: t.id, order: t.order, columnId: t.columnId })), [
-    { id: 't-3', order: 0, columnId: 'col-2' },
-    { id: 't-1', order: 1, columnId: 'col-2' },
-    { id: 't-4', order: 2, columnId: 'col-2' },
+  assert.deepEqual(col2Tasks.map(t => ({ id: t.id, position: t.position, columnId: t.columnId })), [
+    { id: 't-3', position: 0, columnId: 'col-2' },
+    { id: 't-1', position: 1, columnId: 'col-2' },
+    { id: 't-4', position: 2, columnId: 'col-2' },
   ])
 })
 
 test('Empty column drop mechanics: dropping task into empty column places it at index 0, updates columnId, and empties source', async () => {
   const initialBoard = {
     id: 'board-1',
-    name: 'Board',
+    title: 'Board',
     columns: [
       {
         id: 'col-1',
-        name: 'To Do',
-        order: 0,
+        title: 'To Do',
+        position: 0,
         boardId: 'board-1',
         tasks: [
-          { id: 't-1', name: 'Task 1', order: 0, columnId: 'col-1' },
+          { id: 't-1', title: 'Task 1', position: 0, columnId: 'col-1' },
         ],
       },
       {
         id: 'col-empty',
-        name: 'Empty Column',
-        order: 1,
+        title: 'Empty Column',
+        position: 1,
         boardId: 'board-1',
         tasks: [],
       },
@@ -232,28 +239,27 @@ test('Empty column drop mechanics: dropping task into empty column places it at 
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-empty',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 
   const calls = normalize(apiCalls)
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0], {
     taskId: 't-1',
-    fromColumnId: 'col-1',
-    toColumnId: 'col-empty',
-    targetOrder: 0,
+    to_column_id: 'col-empty',
+    target_position: 0,
   })
 
   // Source column is now empty
   assert.equal(exposed.localColumns.value[0].tasks.length, 0)
 
-  // Target column now contains the moved task at order 0
+  // Target column now contains the moved task at position 0
   const targetTasks = normalize(exposed.localColumns.value[1].tasks)
   assert.equal(targetTasks.length, 1)
   assert.deepEqual(targetTasks[0], {
     id: 't-1',
-    name: 'Task 1',
-    order: 0,
+    title: 'Task 1',
+    position: 0,
     columnId: 'col-empty',
   })
 })
@@ -261,21 +267,21 @@ test('Empty column drop mechanics: dropping task into empty column places it at 
 test('Persistence failure: logs warning without throwing or breaking local board state', async () => {
   const initialBoard = {
     id: 'board-1',
-    name: 'Board',
+    title: 'Board',
     columns: [
       {
         id: 'col-1',
-        name: 'To Do',
-        order: 0,
+        title: 'To Do',
+        position: 0,
         boardId: 'board-1',
         tasks: [
-          { id: 't-1', name: 'Task 1', order: 0, columnId: 'col-1' },
+          { id: 't-1', title: 'Task 1', position: 0, columnId: 'col-1' },
         ],
       },
       {
         id: 'col-2',
-        name: 'In Progress',
-        order: 1,
+        title: 'In Progress',
+        position: 1,
         boardId: 'board-1',
         tasks: [],
       },
@@ -293,19 +299,19 @@ test('Persistence failure: logs warning without throwing or breaking local board
       },
     })
 
-    await context.moveTask({
-      taskId: 't-1',
-      fromColumnId: 'col-1',
-      toColumnId: 'col-2',
-      targetOrder: 0,
-    })
+  await context.moveTask({
+    taskId: 't-1',
+    fromColumnId: 'col-1',
+    toColumnId: 'col-2',
+    targetPosition: 0,
+  })
 
-    assert.equal(warnings.length, 1)
-    assert.match(warnings[0][0], /Failed to persist task movement/)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0][0], /Failed to persist task movement/)
 
-    // State is optimistically maintained
-    assert.equal(exposed.localColumns.value[0].tasks.length, 0)
-    assert.equal(exposed.localColumns.value[1].tasks.length, 1)
+  // State is optimistically maintained
+  assert.equal(exposed.localColumns.value[0].tasks.length, 0)
+  assert.equal(exposed.localColumns.value[1].tasks.length, 1)
   } finally {
     console.warn = originalWarn
   }
@@ -393,12 +399,12 @@ function setupColumn(columnData, { moveTask } = {}) {
 test('Column component event dispatching: onUpdate within column dispatches moveTask to kanbanContext', () => {
   const columnData = {
     id: 'col-1',
-    name: 'To Do',
-    order: 0,
+    title: 'To Do',
+    position: 0,
     boardId: 'b1',
     tasks: [
-      { id: 't-1', name: 'Task 1', order: 0, columnId: 'col-1' },
-      { id: 't-2', name: 'Task 2', order: 1, columnId: 'col-1' },
+      { id: 't-1', title: 'Task 1', position: 0, columnId: 'col-1' },
+      { id: 't-2', title: 'Task 2', position: 1, columnId: 'col-1' },
     ],
   }
 
@@ -416,15 +422,15 @@ test('Column component event dispatching: onUpdate within column dispatches move
     taskId: 't-2',
     fromColumnId: 'col-1',
     toColumnId: 'col-1',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 })
 
 test('Column component event dispatching: onAdd across columns dispatches moveTask to kanbanContext', () => {
   const columnData = {
     id: 'col-2',
-    name: 'In Progress',
-    order: 1,
+    title: 'In Progress',
+    position: 1,
     boardId: 'b1',
     tasks: [],
   }
@@ -447,7 +453,7 @@ test('Column component event dispatching: onAdd across columns dispatches moveTa
     taskId: 't-1',
     fromColumnId: 'col-1',
     toColumnId: 'col-2',
-    targetOrder: 0,
+    targetPosition: 0,
   })
 })
 

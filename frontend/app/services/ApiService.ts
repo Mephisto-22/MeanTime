@@ -1,6 +1,6 @@
 /**
  * ApiService provides a centralized HTTP client wrapper around Nuxt's $fetch.
- * It encapsulates standard HTTP methods (GET, POST, PUT, PATCH, DELETE), manages headers,
+ * It encapsulates standard HTTP methods (GET, POST, PUT, DELETE), manages headers,
  * serializes request payloads and query parameters, and normalizes error handling.
  */
 
@@ -40,7 +40,7 @@ export class ApiService {
    */
   protected async request<T>(
     endpoint: string,
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     data?: any,
     options: ApiRequestOptions = {},
   ): Promise<T> {
@@ -116,7 +116,7 @@ export class ApiService {
   }
 
   /**
-   * Send a PATCH request with body payload (a partial update).
+   * Send a PATCH request with body payload.
    */
   patch<T>(url: string, body?: any, options?: ApiRequestOptions): Promise<T> {
     return this.request<T>(url, 'PATCH', body, options)

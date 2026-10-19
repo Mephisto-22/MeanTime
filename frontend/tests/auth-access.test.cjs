@@ -129,3 +129,79 @@ test('server middleware does not read browser storage', async () => {
   }, { 'import.meta.server': 'true' })
   assert.equal(await guard({ meta: {}, fullPath: '/' }), undefined)
 })
+
+test('ApiService.patch sends PATCH method with serialized body, json header, and bearer auth', async () => {
+  const calls = []
+  const { ApiService } = compile('../app/services/ApiService.ts', {
+    async $fetch(url, options) {
+      calls.push({ url, options })
+      return { id: 1, title: 'Updated' }
+    },
+  })
+  const api = new ApiService()
+  api.setAuthHandler({
+    getAccessToken: () => 'valid-token',
+    async refresh() {},
+    async expireSession() {},
+  })
+  const result = await api.patch('/api/kanban/boards/1', { title: 'Updated' }, { headers: { 'X-Custom': 'value' } })
+  assert.deepEqual(result, { id: 1, title: 'Updated' })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].url, '/api/kanban/boards/1')
+  assert.equal(calls[0].options.method, 'PATCH')
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer valid-token')
+  assert.equal(calls[0].options.headers['Content-Type'], 'application/json')
+  assert.equal(calls[0].options.headers['X-Custom'], 'value')
+  assert.deepEqual(calls[0].options.body, { title: 'Updated' })
+  assert.equal(calls[0].options.query, undefined)
+})
+
+test('ApiService.patch retries once on 401 with refreshed token and preserves body and headers', async () => {
+  const calls = []
+  let access = 'old-token'
+  let refreshes = 0
+  const { ApiService } = compile('../app/services/ApiService.ts', {
+    async $fetch(url, options) {
+      calls.push({ url, options })
+      if (options.headers.Authorization === 'Bearer old-token') throw unauthorized()
+      return { id: 2, title: 'Patched' }
+    },
+  })
+  const api = new ApiService()
+  api.setAuthHandler({
+    getAccessToken: () => access,
+    async refresh() { refreshes++; access = 'new-token' },
+    async expireSession() { assert.fail('Valid refresh should not expire session') },
+  })
+  const result = await api.patch('/api/kanban/columns/2', { title: 'Patched', position: 1 })
+  assert.deepEqual(result, { id: 2, title: 'Patched' })
+  assert.equal(refreshes, 1)
+  assert.equal(calls.length, 2)
+  assert.equal(calls[0].options.method, 'PATCH')
+  assert.equal(calls[1].options.method, 'PATCH')
+  assert.equal(calls[1].options.headers.Authorization, 'Bearer new-token')
+  assert.deepEqual(calls[1].options.body, { title: 'Patched', position: 1 })
+})
+
+test('ApiService.patch normalizes error responses into ApiError instances', async () => {
+  const { ApiService, ApiError } = compile('../app/services/ApiService.ts', {
+    async $fetch() {
+      const err = new Error('Bad Request')
+      err.statusCode = 400
+      err.data = { detail: 'Validation failed' }
+      throw err
+    },
+  })
+  const api = new ApiService()
+  await assert.rejects(
+    api.patch('/api/kanban/tasks/3', { title: '' }),
+    (error) => {
+      assert.equal(error.name, 'ApiError')
+      assert.equal(error.statusCode, 400)
+      assert.equal(error.message, 'Validation failed')
+      assert.deepEqual(error.data, { detail: 'Validation failed' })
+      return true
+    },
+  )
+})
+

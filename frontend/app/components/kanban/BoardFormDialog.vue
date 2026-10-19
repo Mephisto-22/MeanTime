@@ -14,25 +14,25 @@
     >
       <div class="flex flex-col gap-2">
         <label
-          for="board-name"
+          for="board-title-input"
           class="font-medium"
         >
           Name
         </label>
         <InputText
-          id="board-name"
-          v-model="name"
-          data-testid="board-name-input"
+          id="board-title-input"
+          v-model="title"
+          data-testid="board-title-input"
           autofocus
           fluid
-          :maxlength="NAME_MAX_LENGTH"
-          :invalid="showNameError"
-          :aria-describedby="showNameError ? 'board-name-error' : undefined"
+          :maxlength="TITLE_MAX_LENGTH"
+          :invalid="showTitleError"
+          :aria-describedby="showTitleError ? 'board-title-error' : undefined"
         />
         <Message
-          v-if="showNameError"
-          id="board-name-error"
-          data-testid="board-name-error"
+          v-if="showTitleError"
+          id="board-title-error"
+          data-testid="board-title-error"
           severity="error"
           size="small"
           variant="simple"
@@ -43,7 +43,7 @@
 
       <div class="flex flex-col gap-2">
         <label
-          for="board-description"
+          for="board-description-input"
           class="font-medium"
         >
           Description
@@ -52,7 +52,7 @@
           </span>
         </label>
         <Textarea
-          id="board-description"
+          id="board-description-input"
           v-model="description"
           data-testid="board-description-input"
           rows="3"
@@ -90,24 +90,20 @@
 </template>
 
 <script setup lang="ts">
-import {
-  kanbanApi,
-  type KanbanBoardInput,
-  type KanbanBoardSummary,
-} from '~/api/kanban';
+import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 
 interface Props {
   /** The board to edit, or null to create a new one. */
-  board: KanbanBoardSummary | null;
+  board: KanbanBoardDto | null;
 }
 
 interface Emits {
   /** Fired after the backend has saved the board, so the page can re-fetch. */
-  saved: [board: KanbanBoardSummary];
+  saved: [board: KanbanBoardDto];
 }
 
 // Matches the max_length of Board.title in backend/kanban/models.py.
-const NAME_MAX_LENGTH = 100;
+const TITLE_MAX_LENGTH = 100;
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
@@ -115,16 +111,16 @@ const emit = defineEmits<Emits>();
 /** Whether the dialog is open. Bound by the parent with v-model:visible. */
 const visible = defineModel<boolean>('visible', {required: true});
 
-const name = ref('');
+const title = ref('');
 const description = ref('');
 const wasSubmitted = ref(false);
 const isSaving = ref(false);
 const saveFailed = ref(false);
 
 const isEditing = computed(() => props.board !== null);
-const trimmedName = computed(() => name.value.trim());
-const showNameError = computed(
-  () => wasSubmitted.value && trimmedName.value === '',
+const trimmedTitle = computed(() => title.value.trim());
+const showTitleError = computed(
+  () => wasSubmitted.value && trimmedTitle.value === '',
 );
 
 // Start from a clean form every time the dialog opens, so values and errors
@@ -133,7 +129,7 @@ watch(visible, isOpen => {
   if (!isOpen) {
     return;
   }
-  name.value = props.board?.name ?? '';
+  title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
   wasSubmitted.value = false;
   saveFailed.value = false;
@@ -141,12 +137,13 @@ watch(visible, isOpen => {
 
 async function save(): Promise<void> {
   wasSubmitted.value = true;
-  if (trimmedName.value === '' || isSaving.value) {
+  if (trimmedTitle.value === '' || isSaving.value) {
     return;
   }
 
-  const input: KanbanBoardInput = {
-    name: trimmedName.value,
+  // The backend replaces both fields on every update, so always send both.
+  const payload = {
+    title: trimmedTitle.value,
     description: description.value.trim(),
   };
 
@@ -155,8 +152,8 @@ async function save(): Promise<void> {
   try {
     const saved =
       props.board !== null
-        ? await kanbanApi.updateBoard(props.board.id, input)
-        : await kanbanApi.createBoard(input);
+        ? await kanbanApi.updateBoard(props.board.id, payload)
+        : await kanbanApi.createBoard(payload);
     emit('saved', saved);
     visible.value = false;
   } catch {

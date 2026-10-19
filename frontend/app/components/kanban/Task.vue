@@ -7,7 +7,7 @@
   >
     <template #content>
       <div class="flex items-center gap-2">
-        <span class="text-sm font-medium">{{ task.name }}</span>
+        <span class="text-sm font-medium">{{ task.title }}</span>
       </div>
     </template>
   </Card>
