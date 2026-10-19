@@ -52,6 +52,19 @@
         />
       </VueDraggable>
     </div>
+
+    <!-- Add Task Button -->
+    <div class="mt-2 shrink-0 pt-1">
+      <Button
+        data-testid="add-task-button"
+        label="+ Add Task"
+        severity="secondary"
+        text
+        size="small"
+        class="w-full justify-center text-sm font-medium"
+        @click="handleAddTask"
+      />
+    </div>
   </div>
 </template>
 
@@ -108,4 +121,17 @@ const onAdd = (event: any) => {
     })
   }
 }
+
+const handleAddTask = () => {
+  if (kanbanContext?.openCreateTaskDialog) {
+    kanbanContext.openCreateTaskDialog(props.column.id)
+  }
+}
+
+defineExpose({
+  tasks,
+  onUpdate,
+  onAdd,
+  handleAddTask,
+})
 </script>
