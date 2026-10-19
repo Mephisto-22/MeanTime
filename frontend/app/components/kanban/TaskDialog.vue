@@ -36,21 +36,65 @@
         />
       </div>
 
-      <div class="flex justify-end gap-2">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          text
-          data-testid="task-cancel-button"
-          @click="cancel"
-        />
-        <Button
-          type="submit"
-          data-testid="task-save-button"
-          :label="mode === 'edit' ? 'Save' : 'Create'"
-          :disabled="isSaveDisabled"
-        />
+      <!-- Delete Confirmation Step -->
+      <div
+        v-if="isConfirmingDelete"
+        data-testid="task-delete-confirmation"
+        class="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30"
+      >
+        <p class="text-sm font-medium text-red-800 dark:text-red-200">
+          Are you sure you want to delete this task? This cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+          <Button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            size="small"
+            text
+            data-testid="task-cancel-delete-button"
+            @click="cancelDelete"
+          />
+          <Button
+            type="button"
+            label="Confirm Delete"
+            severity="danger"
+            size="small"
+            data-testid="task-confirm-delete-button"
+            @click="confirmDelete"
+          />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div v-if="!isConfirmingDelete" class="flex items-center justify-between gap-2 pt-2">
+        <div>
+          <Button
+            v-if="mode === 'edit'"
+            type="button"
+            label="Delete Task"
+            severity="danger"
+            text
+            data-testid="task-delete-button"
+            @click="initiateDelete"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <Button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            text
+            data-testid="task-cancel-button"
+            @click="cancel"
+          />
+          <Button
+            type="submit"
+            data-testid="task-save-button"
+            :label="mode === 'edit' ? 'Save' : 'Create'"
+            :disabled="isSaveDisabled"
+          />
+        </div>
       </div>
     </form>
   </Dialog>
@@ -76,6 +120,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'save', payload: TaskDialogSavePayload): void
+  (e: 'delete', taskId: string | number): void
   (e: 'cancel'): void
 }>()
 
@@ -86,11 +131,13 @@ const isVisible = computed({
 
 const title = ref('')
 const description = ref('')
+const isConfirmingDelete = ref(false)
 
 const trimmedTitle = computed(() => title.value.trim())
 const isSaveDisabled = computed(() => trimmedTitle.value === '')
 
 const syncFormWithProps = () => {
+  isConfirmingDelete.value = false
   if (props.mode === 'edit' && props.task) {
     title.value = props.task.title ?? ''
     description.value = props.task.description ?? ''
@@ -119,13 +166,30 @@ watch(
   },
 )
 
+const initiateDelete = () => {
+  isConfirmingDelete.value = true
+}
+
+const cancelDelete = () => {
+  isConfirmingDelete.value = false
+}
+
+const confirmDelete = () => {
+  if (props.task?.id != null) {
+    emit('delete', props.task.id)
+  }
+  isVisible.value = false
+  isConfirmingDelete.value = false
+}
+
 const cancel = () => {
   isVisible.value = false
+  isConfirmingDelete.value = false
   emit('cancel')
 }
 
 const save = () => {
-  if (isSaveDisabled.value) {
+  if (isSaveDisabled.value || isConfirmingDelete.value) {
     return
   }
   emit('save', {
@@ -143,6 +207,10 @@ defineExpose({
   description,
   isSaveDisabled,
   isVisible,
+  isConfirmingDelete,
+  initiateDelete,
+  cancelDelete,
+  confirmDelete,
   cancel,
   save,
 })

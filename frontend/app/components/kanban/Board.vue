@@ -41,6 +41,7 @@
         :task="activeTask"
         :column-id="activeColumnId"
         @save="handleSaveTask"
+        @delete="handleDeleteTask"
       />
     </template>
   </Card>
@@ -258,17 +259,106 @@ const handleUpdateTask = async (
   taskId: string | number,
   payload: Partial<KanbanTaskDto>,
 ): Promise<void> => {
+  let targetTask: KanbanTaskDto | undefined
+
+  for (const col of localColumns.value) {
+    const found = col.tasks.find(t => sameId(t.id, taskId))
+    if (found) {
+      targetTask = found
+      break
+    }
+  }
+
+  if (!targetTask) return
+
+  errorMessage.value = null
+  const previousTitle = targetTask.title
+  const previousDescription = targetTask.description
+
+  // Optimistic update
+  if (payload.title !== undefined) {
+    targetTask.title = payload.title
+  }
+  if (payload.description !== undefined) {
+    targetTask.description = payload.description
+  }
+
   try {
-    await kanbanApi.updateTask(taskId, payload)
+    const updated = await kanbanApi.updateTask(taskId, {
+      title: payload.title,
+      description: payload.description,
+    })
+    if (updated) {
+      let currentTask = targetTask
+      for (const col of localColumns.value) {
+        const found = col.tasks.find(t => sameId(t.id, taskId))
+        if (found) {
+          currentTask = found
+          break
+        }
+      }
+      if (updated.title !== undefined) currentTask.title = updated.title
+      if (updated.description !== undefined) currentTask.description = updated.description
+    }
   } catch (err) {
+    let currentTask = targetTask
+    for (const col of localColumns.value) {
+      const found = col.tasks.find(t => sameId(t.id, taskId))
+      if (found) {
+        currentTask = found
+        break
+      }
+    }
+    currentTask.title = previousTitle
+    currentTask.description = previousDescription
+
+    const message = (err as any)?.message
+      ? `Failed to update task: ${(err as any).message}`
+      : 'Failed to update task'
+    errorMessage.value = message
     console.warn('Failed to update task:', err)
   }
 }
 
 const handleDeleteTask = async (taskId: string | number): Promise<void> => {
+  let targetCol: KanbanColumnDto | undefined
+  let targetIndex = -1
+  let deletedTask: KanbanTaskDto | undefined
+
+  for (const col of localColumns.value) {
+    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
+    if (idx !== -1) {
+      targetCol = col
+      targetIndex = idx
+      deletedTask = col.tasks[idx]
+      break
+    }
+  }
+
+  if (!targetCol || !deletedTask || targetIndex === -1) return
+
+  errorMessage.value = null
+  const originalColId = targetCol.id
+  const originalPosition = targetIndex
+  const snapshotTask: KanbanTaskDto = { ...deletedTask }
+
+  // Optimistically remove from column
+  targetCol.tasks.splice(targetIndex, 1)
+  reindexTasks(targetCol.tasks)
+
   try {
     await kanbanApi.deleteTask(taskId)
   } catch (err) {
+    // Restore task to original column and position
+    let restoreCol = localColumns.value.find(col => sameId(col.id, originalColId)) || targetCol
+    const restorePos = Math.max(0, Math.min(originalPosition, restoreCol.tasks.length))
+    restoreCol.tasks.splice(restorePos, 0, snapshotTask)
+    reindexTasks(restoreCol.tasks)
+
+    const message = (err as any)?.message
+      ? `Failed to delete task: ${(err as any).message}`
+      : 'Failed to delete task'
+    errorMessage.value = message
     console.warn('Failed to delete task:', err)
   }
 }
