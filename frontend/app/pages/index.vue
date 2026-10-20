@@ -10,6 +10,7 @@
         </p>
       </div>
       <Button
+        v-if="boards.length != 0"
         data-testid="new-board-button"
         label="New board"
         icon="pi pi-plus"
