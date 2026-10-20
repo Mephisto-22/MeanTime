@@ -7,10 +7,21 @@
       <span data-testid="board-description">{{ board.description }}</span>
     </template>
     <template #content>
+      <!-- Error Notification Banner -->
+      <Message
+        v-if="errorMessage"
+        data-testid="board-error-banner"
+        severity="error"
+        class="mb-3"
+        @close="errorMessage = null"
+      >
+        {{ errorMessage }}
+      </Message>
+
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
-        class="flex items-start gap-4 overflow-x-auto overflow-y-hidden pb-2"
+        class="flex w-full items-start gap-4 overflow-x-auto overflow-y-hidden pb-2"
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">
@@ -22,6 +33,16 @@
           </slot>
         </template>
       </div>
+
+      <!-- Centralized Task Dialog -->
+      <KanbanTaskDialog
+        v-model:visible="isTaskDialogOpen"
+        :mode="dialogMode"
+        :task="activeTask"
+        :column-id="activeColumnId"
+        @save="handleSaveTask"
+        @delete="handleDeleteTask"
+      />
     </template>
   </Card>
 </template>
@@ -34,6 +55,7 @@ import type {
   KanbanColumnSummary,
   KanbanTaskDto,
   TaskMoveContext,
+  TaskDialogSavePayload,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -148,13 +170,237 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
   }
 }
 
+const isTaskDialogOpen = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
+const activeTask = ref<KanbanTaskDto | null>(null)
+const activeColumnId = ref<string | number | null>(null)
+const errorMessage = ref<string | null>(null)
+
+const openCreateTaskDialog = (columnId: string | number): void => {
+  dialogMode.value = 'create'
+  activeTask.value = null
+  activeColumnId.value = columnId
+  isTaskDialogOpen.value = true
+}
+
+const openEditTaskDialog = (task: KanbanTaskDto): void => {
+  dialogMode.value = 'edit'
+  activeTask.value = task
+  activeColumnId.value = task.columnId
+  isTaskDialogOpen.value = true
+}
+
+const closeTaskDialog = (): void => {
+  isTaskDialogOpen.value = false
+}
+
+const handleCreateTask = async (
+  columnId: string | number,
+  payload: Partial<KanbanTaskDto>,
+): Promise<void> => {
+  const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
+  if (!targetCol) return
+
+  errorMessage.value = null
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const optimisticTask: KanbanTaskDto = {
+    id: tempId,
+    title: payload.title ?? '',
+    description: payload.description ?? '',
+    position: targetCol.tasks.length,
+    columnId,
+  }
+  targetCol.tasks.push(optimisticTask)
+
+  try {
+    const createdTask = await kanbanApi.createTask(columnId, {
+      title: payload.title,
+      description: payload.description,
+    })
+
+    let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
+    if (!taskInCol) {
+      for (const col of localColumns.value) {
+        taskInCol = col.tasks.find(t => sameId(t.id, tempId))
+        if (taskInCol) break
+      }
+    }
+    if (taskInCol && createdTask) {
+      taskInCol.id = createdTask.id
+      if (createdTask.position !== undefined) {
+        taskInCol.position = createdTask.position
+      }
+    }
+  } catch (err) {
+    let containingCol = targetCol
+    let taskPosition = containingCol.tasks.findIndex(t => sameId(t.id, tempId))
+    if (taskPosition === -1) {
+      for (const col of localColumns.value) {
+        taskPosition = col.tasks.findIndex(t => sameId(t.id, tempId))
+        if (taskPosition !== -1) {
+          containingCol = col
+          break
+        }
+      }
+    }
+    if (taskPosition !== -1) {
+      containingCol.tasks.splice(taskPosition, 1)
+      reindexTasks(containingCol.tasks)
+    }
+    const message = (err as any)?.message
+      ? `Failed to create task: ${(err as any).message}`
+      : 'Failed to create task'
+    errorMessage.value = message
+    console.warn('Failed to create task:', err)
+  }
+}
+
+const handleUpdateTask = async (
+  taskId: string | number,
+  payload: Partial<KanbanTaskDto>,
+): Promise<void> => {
+  let targetTask: KanbanTaskDto | undefined
+
+  for (const col of localColumns.value) {
+    const found = col.tasks.find(t => sameId(t.id, taskId))
+    if (found) {
+      targetTask = found
+      break
+    }
+  }
+
+  if (!targetTask) return
+
+  errorMessage.value = null
+  const previousTitle = targetTask.title
+  const previousDescription = targetTask.description
+
+  // Optimistic update
+  if (payload.title !== undefined) {
+    targetTask.title = payload.title
+  }
+  if (payload.description !== undefined) {
+    targetTask.description = payload.description
+  }
+
+  try {
+    const updated = await kanbanApi.updateTask(taskId, {
+      title: payload.title,
+      description: payload.description,
+    })
+    if (updated) {
+      let currentTask = targetTask
+      for (const col of localColumns.value) {
+        const found = col.tasks.find(t => sameId(t.id, taskId))
+        if (found) {
+          currentTask = found
+          break
+        }
+      }
+      if (updated.title !== undefined) currentTask.title = updated.title
+      if (updated.description !== undefined) currentTask.description = updated.description
+    }
+  } catch (err) {
+    let currentTask = targetTask
+    for (const col of localColumns.value) {
+      const found = col.tasks.find(t => sameId(t.id, taskId))
+      if (found) {
+        currentTask = found
+        break
+      }
+    }
+    currentTask.title = previousTitle
+    currentTask.description = previousDescription
+
+    const message = (err as any)?.message
+      ? `Failed to update task: ${(err as any).message}`
+      : 'Failed to update task'
+    errorMessage.value = message
+    console.warn('Failed to update task:', err)
+  }
+}
+
+const handleDeleteTask = async (taskId: string | number): Promise<void> => {
+  let targetCol: KanbanColumnDto | undefined
+  let targetIndex = -1
+  let deletedTask: KanbanTaskDto | undefined
+
+  for (const col of localColumns.value) {
+    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
+    if (idx !== -1) {
+      targetCol = col
+      targetIndex = idx
+      deletedTask = col.tasks[idx]
+      break
+    }
+  }
+
+  if (!targetCol || !deletedTask || targetIndex === -1) return
+
+  errorMessage.value = null
+  const originalColId = targetCol.id
+  const originalPosition = targetIndex
+  const snapshotTask: KanbanTaskDto = { ...deletedTask }
+
+  // Optimistically remove from column
+  targetCol.tasks.splice(targetIndex, 1)
+  reindexTasks(targetCol.tasks)
+
+  try {
+    await kanbanApi.deleteTask(taskId)
+  } catch (err) {
+    // Restore task to original column and position
+    let restoreCol = localColumns.value.find(col => sameId(col.id, originalColId)) || targetCol
+    const restorePos = Math.max(0, Math.min(originalPosition, restoreCol.tasks.length))
+    restoreCol.tasks.splice(restorePos, 0, snapshotTask)
+    reindexTasks(restoreCol.tasks)
+
+    const message = (err as any)?.message
+      ? `Failed to delete task: ${(err as any).message}`
+      : 'Failed to delete task'
+    errorMessage.value = message
+    console.warn('Failed to delete task:', err)
+  }
+}
+
+const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
+  if (savePayload.mode === 'create' && savePayload.columnId != null) {
+    await handleCreateTask(savePayload.columnId, {
+      title: savePayload.title,
+      description: savePayload.description,
+    })
+  } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
+    await handleUpdateTask(savePayload.taskId, {
+      title: savePayload.title,
+      description: savePayload.description,
+    })
+  }
+}
+
 provide(kanbanContextKey, {
   columns: columnRegistry,
   moveTask: handleMoveTask,
+  openCreateTaskDialog,
+  openEditTaskDialog,
+  createTask: handleCreateTask,
+  updateTask: handleUpdateTask,
+  deleteTask: handleDeleteTask,
 })
 
 defineExpose({
   localColumns,
   handleMoveTask,
+  isTaskDialogOpen,
+  dialogMode,
+  activeTask,
+  activeColumnId,
+  errorMessage,
+  openCreateTaskDialog,
+  openEditTaskDialog,
+  closeTaskDialog,
+  handleCreateTask,
+  handleUpdateTask,
+  handleDeleteTask,
+  handleSaveTask,
 })
 </script>

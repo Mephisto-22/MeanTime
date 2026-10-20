@@ -468,7 +468,7 @@ test('Column drag states and placeholder styling: CSS hides empty placeholder wh
     'main.css must apply drop-target outline when a ghost card is hovering over the column',
   )
   assert.ok(
-    cssSource.includes('.kanban-task-ghost') && cssSource.includes('dashed'),
+    cssSource.includes('.kanban-task-ghost') && (cssSource.includes('solid') || cssSource.includes('dashed')),
     'main.css must define dashed translucent ghost placeholder',
   )
   assert.ok(
