@@ -8,6 +8,7 @@ from .models import Board, BoardColumn, Task, TaskTimeEntry
 from .schemas import (
     TaskIn, 
     TaskOut, 
+    TaskUpdateIn,
     BoardColumnIn, 
     BoardColumnOut, 
     BoardIn, 
@@ -149,16 +150,27 @@ def create_task(request, column_id: int, payload: TaskIn):
         column=column,
         title=payload.title,
         description=payload.description,
+        priority=payload.priority.value,
         position=0 if last is None else last + 1,
     )
 
 @router.patch("/tasks/{task_id}", response=TaskOut)
-def update_task(request, task_id: int, payload: TaskIn):
-    """Update a task's name and description."""
+def update_task(request, task_id: int, payload: TaskUpdateIn):
+    """Update the supplied fields of a task."""
     task = get_owned_task(request.auth, task_id)
-    task.title = payload.title
-    task.description = payload.description
-    task.save()
+
+    updates = payload.dict(exclude_unset=True) # get fields included in request
+    for field, value in updates.items():
+        if value is None:
+            continue
+        if field == "priority":
+            value = value.Value
+
+        setattr(task, field, value)
+
+    if updates:
+        task.save()
+
     return task
 
 @router.delete("/tasks/{task_id}")

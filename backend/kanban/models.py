@@ -44,6 +44,16 @@ class BoardColumn(models.Model):
         return f"{self.board.title} = {self.title}"
 
 class Task(models.Model):
+    class Priority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    priority = models.CharField(
+            max_length=10,
+            choices=Priority.choices,
+            default=Priority.MEDIUM
+        )
     column = models.ForeignKey(
         to=BoardColumn,
         on_delete=models.CASCADE,

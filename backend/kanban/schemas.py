@@ -1,22 +1,35 @@
 from datetime import datetime
 from ninja import Schema
+from enum import Enum
+
+class TaskPriority(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 # Task schemas
 class TaskIn(Schema):
     """Payload expected when creating or updating a task."""
     title: str
     description: str = ""
+    priority: TaskPriority = TaskPriority.MEDIUM
 
 class TaskOut(Schema):
     """Shape of the task returned to clients."""
     id: int
     title: str
     description: str
+    priority: TaskPriority
     position: int
     column_id: int
     created_at: datetime
     updated_at: datetime
 
+# Allows us to update only part of a task without having to send a full TaskIn Schema
+class TaskUpdateIn(Schema):
+    title: str | None = None
+    description: str | None = None
+    priority: TaskPriority | None = None
 
 # Column Schemas
 class BoardColumnIn(Schema):
