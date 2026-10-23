@@ -50,6 +50,7 @@ For specialized guides on adding code and framework conventions, consult the sub
 
 - 📘 **[Backend Developer Guide](backend/README.md)**: Django Ninja setup, creating Django apps, database models, migrations lifecycle, schema definitions, and router registration.
 - 🎨 **[Frontend Developer Guide](frontend/README.md)**: Nuxt 4 app structure, page routing, auto-imported components, centralized HTTP client (`app/services/ApiService.ts`), domain APIs (`app/api/`), Pinia stores (`app/stores/`), and PrimeVue styling.
+- ☁️ **[Infrastructure Guide](infra/README.md)**: Terraform for the AWS Dev and Prod environments: layout, signing in with `aws login`, and bringing environments up and down.
 
 ---
 
@@ -169,6 +170,11 @@ MeanTime/
 │   ├── package.json                     # Frontend npm packages
 │   ├── tailwind.config.ts               # Tailwind CSS theme configuration
 │   └── README.md                        # Frontend developer guide
+├── infra/                               # Terraform for the AWS Dev and Prod environments
+│   ├── modules/                         # Shared Terraform modules
+│   ├── bootstrap/                       # One-time Terraform state bucket setup per account
+│   ├── envs/                            # dev/ and prod/, each with base/ and app/ layers
+│   └── README.md                        # Infrastructure guide
 ├── docs/                                # Documentation and architecture decisions
 │   ├── adr/                             # Architectural Decision Records (ADRs)
 │   └── agents/                          # Coding agent instructions and conventions
