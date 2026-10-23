@@ -39,4 +39,16 @@ provider "aws" {
   }
 }
 
-# ECR repositories are added in #45.
+module "ecr" {
+  source = "../../../modules/ecr"
+}
+
+output "repository_urls" {
+  description = "Image repository URLs for our own images: frontend and backend."
+  value       = module.ecr.repository_urls
+}
+
+output "registry" {
+  description = "Registry host to `docker login` to."
+  value       = module.ecr.registry
+}

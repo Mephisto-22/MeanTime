@@ -14,6 +14,7 @@ Each environment can be brought up for testing or a demo and torn down afterward
 ```text
 infra/
 ├── modules/
+│   ├── ecr/               # image repositories for our own images
 │   └── state-bucket/      # S3 bucket that stores Terraform state (used by bootstrap)
 ├── bootstrap/
 │   ├── dev/               # one-time: creates Dev's state bucket, writes envs/dev/backend.hcl
@@ -94,4 +95,12 @@ terraform destroy                                # tear it down
 - **Bring Dev up for testing:** `apply` in `envs/dev/base` (only the first time), then `envs/dev/app`.
 - **Tear Dev down afterwards:** `destroy` in `envs/dev/app`. Leave `base` alone so images don't need re-pushing.
 - **Prod** works the same way, from `envs/prod/`.
+
+---
+
+## Images
+
+The `base` layer creates two ECR repositories in each account for our own images, `meantime/frontend` and `meantime/backend`, and keeps the 10 most recent images in each.
+
+Third-party images, such as `postgres:18-alpine`, are pulled straight from Docker Hub. Dev's task has no public IP, but it reaches the internet through a NAT gateway.
 
