@@ -8,16 +8,19 @@ The project features a **Nuxt 4 / Vue 3** frontend, an asynchronous **Django Nin
 
 ---
 
-## 📖 Official Documentation
+## Official Documentation
 
 For comprehensive guides, architecture diagrams, and service walkthroughs, visit our documentation hosted on ReadTheDocs:
 
-👉 **[https://meantime.readthedocs.io](https://meantime.readthedocs.io)**
+- **[Stable Release (`main`)](https://meantime.readthedocs.io/en/latest/)**: Production documentation tracking the `main` branch
+- **[Active Development (`dev`)](https://meantime.readthedocs.io/en/dev/)**: Development documentation tracking the `dev` branch
 
-- 🚀 **[Getting Started](https://meantime.readthedocs.io/en/latest/getting-started/)**: Detailed setup, `.env` reference, and service verification.
-- 🏛️ **[Architecture & Domain](https://meantime.readthedocs.io/en/latest/architecture/)**: Container networking, Nitro proxy flow, and ubiquitous domain vocabulary.
-- ⚙️ **[Backend Service Guide](https://meantime.readthedocs.io/en/latest/backend/)**: Django Ninja architecture, database migrations, Pydantic schemas, and API testing.
-- 🎨 **[Frontend Service Guide](https://meantime.readthedocs.io/en/latest/frontend/)**: Nuxt 4, PrimeVue 5 + Tailwind integration, Pinia stores, and the `ApiService` pattern.
+### Direct Guides
+
+- **[Getting Started](https://meantime.readthedocs.io/en/latest/getting-started/)**: Detailed setup, `.env` reference, and service verification.
+- **[Architecture & Domain](https://meantime.readthedocs.io/en/latest/architecture/)**: Container networking, Nitro proxy flow, and ubiquitous domain vocabulary.
+- **[Backend Service Guide](https://meantime.readthedocs.io/en/latest/backend/)**: Django Ninja architecture, database migrations, Pydantic schemas, and API testing.
+- **[Frontend Service Guide](https://meantime.readthedocs.io/en/latest/frontend/)**: Nuxt 4, PrimeVue 5 + Tailwind integration, Pinia stores, and the `ApiService` pattern.
 
 ---
 
