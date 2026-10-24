@@ -39,4 +39,22 @@ provider "aws" {
   }
 }
 
-# The network is added in #46 and the ECS service in #47.
+module "network" {
+  source = "../../../modules/network"
+
+  environment = "prod"
+  public      = true
+  vpc_cidr    = "10.20.0.0/16"
+}
+
+# The ECS service is added in #47.
+
+output "vpc_id" {
+  description = "ID of the prod VPC."
+  value       = module.network.vpc_id
+}
+
+output "task_subnet_ids" {
+  description = "Subnets the ECS task runs in."
+  value       = module.network.task_subnet_ids
+}
