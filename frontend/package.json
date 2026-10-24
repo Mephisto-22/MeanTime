@@ -10,9 +10,8 @@
     "postinstall": "nuxt prepare",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:smoke": "vitest run tests/smoke",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "test:all": "pnpm test && pnpm test:smoke",
-    "test:legacy": "node --test tests/*.test.cjs",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
