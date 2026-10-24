@@ -1,0 +1,40 @@
+# Production image for the MeanTime frontend (Nuxt 4, served by its built Nitro server).
+# Local development uses docker/Dockerfile instead.
+
+# --- Build stage -----------------------------------------------------------
+FROM node:22-alpine AS build
+
+RUN npm install -g pnpm@12.8.1
+
+WORKDIR /app
+
+# Copy everything before installing: pnpm's postinstall runs `nuxt prepare`,
+# which needs the app source.
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+# Nuxt bakes the /api proxy target into the build. In ECS the frontend,
+# backend and database share one network, so the backend is on localhost.
+ARG BACKEND_INTERNAL_URL=http://localhost:8000
+ARG PRIMEVUE_LICENSE_KEY=
+ENV BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL} \
+    PRIMEVUE_LICENSE_KEY=${PRIMEVUE_LICENSE_KEY}
+
+RUN pnpm build
+
+# --- Runtime stage: only the built server ------------------------------------
+FROM node:22-alpine
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
+WORKDIR /app
+
+COPY --from=build --chown=node:node /app/.output ./.output
+
+USER node
+
+EXPOSE 3000
+
+CMD ["node", ".output/server/index.mjs"]
