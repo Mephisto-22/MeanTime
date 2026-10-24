@@ -37,12 +37,12 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
   it('renders board title, description, and column container', () => {
     const board = createBoardFixture({
       title: 'Main Kanban Board',
-      description: 'Sprint items and workflow tracking',
+      description: 'Sprint tasks and workflow tracking',
     })
 
     const wrapper = mountBoard(board)
     expect(wrapper.find('[data-testid="board-title"]').text()).toBe('Main Kanban Board')
-    expect(wrapper.find('[data-testid="board-description"]').text()).toBe('Sprint items and workflow tracking')
+    expect(wrapper.find('[data-testid="board-description"]').text()).toBe('Sprint tasks and workflow tracking')
     expect(wrapper.find('[data-testid="kanban-columns-track"]').exists()).toBe(true)
   })
 

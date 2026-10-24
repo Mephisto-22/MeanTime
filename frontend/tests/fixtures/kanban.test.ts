@@ -33,7 +33,7 @@ describe('Domain Fixture Factories', () => {
   })
 
   describe('createColumnFixture', () => {
-    it('creates a column with default title, position, and empty tasks list', () => {
+    it('creates a column with default title, position, and empty tasks array', () => {
       const column = createColumnFixture()
       expect(column.id).toBeDefined()
       expect(column.title).toBeTruthy()
