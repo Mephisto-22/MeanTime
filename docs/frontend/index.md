@@ -167,3 +167,10 @@ onMounted(() => {
 })
 </script>
 ```
+
+
+---
+
+## Testing
+
+For testing practices, domain fixture factories, Vitest execution in Docker, and component DOM testing guides, see the [Frontend Testing Guide](testing.md).
