@@ -49,3 +49,4 @@ Navigate through the guides below to get started or dive into service architectu
 - **[Architecture & Domain](architecture.md)**: Container topology, internal Docker networking, proxy routing, and canonical domain concepts.
 - **[Backend Service Guide](backend/index.md)**: Django Ninja setup, database models, schema contracts, migrations lifecycle, unit testing, and interactive Swagger/ReDoc links.
 - **[Frontend Service Guide](frontend/index.md)**: Nuxt 4, Vue 3, PrimeVue 5 + Tailwind CSS layering, Pinia stores, and the centralized `ApiService` pattern.
+- **[Infrastructure Guide](infrastructure/index.md)**: Terraform for the AWS Dev and Prod environments: bringing them up and down, opening Dev, and finding Prod's URL.

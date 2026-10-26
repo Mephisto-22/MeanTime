@@ -1,16 +1,3 @@
-# Builds the production images (#44) and pushes them to the ECR repositories
-# from #45, as part of `terraform apply`. Docker must be running on the machine
-# that runs Terraform.
-#
-# Terraform runs `docker build` and `docker push` itself. (The Docker provider
-# for Terraform can't build these images on Windows.) For the push, Terraform
-# writes ECR's login into a private Docker config inside .terraform/ and points
-# `docker push` at it, so `docker login` and Docker's credential store, which
-# rejects ECR's long tokens on Windows, are never used.
-#
-# Each image is tagged with a fingerprint of its source files, so an apply only
-# rebuilds and pushes an image when that part of the app has changed.
-
 data "aws_ecr_repository" "backend" {
   name = "meantime/backend"
 }
@@ -25,15 +12,17 @@ locals {
   backend_dir  = "${var.source_root}/backend"
   frontend_dir = "${var.source_root}/frontend"
 
-  # Everything that goes into the backend image (tests and caches don't).
+  # Everything that goes into the backend image. Tests, caches and the
+  # development Dockerfile don't, so changing them doesn't trigger a rebuild.
   backend_files = sort([
     for f in fileset(local.backend_dir, "**") : f
-    if !can(regex("(^|/)(__pycache__|tests)/|\\.pyc$", f))
+    if !can(regex("(^|/)(__pycache__|tests)/|\\.pyc$|^docker/Dockerfile$", f))
   ])
 
-  # Listed explicitly so node_modules and .nuxt are never scanned.
+  # Listed explicitly so node_modules and .nuxt are never scanned. server/,
+  # public/ and shared/ don't exist yet but are Nuxt folders someone may add.
   frontend_files = sort(setunion(
-    fileset(local.frontend_dir, "app/**"),
+    fileset(local.frontend_dir, "{app,server,public,shared}/**"),
     fileset(local.frontend_dir, "docker/Dockerfile.prod"),
     fileset(local.frontend_dir, "{nuxt.config.ts,tailwind.config.ts,tsconfig.json,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.npmrc,.dockerignore}"),
   ))

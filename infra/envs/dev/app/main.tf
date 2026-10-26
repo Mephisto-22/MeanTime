@@ -83,8 +83,13 @@ output "task_subnet_ids" {
 }
 
 output "dev_tunnel_command" {
-  description = "Paste into Git Bash (or any bash shell) to open Dev at http://localhost:3000."
+  description = "Paste into Git Bash, macOS or Linux to open Dev at http://localhost:3000."
   value       = module.app.dev_tunnel_command
+}
+
+output "dev_tunnel_command_powershell" {
+  description = "Paste into PowerShell to open Dev at http://localhost:3000."
+  value       = module.app.dev_tunnel_command_powershell
 }
 
 output "log_group" {
