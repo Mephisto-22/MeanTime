@@ -24,7 +24,7 @@ locals {
   frontend_files = sort(setunion(
     fileset(local.frontend_dir, "{app,server,public,shared}/**"),
     fileset(local.frontend_dir, "docker/Dockerfile.prod"),
-    fileset(local.frontend_dir, "{nuxt.config.ts,tailwind.config.ts,tsconfig.json,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.npmrc,.dockerignore}"),
+    fileset(local.frontend_dir, "{nuxt.config.ts,tailwind.config.ts,tsconfig.json,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.npmrc,.nuxtrc,.dockerignore}"),
   ))
 
   backend_tag = substr(sha1(join("", [
