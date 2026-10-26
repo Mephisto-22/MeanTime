@@ -1,8 +1,11 @@
-# Integration smoke check (#63): starts the normal Docker Compose stack and
-# checks the whole app (frontend proxy -> backend -> database) with a few
-# API calls. Deeper API + database tests run with Django's test runner.
+# Tests for every pull request and every push to dev or main. All three jobs
+# run in the Docker Compose containers, the same way developers run them.
+# - Backend and frontend unit tests (#62). Branch protection on dev and main
+#   requires them to pass before a PR can be merged.
+# - Integration smoke check (#63): starts the whole stack and checks it
+#   (frontend proxy -> backend -> database) with a few API calls.
 
-name: Integration tests
+name: Tests
 
 on:
   pull_request:
@@ -11,6 +14,50 @@ on:
   workflow_dispatch:
 
 jobs:
+  backend:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env from the example
+        run: cp .env.example .env
+
+      # Starts the database first; Django creates and drops a test database.
+      - name: python manage.py test
+        run: docker compose run --rm backend python manage.py test
+
+      - name: Stop the database
+        if: always()
+        run: docker compose down -v
+
+  frontend:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env from the example
+        run: cp .env.example .env
+
+      # The first run installs the dependencies (the container's entrypoint
+      # does that); the later ones reuse them.
+      - name: pnpm typecheck
+        run: docker compose run --rm --no-deps frontend pnpm typecheck
+
+      - name: pnpm test
+        run: docker compose run --rm --no-deps frontend pnpm test
+
+      - name: pnpm build
+        run: docker compose run --rm --no-deps frontend pnpm build
+
+      - name: pnpm test:smoke
+        run: docker compose run --rm --no-deps frontend pnpm test:smoke
+
   smoke:
     name: Smoke check against the running app
     runs-on: ubuntu-latest
