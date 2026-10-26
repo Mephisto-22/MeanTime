@@ -180,3 +180,13 @@ docker compose exec backend python manage.py shell
 # Show migration status
 docker compose exec backend python manage.py showmigrations
 ```
+
+### Integration smoke check (CI)
+
+Django's tests cover the API and database. On top of that, every pull request (and every push to `dev` or `main`) runs a smoke check against the whole running app, defined in `.github/workflows/integration-tests.yml`. It's separate from the frontend's `pnpm test:smoke`, which checks the built frontend's HTML on its own. It starts the normal Docker Compose stack, then makes a few API calls through the frontend's `/api` proxy:
+
+1. `/api/health` reports the database connected
+2. Register a user, log in, and fetch `/api/auth/me`
+3. Create a board and check it starts with the default columns, then find it in the board list
+
+**If it fails:** open the PR's **Checks** tab, choose **Integration tests**, and look at the **Smoke check** step: the last numbered line printed is the check that failed. The **Show container logs** step below it has the frontend, backend and database logs.
