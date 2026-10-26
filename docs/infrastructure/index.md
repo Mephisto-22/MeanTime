@@ -66,6 +66,11 @@ Each folder under `envs/` is its own Terraform root with its own state file (`ba
 
 No AWS access keys are stored in this repository or on your machine. Terraform uses your temporary login.
 
+---
+
+## First-time setup
+
+Each account needs an S3 bucket for Terraform state before anything else can be applied. Bootstrap creates it, once per account. It has already been done for MeanTime's accounts, so you only need this when setting up a new account:
 
 ```bash
 cd infra/bootstrap/dev
