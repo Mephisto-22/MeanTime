@@ -11,6 +11,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   backend "s3" {
@@ -47,7 +55,22 @@ module "network" {
   vpc_cidr    = "10.10.0.0/16"
 }
 
-# The ECS service is added in #47.
+module "app" {
+  source = "../../../modules/app"
+
+  environment = "dev"
+  public      = false
+  aws_region  = "us-east-2"
+  aws_profile = "meantime-dev"
+  source_root = abspath("${path.root}/../../../..")
+
+  vpc_id                          = module.network.vpc_id
+  task_subnet_ids                 = module.network.task_subnet_ids
+  task_assign_public_ip           = module.network.task_assign_public_ip
+  task_security_group_id          = module.network.task_security_group_id
+  load_balancer_subnet_ids        = module.network.load_balancer_subnet_ids
+  load_balancer_security_group_id = module.network.load_balancer_security_group_id
+}
 
 output "vpc_id" {
   description = "ID of the dev VPC."
@@ -57,4 +80,14 @@ output "vpc_id" {
 output "task_subnet_ids" {
   description = "Subnets the ECS task runs in."
   value       = module.network.task_subnet_ids
+}
+
+output "dev_tunnel_command" {
+  description = "Paste into Git Bash (or any bash shell) to open Dev at http://localhost:3000."
+  value       = module.app.dev_tunnel_command
+}
+
+output "log_group" {
+  description = "CloudWatch log group with each container's logs."
+  value       = module.app.log_group
 }
