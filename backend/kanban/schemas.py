@@ -1,11 +1,7 @@
 from datetime import datetime
 from ninja import Schema
 from enum import Enum
-
-class TaskPriority(str, Enum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
+from .models import TaskPriority
 
 # Task schemas
 class TaskIn(Schema):

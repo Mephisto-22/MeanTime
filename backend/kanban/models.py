@@ -1,6 +1,11 @@
 from django.db import models
 from django.conf import settings
 
+class TaskPriority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
 class Tag(models.Model):
     user = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
@@ -66,15 +71,10 @@ class BoardColumn(models.Model):
         return f"{self.board.title} = {self.title}"
 
 class Task(models.Model):
-    class Priority(models.TextChoices):
-        LOW = "LOW", "Low"
-        MEDIUM = "MEDIUM", "Medium"
-        HIGH = "HIGH", "High"
-
     priority = models.CharField(
             max_length=10,
-            choices=Priority.choices,
-            default=Priority.MEDIUM
+            choices=TaskPriority.choices,
+            default=TaskPriority.MEDIUM
         )
     tags = models.ManyToManyField(
             to=Tag,
