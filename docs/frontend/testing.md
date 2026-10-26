@@ -87,7 +87,7 @@ frontend/tests/
 ## Best Practices: Writing High-Quality Tests
 
 1. **Test User-Visible Behavior, Not Implementation Details**: Test rendered DOM nodes, emitted events, user actions, and network boundaries rather than private component methods or internal state variables.
-2. **Use Domain Vocabulary & Typed Fixtures**: Always generate mock data using domain fixture factories (`tests/fixtures/`) adhering to `GLOSSARY.md` (`Board`, `Column`, `Task`, `Position`, `Title`). Avoid raw object literals with arbitrary schemas.
+2. **Use Domain Vocabulary & Typed Fixtures**: Always generate mock data using domain fixture factories (`tests/fixtures/`) and ahere to naming conventions: (`Board`, `Column`, `Task`, `Position`, `Title`). Avoid raw object literals with arbitrary schemas.
 3. **Partition Fast In-Memory Tests from Production Checks**: Fast unit and component tests execute in seconds in `happy-dom` without launching external processes. Full SSR HTML verification is reserved for `smoke/`.
 
 ---
