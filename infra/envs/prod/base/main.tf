@@ -52,3 +52,15 @@ output "registry" {
   description = "Registry host to `docker login` to."
   value       = module.ecr.registry
 }
+
+module "github_oidc" {
+  source = "../../../modules/github-oidc"
+
+  environment      = "prod"
+  allowed_branches = ["main"]
+}
+
+output "github_actions_role_arn" {
+  description = "Role for GitHub Actions workflows to assume in the prod account."
+  value       = module.github_oidc.role_arn
+}

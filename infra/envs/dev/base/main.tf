@@ -52,3 +52,16 @@ output "registry" {
   description = "Registry host to `docker login` to."
   value       = module.ecr.registry
 }
+
+module "github_oidc" {
+  source = "../../../modules/github-oidc"
+
+  environment = "dev"
+  # main too: scheduled workflows (the nightly teardown) always run on main.
+  allowed_branches = ["dev", "main"]
+}
+
+output "github_actions_role_arn" {
+  description = "Role for GitHub Actions workflows to assume in the dev account."
+  value       = module.github_oidc.role_arn
+}
