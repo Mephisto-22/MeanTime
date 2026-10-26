@@ -1,6 +1,7 @@
 name: Environment
 
 on:
+  # The up/down button (#65).
   workflow_dispatch:
     inputs:
       environment:
@@ -14,32 +15,49 @@ on:
         options: [up, down]
         required: true
 
+  # Nightly teardown (#66) of Dev and Prod. The database's data is kept in the
+  # base layer. 07:00 UTC is 1 a.m. CST.
+  schedule:
+    - cron: '0 7 * * *'
+
+  # Image builds (#64): a push to dev builds Dev's images, a push to main Prod's.
+  push:
+    branches: [dev, main]
+    paths: ['backend/**', 'frontend/**']
+
 permissions:
   id-token: write # GitHub's sign-in to AWS (OIDC)
   contents: read
 
-# One run per environment at a time, so an apply and a destroy never overlap.
-concurrency:
-  group: environment-${{ inputs.environment }}
-  cancel-in-progress: false
-
 jobs:
   terraform:
-    name: ${{ inputs.action }} ${{ inputs.environment }}
+    name: Terraform ${{ matrix.environment }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Button: the chosen environment. Nightly: both. Push: dev or prod, by branch.
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ github.event_name == 'schedule' && fromJSON('["dev", "prod"]') || fromJSON(format('["{0}"]', inputs.environment || (github.ref_name == 'main' && 'prod' || 'dev'))) }}
+
+    # One run per environment at a time, so an apply and a destroy never overlap.
+    concurrency:
+      group: environment-${{ matrix.environment }}
+      cancel-in-progress: false
+
     env:
-      ENVIRONMENT: ${{ inputs.environment }}
-      ACTION: ${{ inputs.action }}
+      ENVIRONMENT: ${{ matrix.environment }}
+      # Button: up or down. Nightly: down. Push: images.
+      ACTION: ${{ inputs.action || (github.event_name == 'schedule' && 'down' || 'images') }}
       BRANCH: ${{ github.ref_name }}
-      PROFILE: meantime-${{ inputs.environment }}
-      ROLE_ARN: ${{ inputs.environment == 'prod' && vars.AWS_PROD_ROLE_ARN || vars.AWS_DEV_ROLE_ARN }}
+      PROFILE: meantime-${{ matrix.environment }}
+      ROLE_ARN: ${{ matrix.environment == 'prod' && vars.AWS_PROD_ROLE_ARN || vars.AWS_DEV_ROLE_ARN }}
       AWS_REGION: us-east-2
 
     defaults:
       run:
-        working-directory: infra/envs/${{ inputs.environment }}/app
+        working-directory: infra/envs/${{ matrix.environment }}/app
 
     steps:
       - name: Check the branch and settings
@@ -60,7 +78,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
-          role-session-name: meantime-${{ inputs.environment }}-${{ inputs.action }}-${{ github.run_id }}
+          role-session-name: meantime-${{ matrix.environment }}-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       # backend.hcl and the providers expect the meantime-dev / meantime-prod
@@ -82,24 +100,37 @@ jobs:
         run: terraform init -input=false -backend-config=../backend.hcl
 
       - name: terraform apply
-        if: inputs.action == 'up'
+        if: env.ACTION == 'up'
         run: terraform apply -input=false -auto-approve
 
+      # Only the images: builds and pushes any whose tag isn't in ECR yet,
+      # without bringing the environment up.
+      - name: Build and push images
+        if: env.ACTION == 'images'
+        run: >-
+          terraform apply -input=false -auto-approve
+          -target=module.app.terraform_data.backend_image
+          -target=module.app.terraform_data.frontend_image
+
+      # Does nothing when the environment is already down.
       - name: terraform destroy
-        if: inputs.action == 'down'
+        if: env.ACTION == 'down'
         run: terraform destroy -input=false -auto-approve
 
       - name: Summary
         run: |
           {
-            if [ "$ACTION" = down ]; then
+            if [ "$ACTION" = images ]; then
+              echo "## MeanTime $ENVIRONMENT images are in ECR"
+              echo "The next \`up\` uses them instead of building its own."
+            elif [ "$ACTION" = down ]; then
               echo "## MeanTime $ENVIRONMENT is down"
-              echo "Everything in the app layer was destroyed. Images stay in ECR."
+              echo "The app layer was destroyed. The database's data and the images are kept, and come back with the next \`up\`."
             elif [ "$ENVIRONMENT" = prod ]; then
               echo "## MeanTime prod is up"
               echo "Open: $(terraform output -raw app_url)"
               echo
-              echo "Tear it down with this workflow (action: down) when you're done."
+              echo "Tear it down with this workflow (action: down) when you're done. It's also torn down every night."
             else
               echo "## MeanTime dev is up"
               echo "Dev has no public address. Open a tunnel, then go to http://localhost:3000."
@@ -114,6 +145,6 @@ jobs:
               terraform output -raw dev_tunnel_command
               echo
               echo '```'
-              echo "Tear it down with this workflow (action: down) when you're done."
+              echo "Tear it down with this workflow (action: down) when you're done. It's also torn down every night."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
