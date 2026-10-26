@@ -1,6 +1,33 @@
 from django.db import models
 from django.conf import settings
 
+class TaskPriority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+class Tag(models.Model):
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tags"
+    )
+    name = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"],
+                name="unique_tag_name_per_user"
+            )
+        ]
+        ordering = ["name"] # tags returned alphabetically by default
+
+    def __str__(self):
+        return self.name
+
+
 class Board(models.Model):
     owner = models.ForeignKey(
         to=settings.AUTH_USER_MODEL, # should resolve to users.User
@@ -44,6 +71,16 @@ class BoardColumn(models.Model):
         return f"{self.board.title} = {self.title}"
 
 class Task(models.Model):
+    priority = models.CharField(
+            max_length=10,
+            choices=TaskPriority.choices,
+            default=TaskPriority.MEDIUM
+        )
+    tags = models.ManyToManyField(
+            to=Tag,
+            blank=True,
+            related_name="tasks"
+        )
     column = models.ForeignKey(
         to=BoardColumn,
         on_delete=models.CASCADE,
