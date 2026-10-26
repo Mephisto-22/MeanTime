@@ -183,7 +183,7 @@ docker compose exec backend python manage.py showmigrations
 
 ### Tests in CI
 
-Every pull request, and every push to `dev` or `main`, runs the **Tests** workflow (`.github/workflows/integration-tests.yml`). It has three jobs, each running in the Docker Compose containers:
+Every pull request, and every push to `dev` or `main`, runs the **Tests** workflow (`.github/workflows/tests.yml`). It has three jobs, each running in the Docker Compose containers:
 
 | Job | What it runs |
 |---|---|
