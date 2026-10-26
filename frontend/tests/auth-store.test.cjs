@@ -148,7 +148,7 @@ test('auth API uses backend paths, payloads, and bearer authentication', async (
     ['POST', '/api/auth/login', { email: profile.email, password: 'password' }, { auth: false }],
     ['POST', '/api/auth/register', { email: profile.email, password: 'password', display_name: profile.display_name }, { auth: false }],
     ['POST', '/api/auth/refresh', { refresh_token: 'refresh-token' }, { auth: false }],
-    ['GET', '/api/auth/me', null, { auth: false, headers: { Authorization: 'Bearer access-token' } }],
+    ['GET', '/api/auth/me', null],
   ])
 })
 

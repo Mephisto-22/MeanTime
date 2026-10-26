@@ -165,6 +165,9 @@ Your new endpoints will immediately appear in the interactive Swagger docs at `/
 
 ## Management & Testing Commands
 
+See [Password reset](../password-reset.md) for reset endpoints, user fields,
+authentication restrictions, console delivery, and test commands.
+
 Execute commands in the running backend container via `docker compose exec`:
 
 ```bash

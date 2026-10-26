@@ -1,5 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.conf import settings
+from django.utils import timezone as django_timezone
+from datetime import timedelta
 
 from users.managers import UserManager
 
@@ -13,6 +16,23 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    resetting_password = models.BooleanField(default=False)
+    password_reset_started_at = models.DateTimeField(null=True, blank=True)
+    password_version = models.PositiveIntegerField(default=0, editable=False)
+
+    def password_reset_active(self):
+        """An abandoned reset stops blocking login after the reset timeout."""
+        if not self.resetting_password:
+            return False
+        if self.password_reset_started_at and (
+            django_timezone.now() >= self.password_reset_started_at
+            + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT)
+        ):
+            self.resetting_password = False
+            self.password_reset_started_at = None
+            self.save(update_fields=["resetting_password", "password_reset_started_at"])
+            return False
+        return True
 
     objects = UserManager()
 

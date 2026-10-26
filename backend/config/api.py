@@ -2,7 +2,7 @@ from asgiref.sync import sync_to_async
 from django.db import connection
 from ninja import NinjaAPI, Schema
 from ninja_extra.exceptions import APIException
-from ninja_jwt.authentication import JWTAuth
+from users.authentication import PasswordResetJWTAuth
 from users.api import auth_router
 
 from kanban.api import router as kanban_router
@@ -12,7 +12,7 @@ api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
     description="MeanTime API service with Django Ninja",
-    auth=JWTAuth(),
+    auth=PasswordResetJWTAuth(),
 )
 
 # router registrations (import above)
@@ -29,12 +29,14 @@ def api_exception_handler(request, exc):
         detail = detail["detail"]
     elif not isinstance(detail, (str, dict, list)):
         detail = str(exc)
-    return api.create_response(
+    response = api.create_response(
         request,
         {"detail": detail},
         status=getattr(exc, "status_code", 400),
-        headers=headers,
     )
+    for name, value in headers.items():
+        response[name] = value
+    return response
 
 
 api.add_router("/auth", auth_router, tags=["Authentication"])

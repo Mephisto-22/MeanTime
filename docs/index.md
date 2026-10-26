@@ -2,6 +2,8 @@
 
 Welcome to the **MeanTime** documentation.
 
+See the [password reset guide](password-reset.md) for the Sprint 2 flow and local testing.
+
 MeanTime is a modern, containerized full-stack web application designed for task management, kanban tracking, and productivity workflows.
 
 The project is built on a containerized microservice architecture featuring a **Nuxt 4 / Vue 3** frontend, an asynchronous **Django Ninja** backend, and a **PostgreSQL 18** database.

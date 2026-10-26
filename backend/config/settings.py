@@ -125,3 +125,12 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Development-only delivery; Mailgun/external email is intentionally deferred.
+EMAIL_BACKEND = (
+    "django.core.mail.backends.console.EmailBackend" if DEBUG
+    else "django.core.mail.backends.dummy.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = "noreply@meantime.local"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+PASSWORD_RESET_TIMEOUT = 3600

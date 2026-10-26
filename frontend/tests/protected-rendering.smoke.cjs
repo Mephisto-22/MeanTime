@@ -27,14 +27,17 @@ async function main() {
     assert.ok(home, `Production server did not start: ${errors}`)
     assert.equal(home.status, 200)
     const html = await home.text()
-    assert.match(html, /Checking your session/)
-    assert.doesNotMatch(html, /Welcome to MeanTime/)
-    assert.doesNotMatch(html, /data-testid="backend-status-badge"/)
-    for (const path of ['/login', '/register']) {
+    // Latest dev serves the dashboard as an SPA shell, without protected markup.
+    assert.doesNotMatch(html, /<h2[^>]*>\s*Your boards/)
+    assert.doesNotMatch(html, /data-testid="new-board-button"/)
+    for (const path of ['/login', '/register', '/forgot-password']) {
       const page = await fetch(`http://127.0.0.1:3217${path}`)
       assert.equal(page.status, 200)
       assert.match(await page.text(), /name="email"/)
     }
+    const reset = await fetch('http://127.0.0.1:3217/reset-password')
+    assert.equal(reset.status, 200)
+    assert.match(await reset.text(), /Checking your reset link/)
     console.log('Production smoke check passed: protected content withheld; public forms rendered.')
   } finally {
     server.kill('SIGTERM')

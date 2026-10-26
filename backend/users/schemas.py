@@ -84,3 +84,22 @@ class ErrorDetail(Schema):
     """Standard single error message response."""
 
     detail: str
+
+
+class PasswordResetRequestIn(Schema):
+    email: str = Field(..., max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def validate_reset_email(cls, value: str) -> str:
+        return RegisterIn.validate_email_field(value)
+
+
+class PasswordResetLinkIn(Schema):
+    uid: str = Field(..., min_length=1, max_length=64)
+    token: str = Field(..., min_length=1, max_length=128)
+
+
+class PasswordResetConfirmIn(PasswordResetLinkIn):
+    password: str = Field(..., min_length=8, max_length=128)
+    password_confirm: str = Field(..., min_length=8, max_length=128)
