@@ -7,16 +7,19 @@ from ninja_jwt.tokens import RefreshToken
 
 from users.schemas import (
     AuthTokenOut,
+    DeleteAccountIn,
     ErrorDetail,
     LoginIn,
     RefreshIn,
     RegisterIn,
     TokenRefreshOut,
     UserOut,
+    UserUpdateIn,
 )
 
 User = get_user_model()
 auth_router = Router()
+users_router = Router(tags=["Users"])
 
 
 @auth_router.post(
@@ -120,3 +123,51 @@ def me(request):
     if not user or not user.is_authenticated:
         return 401, {"detail": "Authentication required."}
     return 200, user
+
+
+@users_router.patch(
+    "/me",
+    response={200: UserOut, 400: ErrorDetail, 401: ErrorDetail},
+    summary="Update current user profile",
+)
+def update_me(request, payload: UserUpdateIn):
+    """
+    Partially update the authenticated user's display_name or timezone.
+    Email is immutable and password updates are not supported here.
+    """
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    update_data = payload.dict(exclude_unset=True)
+    if not update_data:
+        return 200, user
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    user.save(update_fields=list(update_data.keys()))
+    return 200, user
+
+
+@users_router.delete(
+    "/me",
+    response={200: ErrorDetail, 400: ErrorDetail, 401: ErrorDetail},
+    summary="Deactivate user account (soft delete)",
+)
+def delete_me(request, payload: DeleteAccountIn):
+    """
+    Soft-delete the user account by setting is_active to False.
+    Requires password verification to prevent accidental deactivation.
+    """
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if not user.check_password(payload.password):
+        return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    return 200, {"detail": "Account successfully deactivated."}
