@@ -1,7 +1,9 @@
 # MeanTime on ECS Fargate: one service running one task with three containers
 # (frontend, backend, db) that share the task's network and reach each other
 # on localhost.
-# The database is a container, so its data resets whenever the task restarts.
+# The database is a container whose files are on EFS, in the base layer's
+# file system, so the data survives the task restarting or this layer being
+# torn down.
 
 locals {
   name = "meantime-${var.environment}"
@@ -16,30 +18,56 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# Secrets: generated here, stored encrypted in SSM Parameter Store, and
-# injected into the containers by ECS when they start.
+# Secrets: created by the base layer (modules/persistent-data) and injected
+# into the containers by ECS when they start. Only the ARNs are read here.
 # ---------------------------------------------------------------------------
 
-resource "random_password" "django_secret_key" {
-  length  = 50
-  special = true
+data "aws_ssm_parameter" "django_secret_key" {
+  name            = "/meantime/${var.environment}/django-secret-key"
+  with_decryption = false
 }
 
-resource "random_password" "db_password" {
-  length  = 32
-  special = false
+data "aws_ssm_parameter" "db_password" {
+  name            = "/meantime/${var.environment}/db-password"
+  with_decryption = false
 }
 
-resource "aws_ssm_parameter" "django_secret_key" {
-  name  = "/meantime/${var.environment}/django-secret-key"
-  type  = "SecureString"
-  value = random_password.django_secret_key.result
+# ---------------------------------------------------------------------------
+# Database storage: the base layer's EFS file system, connected to this VPC
+# ---------------------------------------------------------------------------
+
+data "aws_efs_file_system" "db" {
+  creation_token = "${local.name}-db"
 }
 
-resource "aws_ssm_parameter" "db_password" {
-  name  = "/meantime/${var.environment}/db-password"
-  type  = "SecureString"
-  value = random_password.db_password.result
+data "aws_efs_access_points" "db" {
+  file_system_id = data.aws_efs_file_system.db.id
+}
+
+resource "aws_security_group" "db_storage" {
+  name        = "${local.name}-db-storage"
+  description = "MeanTime database storage (EFS): NFS from the ECS task only"
+  vpc_id      = var.vpc_id
+
+  tags = { Name = "${local.name}-db-storage" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "db_storage_from_task" {
+  security_group_id            = aws_security_group.db_storage.id
+  description                  = "NFS from the ECS task"
+  ip_protocol                  = "tcp"
+  from_port                    = 2049
+  to_port                      = 2049
+  referenced_security_group_id = var.task_security_group_id
+}
+
+# One per task subnet, so the task can reach the file system from its zone.
+resource "aws_efs_mount_target" "db" {
+  count = length(var.task_subnet_ids)
+
+  file_system_id  = data.aws_efs_file_system.db.id
+  subnet_id       = var.task_subnet_ids[count.index]
+  security_groups = [aws_security_group.db_storage.id]
 }
 
 # ---------------------------------------------------------------------------
@@ -81,8 +109,8 @@ data "aws_iam_policy_document" "read_secrets" {
   statement {
     actions = ["ssm:GetParameters"]
     resources = [
-      aws_ssm_parameter.django_secret_key.arn,
-      aws_ssm_parameter.db_password.arn,
+      data.aws_ssm_parameter.django_secret_key.arn,
+      data.aws_ssm_parameter.db_password.arn,
     ]
   }
 }
@@ -142,6 +170,19 @@ resource "aws_ecs_task_definition" "this" {
     cpu_architecture        = "X86_64"
   }
 
+  volume {
+    name = "db-data"
+
+    efs_volume_configuration {
+      file_system_id     = data.aws_efs_file_system.db.id
+      transit_encryption = "ENABLED"
+
+      authorization_config {
+        access_point_id = one(data.aws_efs_access_points.db.ids)
+      }
+    }
+  }
+
   container_definitions = jsonencode([
     {
       name      = "db"
@@ -152,14 +193,18 @@ resource "aws_ecs_task_definition" "this" {
         { name = "POSTGRES_USER", value = local.db_user },
       ]
       secrets = [
-        { name = "POSTGRES_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn },
+        { name = "POSTGRES_PASSWORD", valueFrom = data.aws_ssm_parameter.db_password.arn },
+      ]
+      mountPoints = [
+        { sourceVolume = "db-data", containerPath = "/var/lib/postgresql" },
       ]
       healthCheck = {
-        command     = ["CMD-SHELL", "pg_isready -U ${local.db_user} -d ${local.db_name}"]
+        command = ["CMD-SHELL", "pg_isready -U ${local.db_user} -d ${local.db_name}"]
+        # Creating a new database on EFS the first time takes a while.
         interval    = 5
         timeout     = 3
         retries     = 10
-        startPeriod = 10
+        startPeriod = 60
       }
       logConfiguration = {
         logDriver = "awslogs"
@@ -179,8 +224,8 @@ resource "aws_ecs_task_definition" "this" {
         { name = "DJANGO_ALLOWED_HOSTS", value = "localhost,127.0.0.1" },
       ]
       secrets = [
-        { name = "POSTGRES_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn },
-        { name = "DJANGO_SECRET_KEY", valueFrom = aws_ssm_parameter.django_secret_key.arn },
+        { name = "POSTGRES_PASSWORD", valueFrom = data.aws_ssm_parameter.db_password.arn },
+        { name = "DJANGO_SECRET_KEY", valueFrom = data.aws_ssm_parameter.django_secret_key.arn },
       ]
       dependsOn = [
         { containerName = "db", condition = "HEALTHY" },
@@ -235,8 +280,9 @@ resource "aws_ecs_service" "this" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  # The database lives in the task, so never run two tasks at once: stop the
-  # old one before starting the new one. Deploys have a short outage.
+  # Never run two tasks at once, or two databases would write to the same
+  # files on EFS: stop the old one before starting the new one. Deploys have a
+  # short outage.
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
 
@@ -264,5 +310,9 @@ resource "aws_ecs_service" "this" {
   # `terraform apply` waits until the task is running and healthy.
   wait_for_steady_state = true
 
-  depends_on = [aws_lb_listener.http]
+  depends_on = [
+    aws_lb_listener.http,
+    aws_efs_mount_target.db,
+    aws_vpc_security_group_ingress_rule.db_storage_from_task,
+  ]
 }
