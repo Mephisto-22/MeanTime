@@ -8,6 +8,16 @@ data "aws_ecr_repository" "frontend" {
 
 data "aws_ecr_authorization_token" "this" {}
 
+# Tags already in ECR, pushed by CI (#64) or an earlier apply. An image whose
+# tag is already there isn't built again, even after the app layer is destroyed.
+data "aws_ecr_images" "backend" {
+  repository_name = data.aws_ecr_repository.backend.name
+}
+
+data "aws_ecr_images" "frontend" {
+  repository_name = data.aws_ecr_repository.frontend.name
+}
+
 locals {
   backend_dir  = "${var.source_root}/backend"
   frontend_dir = "${var.source_root}/frontend"
@@ -24,7 +34,7 @@ locals {
   frontend_files = sort(setunion(
     fileset(local.frontend_dir, "{app,server,public,shared}/**"),
     fileset(local.frontend_dir, "docker/Dockerfile.prod"),
-    fileset(local.frontend_dir, "{nuxt.config.ts,tailwind.config.ts,tsconfig.json,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.npmrc,.dockerignore}"),
+    fileset(local.frontend_dir, "{nuxt.config.ts,tailwind.config.ts,tsconfig.json,package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.npmrc,.nuxtrc,.dockerignore}"),
   ))
 
   backend_tag = substr(sha1(join("", [
@@ -37,6 +47,9 @@ locals {
 
   backend_image  = "${data.aws_ecr_repository.backend.repository_url}:${local.backend_tag}"
   frontend_image = "${data.aws_ecr_repository.frontend.repository_url}:${local.frontend_tag}"
+
+  backend_in_ecr  = contains([for i in data.aws_ecr_images.backend.image_ids : i.image_tag if i.image_tag != null], local.backend_tag)
+  frontend_in_ecr = contains([for i in data.aws_ecr_images.frontend.image_ids : i.image_tag if i.image_tag != null], local.frontend_tag)
 
   registry          = split("/", data.aws_ecr_repository.backend.repository_url)[0]
   docker_config_dir = abspath("${path.root}/.terraform/docker-ecr")
@@ -59,11 +72,11 @@ resource "terraform_data" "backend_image" {
 
   provisioner "local-exec" {
     working_dir = local.backend_dir
-    command     = "docker build --platform linux/amd64 -f docker/Dockerfile.prod -t ${local.backend_image} ."
+    command     = local.backend_in_ecr ? "echo ${local.backend_image} is already in ECR" : "docker build --platform linux/amd64 -f docker/Dockerfile.prod -t ${local.backend_image} ."
   }
 
   provisioner "local-exec" {
-    command = "docker push ${local.backend_image}"
+    command = local.backend_in_ecr ? "echo Skipping the push" : "docker push ${local.backend_image}"
     environment = {
       DOCKER_CONFIG = local.docker_config_dir
     }
@@ -77,11 +90,11 @@ resource "terraform_data" "frontend_image" {
 
   provisioner "local-exec" {
     working_dir = local.frontend_dir
-    command     = "docker build --platform linux/amd64 -f docker/Dockerfile.prod -t ${local.frontend_image} ."
+    command     = local.frontend_in_ecr ? "echo ${local.frontend_image} is already in ECR" : "docker build --platform linux/amd64 -f docker/Dockerfile.prod -t ${local.frontend_image} ."
   }
 
   provisioner "local-exec" {
-    command = "docker push ${local.frontend_image}"
+    command = local.frontend_in_ecr ? "echo Skipping the push" : "docker push ${local.frontend_image}"
     environment = {
       DOCKER_CONFIG = local.docker_config_dir
     }

@@ -1,4 +1,5 @@
-# dev / base layer (kept between demos): ECR image repositories (#45).
+# dev / base layer (kept between demos): ECR image repositories (#45), the
+# GitHub Actions role (#61), and the database's files and secrets (#66).
 #
 # Initialize with the shared backend settings for this environment:
 #   terraform init -backend-config=../backend.hcl
@@ -10,6 +11,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
     }
   }
 
@@ -51,4 +56,28 @@ output "repository_urls" {
 output "registry" {
   description = "Registry host to `docker login` to."
   value       = module.ecr.registry
+}
+
+module "github_oidc" {
+  source = "../../../modules/github-oidc"
+
+  environment = "dev"
+  # main too: scheduled workflows (the nightly teardown) always run on main.
+  allowed_branches = ["dev", "main"]
+}
+
+output "github_actions_role_arn" {
+  description = "Role for GitHub Actions workflows to assume in the dev account."
+  value       = module.github_oidc.role_arn
+}
+
+module "persistent_data" {
+  source = "../../../modules/persistent-data"
+
+  environment = "dev"
+}
+
+output "db_file_system_id" {
+  description = "EFS file system holding the database's files. Destroying base deletes the data."
+  value       = module.persistent_data.db_file_system_id
 }

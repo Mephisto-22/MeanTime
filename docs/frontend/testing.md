@@ -41,6 +41,10 @@ Run test commands directly from your host terminal using `docker compose exec`:
 > [!NOTE]
 > `pnpm test:smoke` and `pnpm test:all` verify the production Nitro bundle. Run `docker compose exec frontend pnpm build` first if `.output/` has not been generated.
 
+### In CI
+
+Every pull request runs `pnpm typecheck`, `pnpm test`, `pnpm build` and `pnpm test:smoke` in the frontend container, and pull requests into `dev` and `main` can't be merged until they pass. See [Tests in CI](../backend/index.md#tests-in-ci).
+
 ### Interactive Container Shell
 
 Alternatively, open an interactive shell inside the frontend container and run tests directly:
