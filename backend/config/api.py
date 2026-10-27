@@ -3,7 +3,7 @@ from django.db import connection
 from ninja import NinjaAPI, Schema
 from ninja_extra.exceptions import APIException
 from ninja_jwt.authentication import JWTAuth
-from users.api import auth_router
+from users.api import auth_router, users_router
 
 from kanban.api import router as kanban_router
 
@@ -38,6 +38,7 @@ def api_exception_handler(request, exc):
 
 
 api.add_router("/auth", auth_router, tags=["Authentication"])
+api.add_router("/users", users_router, tags=["Users"])
 
 
 class HealthResponse(Schema):

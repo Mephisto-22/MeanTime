@@ -1,18 +1,21 @@
 from django.shortcuts import get_object_or_404
 from ninja_jwt.authentication import JWTAuth
 from django.db.models import Prefetch, Max
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from ninja.errors import HttpError
 from ninja import Router
-from .models import Board, BoardColumn, Task, TaskTimeEntry
+from .models import Board, BoardColumn, Task, TaskTimeEntry, Tag
 from .schemas import (
     TaskIn, 
     TaskOut, 
+    TaskUpdateIn,
     BoardColumnIn, 
     BoardColumnOut, 
     BoardIn, 
     BoardOut, 
     TaskMoveIn,
+    TagIn,
+    TagOut,
 )
 
 router = Router(tags=["Kanban"])
@@ -45,6 +48,18 @@ def get_owned_task(user, task_id: int) -> Task:
         id=task_id
     )
 
+def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
+    """Return the requested tags if they all belong to the user."""
+    if len(tag_ids) != len(set(tag_ids)):
+        raise HttpError(400, "Duplicate tag IDs are not allowed.")
+
+    tags = list(Tag.objects.filter(user=user, id__in=tag_ids))
+
+    if len(tags) != len(tag_ids):
+        raise HttpError(400, "One or more tags are invalid or do not belong to you.")
+
+    return tags
+
 def _reindex(items):
     """Rewrite position 0..n-1."""
     for i, obj in enumerate(items):
@@ -60,7 +75,7 @@ def _reindex(items):
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by the authenticated user/"""
-    return Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks")
+    return Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags")
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
@@ -77,7 +92,7 @@ def create_board(request, payload: BoardIn):
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
     board = get_object_or_404(
-        Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks"),
+        Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags"),
         id=board_id,
     )
     return board
@@ -144,21 +159,49 @@ def delete_column(request, column_id: int):
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_owned_column(request.auth, column_id)
+    tags = get_owned_tags(request.auth, payload.tag_ids)
     last = column.tasks.aggregate(m=Max("position"))["m"]
-    return Task.objects.create(
-        column=column,
-        title=payload.title,
-        description=payload.description,
-        position=0 if last is None else last + 1,
-    )
+
+    with transaction.atomic():
+        task = Task.objects.create(
+            column=column,
+            title=payload.title,
+            description=payload.description,
+            priority=payload.priority.value,
+            position=0 if last is None else last + 1,
+        )
+        task.tags.set(tags)
+
+    return task
 
 @router.patch("/tasks/{task_id}", response=TaskOut)
-def update_task(request, task_id: int, payload: TaskIn):
-    """Update a task's name and description."""
+def update_task(request, task_id: int, payload: TaskUpdateIn):
+    """Update the supplied fields of a task."""
     task = get_owned_task(request.auth, task_id)
-    task.title = payload.title
-    task.description = payload.description
-    task.save()
+    updates = payload.dict(exclude_unset=True) # get fields included in request
+
+    # get the owned tasks using the helper since tags are a
+    # relationship, not a normal task field
+    tag_ids = updates.pop("tag_ids", None)
+    tags = None
+
+    if tag_ids is not None:
+        tags = get_owned_tags(request.auth, tag_ids)
+
+    with transaction.atomic():
+        for field, value in updates.items():
+            if value is None:
+                continue
+            if field == "priority":
+                value = value.value
+
+            setattr(task, field, value)
+        if updates:
+            task.save()
+
+        if tags is not None:
+            task.tags.set(tags)
+
     return task
 
 @router.delete("/tasks/{task_id}")
@@ -190,3 +233,30 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
             _reindex(src_tasks)
         _reindex(dest_tasks)
     return task
+
+# ------------------
+# Tag Endpoints
+# ------------------
+@router.get("/tags", response=list[TagOut])
+def list_tags(request):
+    """List tags belonging to the authenticated user."""
+    return Tag.objects.filter(user=request.auth)
+
+@router.post("/tags", response={201: TagOut})
+def create_tag(request, payload: TagIn):
+    """Create a tag for the authenticated user."""
+    name = payload.name.strip()
+
+    if not name:
+        raise HttpError(400, "Tag name cannot be empty.")
+
+    try:
+        with transaction.atomic():
+            tag = Tag.objects.create(
+                user=request.auth,
+                name=name,
+            )
+    except IntegrityError:
+        raise HttpError(409, "A tag with this name already exists.")
+
+    return 201, tag
