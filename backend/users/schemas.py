@@ -84,3 +84,33 @@ class ErrorDetail(Schema):
     """Standard single error message response."""
 
     detail: str
+
+
+class UserUpdateIn(Schema):
+    """Payload for partial user profile update."""
+
+    display_name: str | None = Field(None, min_length=1, max_length=50)
+    timezone: str | None = None
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            cleaned = v.strip()
+            if not cleaned:
+                raise ValueError("Display name cannot be blank.")
+            return cleaned
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
+        if v is not None and v not in zoneinfo.available_timezones():
+            raise ValueError("Enter a valid IANA timezone.")
+        return v
+
+
+class DeleteAccountIn(Schema):
+    """Payload for confirming account deletion with current password."""
+
+    password: str = Field(..., min_length=1)
