@@ -1,8 +1,18 @@
-import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto } from '~/api/kanban'
+import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto, TagDto } from '~/api/kanban'
 
 let nextTaskId = 1
 let nextColumnId = 1
 let nextBoardId = 1
+let nextTagId = 1
+
+export function createTagFixture(overrides: Partial<TagDto> = {}): TagDto {
+  const id = overrides.id ?? `tag-${nextTagId++}`
+  return {
+    id,
+    name: overrides.name ?? `Tag ${id}`,
+    created_at: overrides.created_at,
+  }
+}
 
 export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): KanbanTaskDto {
   const id = overrides.id ?? `task-${nextTaskId++}`
@@ -12,6 +22,8 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     position: overrides.position ?? 0,
     columnId: overrides.columnId ?? 'col-1',
     description: overrides.description,
+    priority: overrides.priority,
+    tags: overrides.tags,
   }
 }
 
