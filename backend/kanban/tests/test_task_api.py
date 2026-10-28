@@ -36,14 +36,20 @@ class TaskPriorityApiTests(TestCase):
         self.board_id = board_res.json()["id"]
         self.column_id = board_res.json()["columns"][0]["id"]
 
-    def test_create_task_without_priority_defaults_to_none(self):
-        """Creating a task without specifying priority defaults priority to None/null."""
-        response = self.client.post(
+    def create_task(self, title: str, priority=None):
+        payload = {"title": title}
+        if priority is not None:
+            payload["priority"] = priority
+        return self.client.post(
             f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "No Priority Task"}),
+            data=json.dumps(payload),
             content_type="application/json",
             **self.auth,
         )
+
+    def test_create_task_without_priority_defaults_to_none(self):
+        """Creating a task without specifying priority defaults priority to None/null."""
+        response = self.create_task("No Priority Task")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -54,12 +60,7 @@ class TaskPriorityApiTests(TestCase):
 
     def test_create_task_with_explicit_priority(self):
         """Creating a task with explicit priority persists and returns that priority."""
-        response = self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "High Priority Task", "priority": "HIGH"}),
-            content_type="application/json",
-            **self.auth,
-        )
+        response = self.create_task("High Priority Task", priority="HIGH")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -70,18 +71,8 @@ class TaskPriorityApiTests(TestCase):
 
     def test_board_endpoint_serializes_null_and_set_priority(self):
         """Board retrieval endpoint returns tasks with both null and assigned priority."""
-        self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "Unset Priority"}),
-            content_type="application/json",
-            **self.auth,
-        )
-        self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "Low Priority", "priority": "LOW"}),
-            content_type="application/json",
-            **self.auth,
-        )
+        self.create_task("Unset Priority")
+        self.create_task("Low Priority", priority="LOW")
 
         board_res = self.client.get(f"/api/kanban/boards/{self.board_id}", **self.auth)
         self.assertEqual(board_res.status_code, 200)
@@ -92,12 +83,7 @@ class TaskPriorityApiTests(TestCase):
 
     def test_update_task_clears_priority_to_null(self):
         """PATCHing a task with priority=null explicitly sets priority to None."""
-        create_res = self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "Priority Task", "priority": "HIGH"}),
-            content_type="application/json",
-            **self.auth,
-        )
+        create_res = self.create_task("Priority Task", priority="HIGH")
         task_id = create_res.json()["id"]
 
         patch_res = self.client.patch(
@@ -116,12 +102,7 @@ class TaskPriorityApiTests(TestCase):
 
     def test_update_task_sets_priority_from_none(self):
         """PATCHing a task without priority to a set priority updates it correctly."""
-        create_res = self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "Task without Priority"}),
-            content_type="application/json",
-            **self.auth,
-        )
+        create_res = self.create_task("Task without Priority")
         task_id = create_res.json()["id"]
 
         patch_res = self.client.patch(
@@ -140,12 +121,7 @@ class TaskPriorityApiTests(TestCase):
 
     def test_update_task_unrelated_field_preserves_priority(self):
         """PATCHing unrelated fields does not clobber existing priority."""
-        create_res = self.client.post(
-            f"/api/kanban/columns/{self.column_id}/tasks",
-            data=json.dumps({"title": "Original Title", "priority": "LOW"}),
-            content_type="application/json",
-            **self.auth,
-        )
+        create_res = self.create_task("Original Title", priority="LOW")
         task_id = create_res.json()["id"]
 
         patch_res = self.client.patch(
