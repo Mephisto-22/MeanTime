@@ -46,12 +46,15 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(titleInput.element.value).toBe('')
     expect(descInput.element.value).toBe('')
     expect(saveButton.attributes('disabled')).toBeDefined()
+    expect(titleInput.attributes('aria-invalid')).toBe('true')
+    expect(titleInput.classes()).toContain('p-invalid')
 
     await titleInput.setValue('   ')
     expect(saveButton.attributes('disabled')).toBeDefined()
 
     await titleInput.setValue('Valid Title')
     expect(saveButton.attributes('disabled')).toBeUndefined()
+    expect(titleInput.attributes('aria-invalid')).toBe('false')
   })
 
   it('in edit mode: populates fields from active task and enables Save', () => {

@@ -21,7 +21,13 @@
           autofocus
           fluid
           placeholder="Task title"
+          maxlength="200"
+          required
+          :invalid="isSaveDisabled"
+          :aria-invalid="isSaveDisabled"
+          :aria-describedby="isSaveDisabled ? 'task-title-error' : undefined"
         />
+        <small v-if="isSaveDisabled" id="task-title-error" class="text-red-600 dark:text-red-400">Enter a title for the task.</small>
       </div>
 
       <div class="flex flex-col gap-2">

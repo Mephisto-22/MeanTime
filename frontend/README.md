@@ -360,6 +360,10 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+The app uses shared PrimeVue notifications and required-field validation. See
+[Notifications and required fields](../docs/frontend/notifications.md) for usage
+and testing conventions.
+
 ### Authentication frontend
 
 - `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates to the requested protected page (or home) only after that succeeds.
