@@ -23,6 +23,7 @@ export interface KanbanTaskDto {
   columnId: string | number
   priority?: TaskPriorityType
   tags?: TagDto[]
+  tag_ids?: Array<string | number>
 }
 
 export interface KanbanColumnDto {
@@ -76,6 +77,7 @@ export interface TaskDialogSavePayload {
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
+  createTag?: (payload: { name: string } | string) => Promise<TagDto>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
   openCreateTaskDialog: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void

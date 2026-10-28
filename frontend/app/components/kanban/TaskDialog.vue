@@ -401,7 +401,7 @@ const attachExistingTag = (tag: TagDto) => {
   tagInputText.value = ''
 }
 
-const addTagFromInput = () => {
+const addTagFromInput = async () => {
   const name = tagInputText.value.trim()
   if (!name) return
 
@@ -420,6 +420,19 @@ const addTagFromInput = () => {
   if (existingInLibrary) {
     attachExistingTag(existingInLibrary)
   } else {
+    if (kanbanContext?.createTag) {
+      try {
+        const created = await kanbanContext.createTag({ name })
+        if (created) {
+          attachedTags.value.push(created)
+          tagInputText.value = ''
+          return
+        }
+      } catch (err) {
+        console.warn('Failed to create tag via context:', err)
+        return
+      }
+    }
     const newTag: TagDto = {
       id: `tag-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name,

@@ -1,9 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
+import { defineComponent, h, inject } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { kanbanApi } from '~/api/kanban'
+import { kanbanApi, kanbanContextKey } from '~/api/kanban'
 import Board from '~/components/kanban/Board.vue'
-import { createBoardFixture, createColumnFixture, createTaskFixture } from '../fixtures/kanban'
+import { createBoardFixture, createColumnFixture, createTaskFixture, createTagFixture } from '../fixtures/kanban'
 
 const DialogStub = {
   name: 'Dialog',
@@ -28,6 +29,7 @@ function mountBoard(boardData: any) {
 describe('Board Component DOM & Optimistic Mutation Verification', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -44,6 +46,284 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(wrapper.find('[data-testid="board-title"]').text()).toBe('Main Kanban Board')
     expect(wrapper.find('[data-testid="board-description"]').text()).toBe('Sprint tasks and workflow tracking')
     expect(wrapper.find('[data-testid="kanban-columns-track"]').exists()).toBe(true)
+  })
+
+  it('fetches user tags on mount via kanbanApi.listTags and exposes availableTags and createTag via kanbanContextKey', async () => {
+    const tag1 = createTagFixture({ id: 'tag-1', name: 'Frontend' })
+    const tag2 = createTagFixture({ id: 'tag-2', name: 'Backend' })
+    const listTagsSpy = vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([tag1, tag2])
+
+    let capturedContext: any = null
+    const TestConsumer = defineComponent({
+      setup() {
+        capturedContext = inject(kanbanContextKey)
+        return () => h('div', { 'data-testid': 'test-consumer' })
+      },
+    })
+
+    const board = createBoardFixture({
+      columns: [createColumnFixture({ id: 'col-1' })],
+    })
+
+    mount(Board, {
+      props: { board },
+      slots: {
+        column: () => h(TestConsumer),
+      },
+      global: {
+        plugins: [PrimeVue],
+        stubs: { Dialog: DialogStub },
+      },
+    })
+
+    await flushPromises()
+
+    expect(listTagsSpy).toHaveBeenCalledTimes(1)
+    expect(capturedContext).not.toBeNull()
+    expect(capturedContext.availableTags.value).toEqual([tag1, tag2])
+    expect(typeof capturedContext.createTag).toBe('function')
+  })
+
+  it('dialog createTag requests immediately invoke kanbanApi.createTag, append the tag to availableTags, and return the created tag for task linking', async () => {
+    const existingTag = createTagFixture({ id: 'tag-1', name: 'Existing Tag' })
+    vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([existingTag])
+
+    const createdTag = createTagFixture({ id: 99, name: 'Brand New Tag' })
+    const createTagSpy = vi.spyOn(kanbanApi, 'createTag').mockResolvedValue(createdTag)
+
+    let capturedContext: any = null
+    const TestConsumer = defineComponent({
+      setup() {
+        capturedContext = inject(kanbanContextKey)
+        return () => h('div', { 'data-testid': 'test-consumer' })
+      },
+    })
+
+    const board = createBoardFixture({
+      columns: [createColumnFixture({ id: 'col-1' })],
+    })
+
+    const wrapper = mount(Board, {
+      props: { board },
+      slots: {
+        column: () => h(TestConsumer),
+      },
+      global: {
+        plugins: [PrimeVue],
+        stubs: { Dialog: DialogStub },
+      },
+    })
+
+    await flushPromises()
+
+    // 1. Invoke createTag via context
+    const returnedTag = await capturedContext.createTag('Brand New Tag')
+
+    expect(createTagSpy).toHaveBeenCalledWith({ name: 'Brand New Tag' })
+    expect(returnedTag).toEqual(createdTag)
+    expect(capturedContext.availableTags.value).toContainEqual(createdTag)
+    expect(wrapper.vm.availableTags).toContainEqual(createdTag)
+
+    // 2. Calling with existing tag name does not duplicate in availableTags
+    await capturedContext.createTag({ name: 'brand new tag' })
+    const matching = capturedContext.availableTags.value.filter(
+      (t: any) => t.name.toLowerCase() === 'brand new tag',
+    )
+    expect(matching).toHaveLength(1)
+  })
+
+  it('saving an edited task with changed column dispatches updateTask and moveTask concurrently via Promise.all and relocates to bottom of destination column', async () => {
+    const taskToMove = createTaskFixture({
+      id: 'task-1',
+      title: 'Original Title',
+      description: 'Original Notes',
+      columnId: 'col-1',
+      position: 0,
+      priority: 'LOW',
+      tags: [],
+    })
+    const existingTargetTask = createTaskFixture({
+      id: 'task-2',
+      title: 'Existing in Col 2',
+      columnId: 'col-2',
+      position: 0,
+    })
+
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({ id: 'col-1', tasks: [taskToMove] }),
+        createColumnFixture({ id: 'col-2', tasks: [existingTargetTask] }),
+      ],
+    })
+
+    let updateStarted = false
+    let moveStarted = false
+    let updateRunningDuringMove = false
+
+    const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockImplementation(async (id, payload) => {
+      updateStarted = true
+      if (moveStarted) updateRunningDuringMove = true
+      await new Promise(resolve => setTimeout(resolve, 20))
+      return {
+        id,
+        ...payload,
+        columnId: 'col-2',
+        position: 1,
+      } as any
+    })
+
+    const moveSpy = vi.spyOn(kanbanApi, 'moveTask').mockImplementation(async (id, req) => {
+      moveStarted = true
+      if (updateStarted) updateRunningDuringMove = true
+      await new Promise(resolve => setTimeout(resolve, 20))
+      return {
+        id,
+        columnId: req.to_column_id,
+        position: req.target_position,
+      } as any
+    })
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    const newTag = createTagFixture({ id: 'tag-10', name: 'Refactor' })
+
+    const savePromise = boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-1',
+      columnId: 'col-2',
+      title: 'Moved & Updated Title',
+      description: 'New Description Notes',
+      priority: 'HIGH',
+      tags: [newTag],
+      tag_ids: ['tag-10'],
+    })
+
+    // Verify optimistic placement and field values immediately before API promises resolve
+    expect(boardVm.localColumns[0].tasks).toHaveLength(0)
+    expect(boardVm.localColumns[1].tasks).toHaveLength(2)
+    const movedOptimistic = boardVm.localColumns[1].tasks[1]
+    expect(movedOptimistic.id).toBe('task-1')
+    expect(movedOptimistic.title).toBe('Moved & Updated Title')
+    expect(movedOptimistic.description).toBe('New Description Notes')
+    expect(movedOptimistic.priority).toBe('HIGH')
+    expect(movedOptimistic.tags).toEqual([newTag])
+    expect(movedOptimistic.columnId).toBe('col-2')
+    expect(movedOptimistic.position).toBe(1)
+
+    await savePromise
+
+    expect(updateSpy).toHaveBeenCalledWith('task-1', {
+      title: 'Moved & Updated Title',
+      description: 'New Description Notes',
+      priority: 'HIGH',
+      tag_ids: ['tag-10'],
+    })
+    expect(moveSpy).toHaveBeenCalledWith('task-1', {
+      to_column_id: 'col-2',
+      target_position: 1, // length of col-2 tasks before relocation
+    })
+    expect(updateRunningDuringMove).toBe(true)
+  })
+
+  it('move-on-save rollback: network error in moveTask rolls back relocated task to source column and previous field values', async () => {
+    const originalTag = createTagFixture({ id: 'tag-1', name: 'Original Tag' })
+    const task = createTaskFixture({
+      id: 'task-rollback-move',
+      title: 'Initial Title',
+      description: 'Initial Description',
+      columnId: 'col-source',
+      position: 0,
+      priority: 'LOW',
+      tags: [originalTag],
+    })
+    const otherDestTask = createTaskFixture({
+      id: 'dest-task',
+      columnId: 'col-dest',
+      position: 0,
+    })
+
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({ id: 'col-source', tasks: [task] }),
+        createColumnFixture({ id: 'col-dest', tasks: [otherDestTask] }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({ id: 'task-rollback-move' } as any)
+    vi.spyOn(kanbanApi, 'moveTask').mockRejectedValue(new Error('Move relocation network failure'))
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    await boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-rollback-move',
+      columnId: 'col-dest',
+      title: 'Doomed Update Title',
+      description: 'Doomed Update Notes',
+      priority: 'HIGH',
+      tags: [],
+    })
+
+    // Rollback verification: task is returned to col-source
+    expect(boardVm.localColumns[0].tasks).toHaveLength(1)
+    expect(boardVm.localColumns[1].tasks).toHaveLength(1)
+
+    const revertedTask = boardVm.localColumns[0].tasks[0]
+    expect(revertedTask.id).toBe('task-rollback-move')
+    expect(revertedTask.columnId).toBe('col-source')
+    expect(revertedTask.title).toBe('Initial Title')
+    expect(revertedTask.description).toBe('Initial Description')
+    expect(revertedTask.priority).toBe('LOW')
+    expect(revertedTask.tags).toEqual([originalTag])
+
+    // Error banner is populated
+    expect(boardVm.errorMessage).toContain('Move relocation network failure')
+  })
+
+  it('move-on-save rollback: network error in updateTask rolls back relocated task to source column and previous field values', async () => {
+    const task = createTaskFixture({
+      id: 'task-rollback-update',
+      title: 'Initial Title 2',
+      description: 'Initial Description 2',
+      columnId: 'col-source',
+      position: 0,
+      priority: 'MEDIUM',
+    })
+
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({ id: 'col-source', tasks: [task] }),
+        createColumnFixture({ id: 'col-dest', tasks: [] }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockRejectedValue(new Error('Update network error'))
+    vi.spyOn(kanbanApi, 'moveTask').mockResolvedValue({ id: 'task-rollback-update' } as any)
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    await boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-rollback-update',
+      columnId: 'col-dest',
+      title: 'Will Fail',
+      description: 'Will Fail Description',
+      priority: 'HIGH',
+    })
+
+    expect(boardVm.localColumns[0].tasks).toHaveLength(1)
+    expect(boardVm.localColumns[1].tasks).toHaveLength(0)
+
+    const revertedTask = boardVm.localColumns[0].tasks[0]
+    expect(revertedTask.id).toBe('task-rollback-update')
+    expect(revertedTask.columnId).toBe('col-source')
+    expect(revertedTask.title).toBe('Initial Title 2')
+    expect(revertedTask.priority).toBe('MEDIUM')
+
+    expect(boardVm.errorMessage).toContain('Update network error')
   })
 
   it('optimistic task creation: appends temporary task, calls kanbanApi, and reconciles server ID on success', async () => {

@@ -48,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, provide, nextTick } from 'vue'
+import { ref, computed, watch, provide, nextTick, onMounted } from 'vue'
 import type {
   KanbanBoardDto,
   KanbanColumnDto,
@@ -56,6 +56,8 @@ import type {
   KanbanTaskDto,
   TaskMoveContext,
   TaskDialogSavePayload,
+  TagDto,
+  TaskPriorityType,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -69,6 +71,20 @@ defineSlots<{
 }>()
 
 const localColumns = ref<KanbanColumnDto[]>([])
+const availableTags = ref<TagDto[]>([])
+
+const loadTags = async (): Promise<void> => {
+  try {
+    const tags = await kanbanApi.listTags()
+    availableTags.value = tags || []
+  } catch (err) {
+    console.warn('Failed to fetch tags:', err)
+  }
+}
+
+onMounted(() => {
+  loadTags()
+})
 
 watch(
   () => props.board.columns,
@@ -196,7 +212,7 @@ const closeTaskDialog = (): void => {
 
 const handleCreateTask = async (
   columnId: string | number,
-  payload: Partial<KanbanTaskDto>,
+  payload: Partial<KanbanTaskDto> & { tag_ids?: Array<string | number> },
 ): Promise<void> => {
   const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
   if (!targetCol) return
@@ -209,6 +225,8 @@ const handleCreateTask = async (
     description: payload.description ?? '',
     position: targetCol.tasks.length,
     columnId,
+    priority: payload.priority ?? null,
+    tags: payload.tags ?? [],
   }
   targetCol.tasks.push(optimisticTask)
 
@@ -216,7 +234,9 @@ const handleCreateTask = async (
     const createdTask = await kanbanApi.createTask(columnId, {
       title: payload.title,
       description: payload.description,
-    })
+      priority: payload.priority,
+      tag_ids: payload.tag_ids,
+    } as any)
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
     if (!taskInCol) {
@@ -229,6 +249,12 @@ const handleCreateTask = async (
       taskInCol.id = createdTask.id
       if (createdTask.position !== undefined) {
         taskInCol.position = createdTask.position
+      }
+      if (createdTask.priority !== undefined) {
+        taskInCol.priority = createdTask.priority
+      }
+      if (createdTask.tags !== undefined) {
+        taskInCol.tags = createdTask.tags
       }
     }
   } catch (err) {
@@ -255,63 +281,104 @@ const handleCreateTask = async (
   }
 }
 
+const applyTaskUpdates = (
+  target: KanbanTaskDto,
+  source: {
+    title?: string
+    description?: string
+    priority?: TaskPriorityType
+    tags?: TagDto[]
+  },
+): void => {
+  if (source.title !== undefined) target.title = source.title
+  if (source.description !== undefined) target.description = source.description
+  if (source.priority !== undefined) target.priority = source.priority
+  if (source.tags !== undefined) target.tags = source.tags
+}
+
 const handleUpdateTask = async (
   taskId: string | number,
-  payload: Partial<KanbanTaskDto>,
+  payload: Omit<Partial<KanbanTaskDto>, 'columnId'> & {
+    columnId?: string | number | null
+    tag_ids?: Array<string | number>
+  },
 ): Promise<void> => {
+  let sourceCol: KanbanColumnDto | undefined
+  let sourceIndex = -1
   let targetTask: KanbanTaskDto | undefined
 
   for (const col of localColumns.value) {
-    const found = col.tasks.find(t => sameId(t.id, taskId))
-    if (found) {
-      targetTask = found
+    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
+    if (idx !== -1) {
+      sourceCol = col
+      sourceIndex = idx
+      targetTask = col.tasks[idx]
       break
     }
   }
 
-  if (!targetTask) return
+  if (!sourceCol || !targetTask || sourceIndex === -1) return
 
   errorMessage.value = null
-  const previousTitle = targetTask.title
-  const previousDescription = targetTask.description
+  const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
 
-  // Optimistic update
-  if (payload.title !== undefined) {
-    targetTask.title = payload.title
+  const destinationColumnId = payload.columnId ?? targetTask.columnId
+  const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
+  const destCol = isColumnChanged
+    ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
+    : sourceCol
+
+  if (!destCol) {
+    errorMessage.value = 'Destination column not found'
+    return
   }
-  if (payload.description !== undefined) {
-    targetTask.description = payload.description
+
+  const targetPosition = destCol.tasks.length
+
+  // Optimistic update of task fields
+  applyTaskUpdates(targetTask, payload)
+
+  // Optimistic column relocation
+  if (isColumnChanged) {
+    sourceCol.tasks.splice(sourceIndex, 1)
+    reindexTasks(sourceCol.tasks)
+
+    targetTask.columnId = destCol.id
+    destCol.tasks.push(targetTask)
+    reindexTasks(destCol.tasks)
   }
 
   try {
-    const updated = await kanbanApi.updateTask(taskId, {
+    const updatePayload: any = {
       title: payload.title,
       description: payload.description,
-    })
+    }
+    if (payload.priority !== undefined) {
+      updatePayload.priority = payload.priority
+    }
+    if (payload.tag_ids !== undefined) {
+      updatePayload.tag_ids = payload.tag_ids
+    }
+
+    const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
+    let updated: KanbanTaskDto | undefined
+
+    if (isColumnChanged) {
+      const movePromise = kanbanApi.moveTask(taskId, {
+        to_column_id: destCol.id,
+        target_position: targetPosition,
+      })
+      const [updateResult] = await Promise.all([updatePromise, movePromise])
+      updated = updateResult
+    } else {
+      updated = await updatePromise
+    }
+
     if (updated) {
-      let currentTask = targetTask
-      for (const col of localColumns.value) {
-        const found = col.tasks.find(t => sameId(t.id, taskId))
-        if (found) {
-          currentTask = found
-          break
-        }
-      }
-      if (updated.title !== undefined) currentTask.title = updated.title
-      if (updated.description !== undefined) currentTask.description = updated.description
+      applyTaskUpdates(targetTask, updated)
     }
   } catch (err) {
-    let currentTask = targetTask
-    for (const col of localColumns.value) {
-      const found = col.tasks.find(t => sameId(t.id, taskId))
-      if (found) {
-        currentTask = found
-        break
-      }
-    }
-    currentTask.title = previousTitle
-    currentTask.description = previousDescription
-
+    localColumns.value = columnsSnapshot
     const message = (err as any)?.message
       ? `Failed to update task: ${(err as any).message}`
       : 'Failed to update task'
@@ -368,17 +435,46 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
     await handleCreateTask(savePayload.columnId, {
       title: savePayload.title,
       description: savePayload.description,
+      priority: savePayload.priority,
+      tags: savePayload.tags,
+      tag_ids: savePayload.tag_ids,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
     await handleUpdateTask(savePayload.taskId, {
       title: savePayload.title,
       description: savePayload.description,
+      priority: savePayload.priority,
+      tags: savePayload.tags,
+      tag_ids: savePayload.tag_ids,
+      columnId: savePayload.columnId,
     })
+  }
+}
+
+const handleCreateTag = async (payload: { name: string } | string): Promise<TagDto> => {
+  const name = typeof payload === 'string' ? payload : payload.name
+  try {
+    const created = await kanbanApi.createTag({ name })
+    const exists = availableTags.value.some(
+      t => sameId(t.id, created.id) || t.name.toLowerCase() === created.name.toLowerCase(),
+    )
+    if (!exists) {
+      availableTags.value.push(created)
+    }
+    return created
+  } catch (err) {
+    const message = (err as any)?.message
+      ? `Failed to create tag: ${(err as any).message}`
+      : 'Failed to create tag'
+    errorMessage.value = message
+    throw err
   }
 }
 
 provide(kanbanContextKey, {
   columns: columnRegistry,
+  availableTags: computed(() => availableTags.value),
+  createTag: handleCreateTag,
   moveTask: handleMoveTask,
   openCreateTaskDialog,
   openEditTaskDialog,
@@ -389,6 +485,7 @@ provide(kanbanContextKey, {
 
 defineExpose({
   localColumns,
+  availableTags,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,
@@ -398,6 +495,8 @@ defineExpose({
   openCreateTaskDialog,
   openEditTaskDialog,
   closeTaskDialog,
+  loadTags,
+  handleCreateTag,
   handleCreateTask,
   handleUpdateTask,
   handleDeleteTask,
