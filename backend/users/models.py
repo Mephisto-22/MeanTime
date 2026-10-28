@@ -19,6 +19,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     resetting_password = models.BooleanField(default=False)
     password_reset_started_at = models.DateTimeField(null=True, blank=True)
     password_version = models.PositiveIntegerField(default=0, editable=False)
+    # Directional M2M tracking outgoing requests and connections.
+    # Note: user.friends.all() returns outgoing connections of all statuses.
+    # Use user.get_friends() to retrieve confirmed/accepted mutual friends.
     friends = models.ManyToManyField(
         "self",
         through="Friendship",
@@ -79,7 +82,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Check whether self and user have an ACCEPTED friendship."""
         if not user or not user.is_authenticated or user == self:
             return False
-        return self.get_friends().filter(id=user.id).exists()
+        return Friendship.objects.filter(
+            models.Q(requester=self, receiver=user) | models.Q(requester=user, receiver=self),
+            status=FriendshipStatus.ACCEPTED,
+        ).exists()
 
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
@@ -126,19 +132,7 @@ class Friendship(models.Model):
             ),
         ]
 
-    def get_friends(self):
-        """Return QuerySet of users who have an ACCEPTED friendship with self in either direction."""
-        from django.db.models import Q
-        return User.objects.filter(
-            Q(friendships_received__requester=self, friendships_received__status=FriendshipStatus.ACCEPTED) |
-            Q(friendships_initiated__receiver=self, friendships_initiated__status=FriendshipStatus.ACCEPTED)
-        ).distinct()
-
-    def is_friends_with(self, user):
-        """Check whether self and user have an ACCEPTED friendship."""
-        if not user or not user.is_authenticated or user == self:
-            return False
-        return self.get_friends().filter(id=user.id).exists()
-
     def __str__(self):
-        return f"{self.requester.display_name} -> {self.receiver.display_name} ({self.status})"
+        req = self.requester.display_name or self.requester.email
+        rec = self.receiver.display_name or self.receiver.email
+        return f"{req} -> {rec} ({self.status})"

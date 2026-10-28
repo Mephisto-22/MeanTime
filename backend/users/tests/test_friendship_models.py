@@ -115,3 +115,44 @@ class FriendshipModelTests(TestCase):
         self.assertEqual(alice_friends.count(), 2)
         self.assertIn(self.user2, alice_friends)
         self.assertIn(user3, alice_friends)
+
+    def test_friendship_model_does_not_have_friend_methods(self):
+        self.assertFalse(hasattr(Friendship, "get_friends"))
+        self.assertFalse(hasattr(Friendship, "is_friends_with"))
+
+    def test_get_friends_ignores_declined_and_blocked(self):
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+            status=FriendshipStatus.DECLINED,
+        )
+        self.assertNotIn(self.user2, self.user1.get_friends())
+        self.assertFalse(self.user1.is_friends_with(self.user2))
+
+        user3 = User.objects.create_user(
+            email="blocked@example.com",
+            password="password123",
+            display_name="Blocked",
+        )
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=user3,
+            status=FriendshipStatus.BLOCKED,
+        )
+        self.assertNotIn(user3, self.user1.get_friends())
+        self.assertFalse(self.user1.is_friends_with(user3))
+
+    def test_cascade_delete_on_receiver_removal(self):
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+        )
+        self.assertEqual(Friendship.objects.count(), 1)
+        self.user2.delete()
+        self.assertEqual(Friendship.objects.count(), 0)
+
+    def test_is_friends_with_guards_invalid_users(self):
+        from django.contrib.auth.models import AnonymousUser
+        self.assertFalse(self.user1.is_friends_with(None))
+        self.assertFalse(self.user1.is_friends_with(self.user1))
+        self.assertFalse(self.user1.is_friends_with(AnonymousUser()))
