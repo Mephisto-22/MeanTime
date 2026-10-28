@@ -101,11 +101,17 @@ describe('Production SSR Smoke Check', () => {
   })
 
   it('verifies public forms render correctly on login and register routes', async () => {
-    for (const path of ['/login', '/register']) {
+    for (const path of ['/login', '/register', '/forgot-password']) {
       const page = await request(path)
       expect(page.status).toBe(200)
       const html = await page.text()
       expect(html).toContain('name="email"')
     }
+  })
+
+  it('renders the public reset-link page without requiring a session', async () => {
+    const page = await request('/reset-password')
+    expect(page.status).toBe(200)
+    expect(await page.text()).toContain('Checking your reset link')
   })
 })

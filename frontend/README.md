@@ -360,6 +360,14 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+### Password reset
+
+Login links to `/forgot-password`; the reset link opens the public `/reset-password`
+page. Forms call `AuthApi` to request, validate, and confirm a reset. With backend
+debug enabled, reset links print in backend container logs. Mailgun and inbox
+delivery are deferred. See [the reset guide](../docs/password-reset.md) for setup,
+database changes, endpoint contracts, and manual tests.
+
 ### Authentication frontend
 
 - `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates to the requested protected page (or home) only after that succeeds.

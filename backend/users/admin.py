@@ -16,7 +16,7 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ("is_active", "is_staff", "is_superuser")
     search_fields = ("email", "display_name")
     ordering = ("email",)
-    readonly_fields = ("created_at", "last_login")
+    readonly_fields = ("created_at", "last_login", "resetting_password", "password_reset_started_at")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
@@ -34,6 +34,7 @@ class UserAdmin(BaseUserAdmin):
             },
         ),
         ("Important Dates", {"fields": ("created_at", "last_login")}),
+        ("Password Reset", {"fields": ("resetting_password", "password_reset_started_at")}),
     )
 
     add_fieldsets = (

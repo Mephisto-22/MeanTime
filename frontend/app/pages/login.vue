@@ -8,6 +8,7 @@
         </p>
         <LoginForm :loading="loading" @submit="login" />
         <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
+        <NuxtLink to="/forgot-password" class="mt-4 block text-primary underline">Forgot your password?</NuxtLink>
         <p class="mt-4">
           Need an account?
           <NuxtLink to="/register" class="text-primary underline">Register</NuxtLink>
