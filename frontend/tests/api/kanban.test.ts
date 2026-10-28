@@ -7,6 +7,7 @@ import {
   type TaskPriorityType,
 } from '~/api/kanban'
 import { ApiError, apiService } from '~/services/ApiService'
+import { createTagFixture, createTaskFixture } from '../fixtures/kanban'
 
 const mockFetch = vi.fn()
 
@@ -22,43 +23,41 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
 
   describe('DTO & Type Definitions', () => {
     it('supports TaskPriorityType and TagDto shapes on KanbanTaskDto', () => {
-      const tag: TagDto = {
+      const tag = createTagFixture({
         id: 1,
         name: 'Urgent',
         created_at: '2026-10-27T20:00:00Z',
-      }
+      })
 
-      const priorityLow: TaskPriorityType = 'LOW'
-      const priorityMed: TaskPriorityType = 'MEDIUM'
       const priorityHigh: TaskPriorityType = 'HIGH'
       const priorityNull: TaskPriorityType = null
 
-      const task: KanbanTaskDto = {
+      const task = createTaskFixture({
         id: 'task-1',
         title: 'Task 1',
         position: 0,
         columnId: 'col-1',
         priority: priorityHigh,
         tags: [tag],
-      }
+      })
 
       expect(task.priority).toBe('HIGH')
       expect(task.tags).toHaveLength(1)
       expect(task.tags?.[0].name).toBe('Urgent')
 
-      const unassignedTask: KanbanTaskDto = {
+      const unassignedTask = createTaskFixture({
         id: 'task-2',
         title: 'Task 2',
         position: 1,
         columnId: 'col-1',
         priority: priorityNull,
-      }
+      })
       expect(unassignedTask.priority).toBeNull()
       expect(unassignedTask.tags).toBeUndefined()
     })
 
     it('supports priority, tags, and tag_ids on TaskDialogSavePayload', () => {
-      const tag: TagDto = { id: 'tag-1', name: 'Frontend' }
+      const tag = createTagFixture({ id: 'tag-1', name: 'Frontend' })
       const payload: TaskDialogSavePayload = {
         title: 'Updated Task',
         description: 'Detailed description',
@@ -79,8 +78,8 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
   describe('listTags endpoint', () => {
     it('routes listTags to GET /api/kanban/tags and returns TagDto array', async () => {
       const mockTags: TagDto[] = [
-        { id: 1, name: 'Backend', created_at: '2026-10-27T10:00:00Z' },
-        { id: 2, name: 'Frontend', created_at: '2026-10-27T11:00:00Z' },
+        createTagFixture({ id: 1, name: 'Backend', created_at: '2026-10-27T10:00:00Z' }),
+        createTagFixture({ id: 2, name: 'Frontend', created_at: '2026-10-27T11:00:00Z' }),
       ]
       const getSpy = vi.spyOn(apiService, 'get').mockResolvedValue(mockTags)
 
@@ -100,7 +99,7 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
 
     it('deserializes GET /api/kanban/tags response through ApiService with auth headers', async () => {
       const sampleTags: TagDto[] = [
-        { id: 101, name: 'DevOps', created_at: '2026-10-27T12:00:00Z' },
+        createTagFixture({ id: 101, name: 'DevOps', created_at: '2026-10-27T12:00:00Z' }),
       ]
 
       mockFetch.mockResolvedValueOnce(sampleTags)
@@ -130,11 +129,11 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
   describe('createTag endpoint', () => {
     it('routes createTag to POST /api/kanban/tags with payload and returns created TagDto', async () => {
       const payload = { name: 'Bug Fix' }
-      const mockCreatedTag: TagDto = {
+      const mockCreatedTag: TagDto = createTagFixture({
         id: 3,
         name: 'Bug Fix',
         created_at: '2026-10-27T14:00:00Z',
-      }
+      })
       const postSpy = vi.spyOn(apiService, 'post').mockResolvedValue(mockCreatedTag)
 
       const result = await kanbanApi.createTag(payload)
@@ -152,11 +151,11 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
     })
 
     it('deserializes POST /api/kanban/tags response through ApiService with payload and headers', async () => {
-      const createdTag: TagDto = {
+      const createdTag: TagDto = createTagFixture({
         id: 202,
         name: 'Design System',
         created_at: '2026-10-27T15:30:00Z',
-      }
+      })
 
       mockFetch.mockResolvedValueOnce(createdTag)
 
