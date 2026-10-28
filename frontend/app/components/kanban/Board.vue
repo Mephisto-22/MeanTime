@@ -89,7 +89,15 @@ onMounted(() => {
 watch(
   () => props.board.columns,
   (newColumns) => {
-    localColumns.value = JSON.parse(JSON.stringify(newColumns || []))
+    const raw = JSON.parse(JSON.stringify(newColumns || []))
+    raw.forEach((col: KanbanColumnDto) => {
+      col.tasks?.forEach((t: KanbanTaskDto) => {
+        if (t.columnId == null) {
+          t.columnId = (t as any).column_id ?? col.id
+        }
+      })
+    })
+    localColumns.value = raw
   },
   { immediate: true, deep: true },
 )
@@ -202,7 +210,15 @@ const openCreateTaskDialog = (columnId: string | number): void => {
 const openEditTaskDialog = (task: KanbanTaskDto): void => {
   dialogMode.value = 'edit'
   activeTask.value = task
-  activeColumnId.value = task.columnId
+  let colId = task.columnId ?? (task as any).column_id
+  if (colId == null) {
+    const containingCol = localColumns.value.find(c => c.tasks.some(t => sameId(t.id, task.id)))
+    if (containingCol) colId = containingCol.id
+  }
+  if (task.columnId == null && colId != null) {
+    task.columnId = colId
+  }
+  activeColumnId.value = colId ?? null
   isTaskDialogOpen.value = true
 }
 
@@ -247,6 +263,9 @@ const handleCreateTask = async (
     }
     if (taskInCol && createdTask) {
       taskInCol.id = createdTask.id
+      if (createdTask.columnId != null || (createdTask as any).column_id != null) {
+        taskInCol.columnId = createdTask.columnId ?? (createdTask as any).column_id
+      }
       if (createdTask.position !== undefined) {
         taskInCol.position = createdTask.position
       }
@@ -322,7 +341,10 @@ const handleUpdateTask = async (
   errorMessage.value = null
   const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
 
-  const destinationColumnId = payload.columnId ?? targetTask.columnId
+  const destinationColumnId =
+    payload.columnId != null
+      ? payload.columnId
+      : (targetTask.columnId ?? (targetTask as any)?.column_id ?? sourceCol.id)
   const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
   const destCol = isColumnChanged
     ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
@@ -376,6 +398,12 @@ const handleUpdateTask = async (
 
     if (updated) {
       applyTaskUpdates(targetTask, updated)
+      if (updated.position !== undefined) {
+        targetTask.position = updated.position
+      }
+      if (updated.columnId != null || (updated as any)?.column_id != null) {
+        targetTask.columnId = updated.columnId ?? (updated as any)?.column_id
+      }
     }
   } catch (err) {
     localColumns.value = columnsSnapshot

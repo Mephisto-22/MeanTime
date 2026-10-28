@@ -100,6 +100,35 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(saveButton.attributes('disabled')).toBeUndefined()
   })
 
+  it('in edit mode: correctly populates column select and save payload when task has backend column_id', async () => {
+    const backendTask = {
+      id: 't-backend',
+      title: 'Backend Task Title',
+      description: 'Backend Details',
+      column_id: 'col-2',
+      priority: 'LOW',
+      tags: [],
+    }
+
+    const wrapper = mountTaskDialog({
+      mode: 'edit',
+      task: backendTask as any,
+      columns: [
+        { id: 'col-1', title: 'To Do', position: 0 },
+        { id: 'col-2', title: 'In Progress', position: 1 },
+      ],
+    })
+
+    const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
+    expect(titleInput.element.value).toBe('Backend Task Title')
+
+    await wrapper.find('form').trigger('submit.prevent')
+    const saveEmits = wrapper.emitted('save')
+    expect(saveEmits).toHaveLength(1)
+    const payload = saveEmits![0][0] as TaskDialogSavePayload
+    expect(payload.columnId).toBe('col-2')
+  })
+
   it('discard behavior: cancelling or closing discards changes without mutating active task', async () => {
     const sampleTask = createTaskFixture({
       id: 't-100',

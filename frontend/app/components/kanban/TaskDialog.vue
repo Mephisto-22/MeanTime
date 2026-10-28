@@ -312,7 +312,7 @@ const availableColumns = computed(() => {
 })
 
 const currentColumnTitle = computed(() => {
-  const colId = selectedColumnId.value ?? props.columnId ?? props.task?.columnId
+  const colId = selectedColumnId.value ?? props.columnId ?? props.task?.columnId ?? (props.task as any)?.column_id
   const col = availableColumns.value.find(c => String(c.id) === String(colId))
   return col?.title ?? 'Default Column'
 })
@@ -347,7 +347,7 @@ const syncFormWithProps = () => {
     title.value = props.task.title ?? ''
     description.value = props.task.description ?? ''
     priority.value = props.task.priority ?? null
-    selectedColumnId.value = props.task.columnId ?? props.columnId ?? null
+    selectedColumnId.value = props.task.columnId ?? (props.task as any)?.column_id ?? props.columnId ?? null
     attachedTags.value = props.task.tags ? [...props.task.tags] : []
   } else {
     title.value = ''
@@ -477,7 +477,7 @@ const save = () => {
     title: trimmedTitle.value,
     description: description.value.trim(),
     mode: props.mode,
-    columnId: selectedColumnId.value ?? props.columnId ?? (props.task?.columnId ?? null),
+    columnId: selectedColumnId.value ?? props.columnId ?? (props.task?.columnId ?? (props.task as any)?.column_id ?? null),
     taskId: props.task?.id ?? null,
     priority: priority.value,
     tags: [...attachedTags.value],

@@ -510,4 +510,63 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(boardVm.localColumns[0].tasks[0].id).toBe('task-to-delete')
     expect(boardVm.errorMessage).toContain('Delete rejected')
   })
+
+  it('editing a task on initial page load (with backend column_id or null columnId) updates cleanly without destination column not found error', async () => {
+    const rawBackendTask = {
+      id: 'task-backend-1',
+      title: 'Initial Title',
+      description: 'Initial Description',
+      position: 0,
+      column_id: 'col-1',
+      priority: null,
+      tags: [],
+    }
+
+    const board = {
+      id: 'board-1',
+      title: 'Initial Board',
+      columns: [
+        {
+          id: 'col-1',
+          title: 'To Do',
+          position: 0,
+          board_id: 'board-1',
+          tasks: [rawBackendTask],
+        },
+      ],
+    }
+
+    const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+      id: 'task-backend-1',
+      title: 'Updated Title',
+      description: 'Initial Description',
+      column_id: 'col-1',
+      position: 0,
+      priority: null,
+      tags: [],
+    } as any)
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    // When the board loads, tasks should be properly associated with columnId
+    boardVm.openEditTaskDialog(boardVm.localColumns[0].tasks[0])
+    expect(boardVm.activeColumnId).toBe('col-1')
+
+    // Saving edit without moving column (e.g. columnId is null or omitted or same)
+    await boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-backend-1',
+      title: 'Updated Title',
+      description: 'Initial Description',
+      columnId: null,
+    })
+
+    expect(boardVm.errorMessage).toBeNull()
+    expect(updateSpy).toHaveBeenCalledWith('task-backend-1', {
+      title: 'Updated Title',
+      description: 'Initial Description',
+    })
+    expect(boardVm.localColumns[0].tasks[0].title).toBe('Updated Title')
+  })
 })

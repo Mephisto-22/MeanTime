@@ -20,7 +20,8 @@ export interface KanbanTaskDto {
   title: string
   description?: string
   position: number
-  columnId: string | number
+  columnId?: string | number
+  column_id?: string | number
   priority?: TaskPriorityType
   tags?: TagDto[]
   tag_ids?: Array<string | number>
