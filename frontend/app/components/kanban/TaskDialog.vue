@@ -10,7 +10,7 @@
     <form class="flex flex-col gap-5 pt-1" novalidate @submit.prevent="save">
       <!-- Frameless / Editorial Title Input -->
       <div class="flex flex-col gap-1">
-        <label for="task-title-input" class="sr-only">Task Title</label>
+        <Label for="task-title-input" class="sr-only">Task Title</Label>
         <InputText
           id="task-title-input"
           v-model="title"
@@ -28,9 +28,9 @@
         <div class="flex flex-col gap-3 md:col-span-5">
           <!-- Column Selector / Badge -->
           <div class="flex flex-col gap-1">
-            <label for="task-column-select" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
+            <Label for="task-column-select" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
               Column
-            </label>
+            </Label>
             <div v-if="mode === 'edit'">
               <Select
                 id="task-column-select"
@@ -56,9 +56,9 @@
 
           <!-- Priority Selector (Stacked directly below Column) -->
           <div class="flex flex-col gap-1">
-            <label for="task-priority-select" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
+            <Label for="task-priority-select" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
               Priority
-            </label>
+            </Label>
             <Select
               id="task-priority-select"
               v-model="priority"
@@ -90,9 +90,9 @@
         <!-- Right: Tags Management (Static Add Tag on left, Tags populate right, In-Layout Suggestions below) (7 cols) -->
         <div class="flex flex-col gap-1.5 md:col-span-7 md:border-l md:border-surface-200/70 md:pl-5 dark:md:border-surface-800">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
+            <Label class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
               Tags
-            </label>
+            </Label>
             <span class="text-[11px] text-surface-400">
               {{ attachedTags.length }} attached
             </span>
@@ -102,14 +102,14 @@
           <div class="flex flex-wrap items-center gap-1.5 min-h-[28px]">
             <!-- Static Add Tag Input (rounded-full) -->
             <div class="shrink-0 flex items-center">
-              <input
+              <InputText
                 id="task-tag-input"
                 v-model="tagInputText"
                 type="text"
                 maxlength="50"
                 placeholder="+ add tag..."
                 data-testid="task-tag-input"
-                class="h-6 w-24 rounded-full border border-dashed border-surface-300 bg-transparent px-2.5 text-[11px] text-surface-800 placeholder-surface-400 focus:w-36 focus:border-solid focus:border-primary-500 focus:outline-none dark:border-surface-600 dark:text-surface-200 transition-all"
+                class="!h-6 !w-24 rounded-full border border-dashed border-surface-300 bg-transparent px-2.5 text-[11px] text-surface-800 placeholder-surface-400 focus:!w-36 focus:border-solid focus:border-primary-500 focus:outline-none dark:border-surface-600 dark:text-surface-200 transition-all"
                 @keydown.enter.prevent="addTagFromInput"
               />
             </div>
@@ -122,15 +122,19 @@
               class="inline-flex items-center gap-1 rounded-full border border-surface-200 bg-surface-100/80 px-2.5 py-0.5 text-[11px] font-medium text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
             >
               {{ tag.name }}
-              <button
+              <Button
                 type="button"
-                class="text-surface-400 hover:text-surface-700 dark:hover:text-surface-100"
+                text
+                rounded
+                severity="secondary"
+                class="!p-0 !h-auto !w-auto !border-0 bg-transparent text-surface-400 hover:text-surface-700 dark:hover:text-surface-100 focus:outline-none shadow-none cursor-pointer"
                 title="Remove tag"
+                aria-label="Remove tag"
                 data-testid="task-remove-tag-button"
                 @click="removeTag(tag.id)"
               >
                 &times;
-              </button>
+              </Button>
             </span>
 
             <span
@@ -149,16 +153,17 @@
             </div>
 
             <div v-if="suggestedTags.length > 0" class="flex flex-wrap gap-1">
-              <button
+              <Button
                 v-for="tag in suggestedTags"
                 :key="tag.id"
                 type="button"
                 data-testid="task-tag-suggestion"
-                class="inline-flex items-center rounded-full border border-dashed border-surface-300/90 bg-surface-50/70 px-2.5 py-0.5 text-[11px] font-medium text-surface-600 transition-colors hover:border-solid hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800/70 dark:text-surface-300 dark:hover:border-primary-400 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                unstyled
+                class="inline-flex items-center rounded-full border border-dashed border-surface-300/90 bg-surface-50/70 px-2.5 py-0.5 text-[11px] font-medium text-surface-600 transition-colors hover:border-solid hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800/70 dark:text-surface-300 dark:hover:border-primary-400 dark:hover:bg-primary-950/40 dark:hover:text-primary-300 cursor-pointer"
                 @click="attachExistingTag(tag)"
               >
                 + {{ tag.name }}
-              </button>
+              </Button>
             </div>
             <div v-else class="text-[11px] text-surface-400 italic py-0.5">
               {{ tagInputText.trim() ? 'No matching tags found. Press Enter to create.' : 'All available library tags attached.' }}
@@ -169,9 +174,9 @@
 
       <!-- Description Textarea -->
       <div class="flex flex-col gap-1.5">
-        <label for="task-description-input" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
+        <Label for="task-description-input" class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
           Notes & Description
-        </label>
+        </Label>
         <Textarea
           id="task-description-input"
           v-model="description"

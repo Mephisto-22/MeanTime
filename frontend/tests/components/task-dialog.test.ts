@@ -50,10 +50,11 @@ function mountTaskDialog(props: Record<string, any> = {}) {
 }
 
 describe('TaskDialog Component DOM Suite', () => {
-  it('renders PrimeVue Dialog structure, title InputText, and description Textarea', () => {
+  it('renders PrimeVue Dialog structure, title InputText, tag InputText, and description Textarea', () => {
     const wrapper = mountTaskDialog()
     expect(wrapper.find('[data-testid="task-dialog"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="task-title-input"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="task-tag-input"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="task-description-input"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="task-save-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="task-cancel-button"]').exists()).toBe(true)
