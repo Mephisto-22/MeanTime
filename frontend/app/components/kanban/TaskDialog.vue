@@ -256,7 +256,7 @@ import type {
   TaskDialogSavePayload,
   KanbanColumnSummary,
 } from '~/api/kanban'
-import { kanbanContextKey } from '~/api/kanban'
+import { kanbanContextKey, TASK_PRIORITY_CONFIG } from '~/api/kanban'
 
 interface Props {
   visible?: boolean
@@ -319,7 +319,7 @@ const currentColumnTitle = computed(() => {
 
 const tagLibrary = computed<TagDto[]>(() => {
   if (props.availableTags && props.availableTags.length > 0) return props.availableTags
-  if ((kanbanContext as any)?.availableTags?.value) return (kanbanContext as any).availableTags.value as TagDto[]
+  if (kanbanContext?.availableTags?.value) return kanbanContext.availableTags.value
   return []
 })
 
@@ -327,29 +327,17 @@ const trimmedTitle = computed(() => title.value.trim())
 const isSaveDisabled = computed(() => trimmedTitle.value === '')
 
 const getPriorityDot = (val: TaskPriorityType) => {
-  switch (val) {
-    case 'HIGH':
-      return 'bg-red-500'
-    case 'MEDIUM':
-      return 'bg-amber-500'
-    case 'LOW':
-      return 'bg-sky-500'
-    default:
-      return 'bg-surface-400'
+  if (val && val in TASK_PRIORITY_CONFIG) {
+    return TASK_PRIORITY_CONFIG[val].dotClass
   }
+  return 'bg-surface-400'
 }
 
 const getPriorityLabel = (val: TaskPriorityType) => {
-  switch (val) {
-    case 'HIGH':
-      return 'High'
-    case 'MEDIUM':
-      return 'Medium'
-    case 'LOW':
-      return 'Low'
-    default:
-      return 'None'
+  if (val && val in TASK_PRIORITY_CONFIG) {
+    return TASK_PRIORITY_CONFIG[val].label
   }
+  return 'None'
 }
 
 const syncFormWithProps = () => {
@@ -438,8 +426,8 @@ const addTagFromInput = () => {
     }
     attachedTags.value.push(newTag)
     emit('createTag', name)
+    tagInputText.value = ''
   }
-  tagInputText.value = ''
 }
 
 const removeTag = (tagId: string | number) => {

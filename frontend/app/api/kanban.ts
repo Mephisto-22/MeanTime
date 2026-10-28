@@ -3,6 +3,12 @@ import { apiService } from '~/services/ApiService'
 
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
 
+export const TASK_PRIORITY_CONFIG = {
+  HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
+  MEDIUM: { label: 'Medium', dotClass: 'bg-amber-500', badgeClass: 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
+  LOW: { label: 'Low', dotClass: 'bg-sky-500', badgeClass: 'border-sky-500 text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+} as const
+
 export interface TagDto {
   id: string | number
   name: string
@@ -69,6 +75,7 @@ export interface TaskDialogSavePayload {
 
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
+  availableTags?: ComputedRef<TagDto[]>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
   openCreateTaskDialog: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void

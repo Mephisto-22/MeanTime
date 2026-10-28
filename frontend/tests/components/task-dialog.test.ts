@@ -2,8 +2,8 @@ import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
-import { createTaskFixture } from '../fixtures/kanban'
-import type { TagDto } from '~/api/kanban'
+import { createTaskFixture, createTagFixture } from '../fixtures/kanban'
+import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
 
 const DialogStub = {
   name: 'Dialog',
@@ -31,7 +31,7 @@ const SelectStub = {
   `,
 }
 
-function mountTaskDialog(props: any = {}) {
+function mountTaskDialog(props: Record<string, any> = {}) {
   return mount(TaskDialog, {
     props: {
       visible: true,
@@ -83,7 +83,7 @@ describe('TaskDialog Component DOM Suite', () => {
       description: 'Existing Details',
       columnId: 'col-1',
       priority: 'HIGH',
-      tags: [{ id: 'tag-1', name: 'Frontend' }],
+      tags: [createTagFixture({ id: 'tag-1', name: 'Frontend' })],
     })
 
     const wrapper = mountTaskDialog({
@@ -139,7 +139,8 @@ describe('TaskDialog Component DOM Suite', () => {
 
     const saveEmits = wrapper.emitted('save')
     expect(saveEmits).toHaveLength(1)
-    expect(saveEmits![0][0]).toEqual({
+    const payload = saveEmits![0][0] as TaskDialogSavePayload
+    expect(payload).toEqual({
       title: 'New Task Title',
       description: 'New Task Description',
       mode: 'create',
@@ -255,7 +256,7 @@ describe('TaskDialog Component DOM Suite', () => {
 
     await wrapper.find('form').trigger('submit.prevent')
 
-    const savePayload = wrapper.emitted('save')?.[0]?.[0] as any
+    const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
     expect(savePayload.columnId).toBe('col-2')
     expect(savePayload.priority).toBe('HIGH')
   })
@@ -276,7 +277,7 @@ describe('TaskDialog Component DOM Suite', () => {
     await prioritySelect.setValue('')
 
     await wrapper.find('form').trigger('submit.prevent')
-    const savePayload = wrapper.emitted('save')?.[0]?.[0] as any
+    const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
     expect(savePayload.priority).toBeNull()
   })
 
@@ -311,8 +312,8 @@ describe('TaskDialog Component DOM Suite', () => {
   })
 
   it('attached tags: populate to the right with remove buttons that strictly unlink tags from task', async () => {
-    const tag1: TagDto = { id: 'tag-1', name: 'Bug' }
-    const tag2: TagDto = { id: 'tag-2', name: 'Refactor' }
+    const tag1 = createTagFixture({ id: 'tag-1', name: 'Bug' })
+    const tag2 = createTagFixture({ id: 'tag-2', name: 'Refactor' })
     const availableTags: TagDto[] = [tag1, tag2]
 
     const task = createTaskFixture({
@@ -343,16 +344,16 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(availableTags).toHaveLength(2)
 
     await wrapper.find('form').trigger('submit.prevent')
-    const savePayload = wrapper.emitted('save')?.[0]?.[0] as any
+    const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
     expect(savePayload.tags).toEqual([tag2])
     expect(savePayload.tag_ids).toEqual(['tag-2'])
   })
 
   it('in-layout suggestions box: displays unattached library tags, filters case-insensitively, and attaches directly on click', async () => {
     const availableTags: TagDto[] = [
-      { id: '1', name: 'Frontend' },
-      { id: '2', name: 'Design System' },
-      { id: '3', name: 'Backend' },
+      createTagFixture({ id: '1', name: 'Frontend' }),
+      createTagFixture({ id: '2', name: 'Design System' }),
+      createTagFixture({ id: '3', name: 'Backend' }),
     ]
 
     const wrapper = mountTaskDialog({
