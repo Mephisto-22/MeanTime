@@ -2,8 +2,8 @@ from asgiref.sync import sync_to_async
 from django.db import connection
 from ninja import NinjaAPI, Schema
 from ninja_extra.exceptions import APIException
-from users.authentication import PasswordResetJWTAuth
-from users.api import auth_router
+from users.authentication import AppJWTAuth
+from users.api import auth_router, users_router
 
 from kanban.api import router as kanban_router
 
@@ -12,7 +12,7 @@ api = NinjaAPI(
     title="MeanTime API",
     version="1.0.0",
     description="MeanTime API service with Django Ninja",
-    auth=PasswordResetJWTAuth(),
+    auth=AppJWTAuth(),
 )
 
 # router registrations (import above)
@@ -40,6 +40,7 @@ def api_exception_handler(request, exc):
 
 
 api.add_router("/auth", auth_router, tags=["Authentication"])
+api.add_router("/users", users_router, tags=["Users"])
 
 
 class HealthResponse(Schema):

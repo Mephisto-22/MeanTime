@@ -21,6 +21,7 @@ For comprehensive guides, architecture diagrams, and service walkthroughs, visit
 - **[Architecture & Domain](https://meantime.readthedocs.io/en/latest/architecture/)**: Container networking, Nitro proxy flow, and ubiquitous domain vocabulary.
 - **[Backend Service Guide](https://meantime.readthedocs.io/en/latest/backend/)**: Django Ninja architecture, database migrations, Pydantic schemas, and API testing.
 - **[Frontend Service Guide](https://meantime.readthedocs.io/en/latest/frontend/)**: Nuxt 4, PrimeVue 5 + Tailwind integration, Pinia stores, and the `ApiService` pattern.
+- **[Infrastructure Guide](https://meantime.readthedocs.io/en/latest/infrastructure/)**: Terraform for the AWS Dev and Prod environments: bringing them up and down, opening Dev, and finding Prod's URL.
 
 ---
 
@@ -99,6 +100,7 @@ docker compose up -d --build
 MeanTime/
 ├── backend/                             # Django Ninja backend service (Python 3.14, Uvicorn)
 ├── frontend/                            # Nuxt 4 / Vue 3 frontend service (PrimeVue 5, Tailwind)
+├── infra/                               # Terraform for the AWS Dev and Prod environments
 ├── docs/                                # Documentation source (MkDocs Material)
 │   ├── getting-started.md               # Quickstart and configuration guides
 │   ├── architecture.md                  # System architecture and domain glossary

@@ -45,6 +45,12 @@ frontend/
 │   ├── stores/                  # Pinia state management stores (auto-imported)
 │   │   └── .gitkeep
 │   └── app.vue                  # Root Vue application shell
+├── tests/                       # Vitest test suite organized into functional layers
+│   ├── api/                     # HTTP client contracts, bearer token, 401 retry loops
+│   ├── components/              # Real DOM component tests & optimistic mutation verification
+│   ├── fixtures/                # Canonical domain entity factories (Board, Column, Task)
+│   ├── smoke/                   # Production SSR smoke tests against built Nitro output
+│   └── stores/                  # Pinia store state transitions and session lifecycles
 ├── docker/
 │   ├── Dockerfile               # Production-grade Node 22 Alpine build definition
 │   └── entrypoint.sh            # Container initialization and dependency verification script
@@ -56,7 +62,9 @@ frontend/
 ├── pnpm-workspace.yaml          # Pnpm security and build configuration
 ├── README.md                    # This documentation
 ├── tailwind.config.ts           # Tailwind CSS theme extension & PrimeUI plugin
-└── tsconfig.json                # TypeScript compiler configuration extending Nuxt
+├── tsconfig.json                # TypeScript compiler configuration extending Nuxt
+├── vitest.config.ts             # Nuxt runtime & happy-dom in-memory test configuration
+└── vitest.smoke.config.ts       # Production SSR smoke test configuration
 ```
 
 ---
@@ -370,7 +378,45 @@ database changes, endpoint contracts, and manual tests.
 - Pages are protected by default through `app/middleware/auth.global.ts`; add `definePageMeta({ public: true })` for public pages. Login and registration are public. Protected content uses `ClientOnly` and waits for a validated session, so server HTML never contains protected page content. API endpoints still enforce authorization on the backend.
 - `ApiService` attaches the current bearer token to relative `/api/` requests, refreshes on 401, and retries once. Public endpoints use `{ auth: false }`; authentication routes opt out to avoid recursive refresh. A second 401 ends the session; a normal 403 permission error does not trigger refresh.
 - `setUser` stores profiles in memory; `clearTokens` removes the whole session. Only tokens are persisted, never the user or initialization state.
-- Run `pnpm typecheck` and `node --test tests/*.test.cjs` inside the frontend container. After `pnpm build`, run `node tests/protected-rendering.smoke.cjs` to check production HTML.
+- Run `pnpm typecheck` and `pnpm test` inside the frontend container. After `pnpm build`, run `pnpm test:smoke` to check production HTML.
+
+---
+
+## Testing
+
+MeanTime frontend uses Vitest, `@nuxt/test-utils`, `@vue/test-utils`, and `happy-dom` for fast, type-safe in-memory testing and production smoke verification.
+
+### Running Tests in Docker (Required)
+
+MeanTime is built with a container-first approach. All test commands **must be executed inside the running frontend Docker container** (via `docker compose exec frontend ...`), ensuring identical execution environments across development and CI while preventing host-specific file-system and permission issues.
+
+```bash
+# Run in-memory unit, store, and component tests (< 5 seconds)
+docker compose exec frontend pnpm test
+
+# Run tests in interactive watch mode for TDD
+docker compose exec frontend pnpm test:watch
+
+# Run production SSR smoke check against built output (requires building first)
+docker compose exec frontend pnpm build
+docker compose exec frontend pnpm test:smoke
+
+# Run full test suite: unit suites followed by production smoke check
+docker compose exec frontend pnpm test:all
+```
+
+Alternatively, open an interactive shell inside the container:
+
+```bash
+docker compose exec frontend sh
+# Then run within the container /app directory:
+pnpm test
+pnpm test:watch
+pnpm test:smoke
+pnpm test:all
+```
+
+For complete authoring patterns, typed domain fixture factories, component mounting with PrimeVue stubs, and optimistic mutation testing, see the [Frontend Testing Guide](../docs/frontend/testing.md).
 
 Manual checks with the backend running:
 

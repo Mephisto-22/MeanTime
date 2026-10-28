@@ -2,8 +2,10 @@
 
 The Sprint 2 flow lets a user request a reset link, choose a new password, and
 return to login. Mailgun and real email delivery are deferred. With
-`DJANGO_DEBUG=1`, Django's console backend prints the message and link in backend
-container logs. With debug off, delivery is disabled using the dummy backend.
+`DJANGO_DEBUG=1`, development console delivery prints a plain, unwrapped link in
+backend container logs. It deliberately bypasses MIME serialization: quoted-printable
+email output can wrap the URL and truncate the token when copied or clicked.
+With debug off, delivery is disabled using the dummy backend.
 Configure real delivery before enabling this flow for production users.
 
 ## Try it locally
@@ -52,6 +54,8 @@ token or reveals whether an email belongs to an active account.
 - `password_version` increments on completion. JWTs include the version at login,
   so reset invalidates prior access and refresh tokens. Legacy tokens without a
   version count as zero until the user's first reset.
+- `AppJWTAuth` in `users/authentication.py` enforces these application-wide JWT
+  rules. Reset-link helpers live at the top of `users/api.py`, alongside the routes.
 - Login returns 403 during an active reset. Protected JWT requests and refresh
   return 401 during reset or after a password-version mismatch.
 - Django's password reset token generator supplies expiring links. Changing the
@@ -67,12 +71,18 @@ token or reveals whether an email belongs to an active account.
 docker compose run --rm --no-deps --entrypoint python backend manage.py makemigrations --check --dry-run
 docker compose run --rm --no-deps --entrypoint python backend manage.py test users.tests kanban.tests --noinput
 docker compose run --rm --no-deps --entrypoint sh frontend -c 'pnpm typecheck && pnpm test'
+docker compose run --rm --no-deps --entrypoint sh frontend -c 'pnpm build && pnpm test:smoke'
 ```
 
 Start the database container before backend tests. Django uses a separate test
 database. Tests cover generic responses, expiry and reuse, password validation,
 login restrictions, session invalidation, successful login afterward, frontend
-payloads, mismatches, errors, and successful confirmation.
+payloads, mismatches, errors, and successful confirmation. The console regression
+uses the exact printed URL to validate, complete a reset, and reject reuse.
+Frontend tests use Vitest and Vue Test Utils under Nuxt's test environment:
+`tests/api/password-reset.test.ts`, `tests/components/password-reset.test.ts`, and
+`tests/pages/password-reset.test.ts`. Production routing is checked by
+`tests/smoke/protected-rendering.smoke.test.ts`.
 
 Before production rollout, connect and verify the deferred email provider and
 configure delivery monitoring and request throttling at the API or gateway.

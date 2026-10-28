@@ -2,7 +2,7 @@ from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.exceptions import AuthenticationFailed
 
 
-class PasswordResetJWTAuth(JWTAuth):
+class AppJWTAuth(JWTAuth):
     def get_user(self, validated_token):
         user = super().get_user(validated_token)
         if user.password_reset_active():

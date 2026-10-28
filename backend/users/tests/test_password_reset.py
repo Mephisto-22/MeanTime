@@ -1,5 +1,7 @@
 import json
 import re
+from contextlib import redirect_stdout
+from io import StringIO
 from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -57,6 +59,21 @@ class PasswordResetTests(TestCase):
         fragment = parse_qs(parsed.fragment)
         self.assertTrue(default_token_generator.check_token(self.user, fragment["token"][0]))
         self.assertEqual(self.login().status_code, 200)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
+    def test_console_delivered_link_can_be_submitted_to_validate(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            self.post("password-reset", {"email": self.user.email})
+        url = re.search(r"http://localhost:3000/reset-password#[^\s]+", output.getvalue()).group()
+        fragment = parse_qs(urlsplit(url).fragment)
+        self.assertIn("uid", fragment, "Console delivery changed the UID parameter")
+        self.assertIn("token", fragment, "Console delivery changed the token parameter")
+        link = {"uid": fragment["uid"][0], "token": fragment["token"][0]}
+        self.assertTrue(default_token_generator.check_token(self.user, link["token"]))
+        self.assertEqual(self.post("password-reset/validate", link).status_code, 200)
+        self.assertEqual(self.confirm(**link).status_code, 200)
+        self.assertEqual(self.confirm(**link).status_code, 400)
 
     def test_inactive_or_unusable_accounts_do_not_receive_links(self):
         self.user.is_active = False

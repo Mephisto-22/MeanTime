@@ -1,15 +1,22 @@
-import zoneinfo
 import logging
+from urllib.parse import urlencode
+
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from ninja import Router
 from ninja_jwt.tokens import RefreshToken
 
 from users.schemas import (
     AuthTokenOut,
+    DeleteAccountIn,
     ErrorDetail,
     LoginIn,
     RefreshIn,
@@ -19,11 +26,47 @@ from users.schemas import (
     PasswordResetRequestIn,
     PasswordResetLinkIn,
     PasswordResetConfirmIn,
+    UserUpdateIn,
 )
-from users.password_reset import deliver_reset_link, get_reset_user, INVALID_RESET_LINK
 
 User = get_user_model()
 auth_router = Router()
+users_router = Router(tags=["Users"])
+
+
+INVALID_RESET_LINK = "This password reset link is invalid or expired. Request a new link."
+
+
+def deliver_reset_link(user):
+    # The fragment keeps the secret out of frontend HTTP access logs.
+    fragment = urlencode({
+        "uid": urlsafe_base64_encode(force_bytes(user.pk)),
+        "token": default_token_generator.make_token(user),
+    })
+    link = f"{settings.FRONTEND_URL}/reset-password#{fragment}"
+    if settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
+        # MIME quoted-printable output wraps long URLs with '=\n', corrupting
+        # clickable console links. Development delivery must print the raw URL.
+        print(f"MeanTime password reset link (development only):\n{link}", flush=True)
+        return
+    send_mail(
+        "Reset your MeanTime password",
+        f"Open this link to reset your password:\n{link}\n\n"
+        "If you did not request this, ignore this message.\n"
+        f"This link expires in {settings.PASSWORD_RESET_TIMEOUT // 60} minutes.",
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+    )
+
+
+def get_reset_user(uid, token, *, lock=False):
+    try:
+        pk = force_str(urlsafe_base64_decode(uid))
+        users = User.objects.select_for_update() if lock else User.objects
+        user = users.get(pk=pk, is_active=True)
+    except (ValueError, TypeError, OverflowError, UnicodeDecodeError, User.DoesNotExist):
+        return None
+    return user if user.has_usable_password() and default_token_generator.check_token(user, token) else None
 
 
 @auth_router.post(
@@ -182,3 +225,50 @@ def confirm_password_reset(request, payload: PasswordResetConfirmIn):
     user.save(update_fields=["password", "resetting_password", "password_reset_started_at", "password_version"])
     # Changing the password also invalidates all outstanding Django reset links.
     return {"detail": "Password updated. You can now log in with your new password."}
+
+@users_router.patch(
+    "/me",
+    response={200: UserOut, 400: ErrorDetail, 401: ErrorDetail},
+    summary="Update current user profile",
+)
+def update_me(request, payload: UserUpdateIn):
+    """
+    Partially update the authenticated user's display_name or timezone.
+    Email is immutable and password updates are not supported here.
+    """
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    update_data = payload.dict(exclude_unset=True)
+    if not update_data:
+        return 200, user
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    user.save(update_fields=list(update_data.keys()))
+    return 200, user
+
+
+@users_router.delete(
+    "/me",
+    response={200: ErrorDetail, 400: ErrorDetail, 401: ErrorDetail},
+    summary="Deactivate user account (soft delete)",
+)
+def delete_me(request, payload: DeleteAccountIn):
+    """
+    Soft-delete the user account by setting is_active to False.
+    Requires password verification to prevent accidental deactivation.
+    """
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if not user.check_password(payload.password):
+        return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+
+    return 200, {"detail": "Account successfully deactivated."}

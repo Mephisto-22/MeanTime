@@ -183,3 +183,34 @@ docker compose exec backend python manage.py shell
 # Show migration status
 docker compose exec backend python manage.py showmigrations
 ```
+
+### Tests in CI
+
+Every pull request, and every push to `dev` or `main`, runs the **Tests** workflow (`.github/workflows/tests.yml`). It has three jobs, each running in the Docker Compose containers:
+
+| Job | What it runs |
+|---|---|
+| **Backend unit tests** | `python manage.py test` |
+| **Frontend unit tests** | `pnpm typecheck`, `pnpm test`, `pnpm build`, then `pnpm test:smoke` (see the [Frontend Testing Guide](../frontend/testing.md)) |
+| **Smoke check against the running app** | Starts the whole stack and makes a few API calls through the frontend's `/api` proxy (below) |
+
+Pull requests into `dev` and `main` can't be merged until all three pass.
+
+**If a job fails:** open the PR's **Checks** tab, choose **Tests**, then the failed job. The failed step shows the test output.
+
+#### Integration smoke check
+
+Django's tests cover the API and database, and the frontend's `pnpm test:smoke` checks the built frontend's HTML on its own. The smoke check tests them together. It starts the normal Docker Compose stack, then:
+
+1. `/api/health` reports the database connected
+2. Register a user, log in, and fetch `/api/auth/me`
+3. Create a board and check it starts with the default columns, then find it in the board list
+
+If it fails, the last numbered line printed in the **Smoke check** step is the check that failed. The **Show container logs** step below it has the frontend, backend and database logs.
+
+#### Branch protection (one-time setup)
+
+A repository admin sets this up once, after the workflow has run at least once (GitHub only lists checks it has seen). In the repository's **Settings → Branches**, add a branch protection rule for `dev`, and another for `main`:
+
+- Turn on **Require a pull request before merging**.
+- Turn on **Require status checks to pass before merging**, and add **Backend unit tests**, **Frontend unit tests** and **Smoke check against the running app**.
