@@ -61,3 +61,48 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
+
+
+class FriendshipStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    ACCEPTED = "ACCEPTED", "Accepted"
+    DECLINED = "DECLINED", "Declined"
+    BLOCKED = "BLOCKED", "Blocked"
+
+
+class Friendship(models.Model):
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_initiated",
+    )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_received",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=FriendshipStatus.choices,
+        default=FriendshipStatus.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "friendships"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["requester", "receiver"],
+                name="unique_friendship_request",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(requester=models.F("receiver")),
+                name="prevent_self_friending",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.requester.display_name} -> {self.receiver.display_name} ({self.status})"
