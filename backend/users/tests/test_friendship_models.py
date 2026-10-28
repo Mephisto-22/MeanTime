@@ -64,3 +64,54 @@ class FriendshipModelTests(TestCase):
         self.assertEqual(Friendship.objects.count(), 1)
         self.user1.delete()
         self.assertEqual(Friendship.objects.count(), 0)
+
+    def test_get_friends_returns_accepted_friends_symmetrically(self):
+        # Alice invites Bob; accepted
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+            status=FriendshipStatus.ACCEPTED,
+        )
+        self.assertIn(self.user2, self.user1.get_friends())
+        self.assertIn(self.user1, self.user2.get_friends())
+        self.assertTrue(self.user1.is_friends_with(self.user2))
+        self.assertTrue(self.user2.is_friends_with(self.user1))
+
+    def test_get_friends_ignores_pending_and_declined(self):
+        # Alice invites Bob; still pending
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+            status=FriendshipStatus.PENDING,
+        )
+        self.assertNotIn(self.user2, self.user1.get_friends())
+        self.assertNotIn(self.user1, self.user2.get_friends())
+        self.assertFalse(self.user1.is_friends_with(self.user2))
+        self.assertFalse(self.user2.is_friends_with(self.user1))
+
+    def test_user_can_have_zero_friends(self):
+        self.assertEqual(self.user1.get_friends().count(), 0)
+        self.assertFalse(self.user1.is_friends_with(self.user2))
+
+    def test_user_can_have_multiple_friends(self):
+        user3 = User.objects.create_user(
+            email="carol@example.com",
+            password="password123",
+            display_name="Carol",
+        )
+        # Alice invites Bob (accepted)
+        Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+            status=FriendshipStatus.ACCEPTED,
+        )
+        # Carol invites Alice (accepted)
+        Friendship.objects.create(
+            requester=user3,
+            receiver=self.user1,
+            status=FriendshipStatus.ACCEPTED,
+        )
+        alice_friends = self.user1.get_friends()
+        self.assertEqual(alice_friends.count(), 2)
+        self.assertIn(self.user2, alice_friends)
+        self.assertIn(user3, alice_friends)

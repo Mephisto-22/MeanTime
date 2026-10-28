@@ -19,6 +19,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     resetting_password = models.BooleanField(default=False)
     password_reset_started_at = models.DateTimeField(null=True, blank=True)
     password_version = models.PositiveIntegerField(default=0, editable=False)
+    friends = models.ManyToManyField(
+        "self",
+        through="Friendship",
+        symmetrical=False,
+        through_fields=("requester", "receiver"),
+        related_name="friended_by",
+        blank=True,
+    )
 
     def password_reset_active(self):
         """An abandoned reset stops blocking login after the reset timeout."""
@@ -58,6 +66,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.email:
             self.email = self.email.lower()
         super().save(*args, **kwargs)
+
+    def get_friends(self):
+        """Return QuerySet of users who have an ACCEPTED friendship with self in either direction."""
+        from django.db.models import Q
+        return User.objects.filter(
+            Q(friendships_received__requester=self, friendships_received__status=FriendshipStatus.ACCEPTED) |
+            Q(friendships_initiated__receiver=self, friendships_initiated__status=FriendshipStatus.ACCEPTED)
+        ).distinct()
+
+    def is_friends_with(self, user):
+        """Check whether self and user have an ACCEPTED friendship."""
+        if not user or not user.is_authenticated or user == self:
+            return False
+        return self.get_friends().filter(id=user.id).exists()
 
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
@@ -103,6 +125,20 @@ class Friendship(models.Model):
                 name="prevent_self_friending",
             ),
         ]
+
+    def get_friends(self):
+        """Return QuerySet of users who have an ACCEPTED friendship with self in either direction."""
+        from django.db.models import Q
+        return User.objects.filter(
+            Q(friendships_received__requester=self, friendships_received__status=FriendshipStatus.ACCEPTED) |
+            Q(friendships_initiated__receiver=self, friendships_initiated__status=FriendshipStatus.ACCEPTED)
+        ).distinct()
+
+    def is_friends_with(self, user):
+        """Check whether self and user have an ACCEPTED friendship."""
+        if not user or not user.is_authenticated or user == self:
+            return False
+        return self.get_friends().filter(id=user.id).exists()
 
     def __str__(self):
         return f"{self.requester.display_name} -> {self.receiver.display_name} ({self.status})"
