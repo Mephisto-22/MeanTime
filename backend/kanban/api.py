@@ -167,7 +167,7 @@ def create_task(request, column_id: int, payload: TaskIn):
             column=column,
             title=payload.title,
             description=payload.description,
-            priority=payload.priority.value,
+            priority=payload.priority.value if payload.priority is not None else None,
             position=0 if last is None else last + 1,
         )
         task.tags.set(tags)
@@ -190,10 +190,10 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
 
     with transaction.atomic():
         for field, value in updates.items():
-            if value is None:
-                continue
             if field == "priority":
-                value = value.value
+                value = value.value if value is not None else None
+            elif value is None:
+                continue
 
             setattr(task, field, value)
         if updates:

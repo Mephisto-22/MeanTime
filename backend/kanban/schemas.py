@@ -8,7 +8,7 @@ class TaskIn(Schema):
     """Payload expected when creating a task."""
     title: str
     description: str = ""
-    priority: TaskPriority = TaskPriority.MEDIUM
+    priority: TaskPriority | None = None
     tag_ids: list[int] = []
 
 class TaskOut(Schema):
@@ -16,7 +16,7 @@ class TaskOut(Schema):
     id: int
     title: str
     description: str
-    priority: TaskPriority
+    priority: TaskPriority | None = None
     position: int
     column_id: int
     tags: list[TagOut]
