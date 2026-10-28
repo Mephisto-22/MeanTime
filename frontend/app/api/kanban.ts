@@ -1,12 +1,22 @@
 import type { ComputedRef, InjectionKey } from 'vue'
 import { apiService } from '~/services/ApiService'
 
+export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
+
+export interface TagDto {
+  id: string | number
+  name: string
+  created_at?: string
+}
+
 export interface KanbanTaskDto {
   id: string | number
   title: string
   description?: string
   position: number
   columnId: string | number
+  priority?: TaskPriorityType
+  tags?: TagDto[]
 }
 
 export interface KanbanColumnDto {
@@ -52,6 +62,9 @@ export interface TaskDialogSavePayload {
   mode: 'create' | 'edit'
   columnId?: string | number | null
   taskId?: string | number | null
+  priority?: TaskPriorityType
+  tags?: TagDto[]
+  tag_ids?: Array<string | number>
 }
 
 export interface KanbanContext {
@@ -127,6 +140,18 @@ export class KanbanApi {
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -----------------
+  // Tag Endpoints
+  // -----------------
+
+  listTags(): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
+  }
+
+  createTag(payload: { name: string }): Promise<TagDto> {
+    return apiService.post<TagDto>(`${this.endpoint}/tags`, payload)
   }
 }
 
