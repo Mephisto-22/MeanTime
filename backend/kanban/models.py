@@ -34,6 +34,11 @@ class Board(models.Model):
         on_delete=models.CASCADE, # delete a deleted user's boards
         related_name="boards", # allows us to call user.boards in other code
     )
+    collaborators = models.ManyToManyField(
+        to=settings.AUTH_USER_MODEL,
+        related_name="shared_boards", # allows us to call user.shared_boards
+        blank=True, # a board doesn't have to have collaborators
+    )
 
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True, default="")

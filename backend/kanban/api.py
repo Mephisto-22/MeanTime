@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from ninja_jwt.authentication import JWTAuth
-from django.db.models import Prefetch, Max
+from django.db.models import Prefetch, Max, Q
 from django.db import IntegrityError, transaction
 from ninja.errors import HttpError
 from ninja import Router
@@ -32,20 +32,31 @@ def get_owned_board(user, board_id: int) -> Board:
         id=board_id
     )
 
-def get_owned_column(user, column_id: int) -> BoardColumn:
-    """Retrieve a column belonging to the authenticated user."""
+def get_accessible_board(user, board_id: int) -> Board:
+    """Retrieve a board owned by or shared with the user."""
     return get_object_or_404(
-        BoardColumn.objects.filter(board__owner=user),
-        id=column_id
+        Board.objects.filter(
+            Q(owner=user) | Q(collaborators=user)
+        ).distinct().prefetch_related("columns__tasks__tags"),
+        id=board_id,
     )
 
-def get_owned_task(user, task_id: int) -> Task:
-    """Retrieve a task belonging to the authenticated user."""
+def get_accessible_column(user, column_id: int) -> BoardColumn:
+    """Retrieve a column on a board the user can access."""
+    return get_object_or_404(
+        BoardColumn.objects.filter(
+            Q(board__owner=user) | Q(board__collaborators=user)
+        ).distinct(),
+        id=column_id,
+    )
+
+def get_accessible_task(user, task_id: int) -> Task:
+    """Retrieve a task on a board the user can access."""
     return get_object_or_404(
         Task.objects.select_related("column__board").filter(
-            column__board__owner=user
-        ),
-        id=task_id
+            Q(column__board__owner=user) | Q(column__board__collaborators=user)
+        ).distinct(),
+        id=task_id,
     )
 
 def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
@@ -74,8 +85,12 @@ def _reindex(items):
 
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
-    """List boards owned by the authenticated user/"""
-    return Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags")
+    """List boards owned by or shared with the authenticated user."""
+    return (
+        Board.objects.filter(
+            Q(owner=request.auth) | Q(collaborators=request.auth)
+        ).distinct().prefetch_related("columns__tasks__tags"),
+    )
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
@@ -91,16 +106,12 @@ def create_board(request, payload: BoardIn):
 @router.get("/boards/{board_id}", response=BoardOut)
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
-    board = get_object_or_404(
-        Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags"),
-        id=board_id,
-    )
-    return board
+    return get_accessible_board(request.auth, board_id)
 
 @router.patch("/boards/{board_id}", response=BoardOut)
 def update_board(request, board_id: int, payload: BoardIn):
     """Update a board's title and description."""
-    board = get_owned_board(request.auth, board_id)
+    board = get_accessible_board(request.auth, board_id)
     board.title = payload.title
     board.description = payload.description
     board.save()
@@ -120,7 +131,7 @@ def delete_board(request, board_id: int):
 @router.post("/boards/{board_id}/columns", response=BoardColumnOut)
 def create_column(request, board_id: int, payload: BoardColumnIn):
     """Create a column on a board owned by the authenticated user."""
-    board = get_owned_board(request.auth, board_id)
+    board = get_accessible_board(request.auth, board_id)
     last = board.columns.aggregate(m=Max("position"))["m"]
     return BoardColumn.objects.create(
         board=board,
@@ -131,7 +142,7 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
 def update_column(request, column_id: int, payload: BoardColumnIn):
     """Update a column's title or position."""
-    column = get_owned_column(request.auth, column_id)
+    column = get_accessible_column(request.auth, column_id)
     with transaction.atomic():
         column.title = payload.title
         others = [c for c in column.board.columns.all() if c.id != column.id]
@@ -143,7 +154,7 @@ def update_column(request, column_id: int, payload: BoardColumnIn):
 @router.delete("/columns/{column_id}")
 def delete_column(request, column_id: int):
     """Delete a column and its tasks."""
-    column = get_owned_column(request.auth, column_id)
+    column = get_accessible_column(request.auth, column_id)
     board = column.board
     with transaction.atomic():
         column.delete()
@@ -158,7 +169,7 @@ def delete_column(request, column_id: int):
 @router.post("/columns/{column_id}/tasks", response=TaskOut)
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
-    column = get_owned_column(request.auth, column_id)
+    column = get_accessible_column(request.auth, column_id)
     tags = get_owned_tags(request.auth, payload.tag_ids)
     last = column.tasks.aggregate(m=Max("position"))["m"]
 
@@ -177,7 +188,7 @@ def create_task(request, column_id: int, payload: TaskIn):
 @router.patch("/tasks/{task_id}", response=TaskOut)
 def update_task(request, task_id: int, payload: TaskUpdateIn):
     """Update the supplied fields of a task."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     updates = payload.dict(exclude_unset=True) # get fields included in request
 
     # get the owned tasks using the helper since tags are a
@@ -207,7 +218,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
 @router.delete("/tasks/{task_id}")
 def delete_task(request, task_id: int):
     """Delete a task."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     column = task.column
     with transaction.atomic():
         task.delete()
@@ -217,9 +228,9 @@ def delete_task(request, task_id: int):
 @router.post("/tasks/{task_id}/move", response=TaskOut)
 def move_task(request, task_id: int, payload: TaskMoveIn):
     """Move a task to another column and position."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     src = task.column
-    dest = get_owned_column(request.auth, payload.to_column_id)
+    dest = get_accessible_column(request.auth, payload.to_column_id)
     if dest.board_id != src.board.id:
         raise HttpError(400, "Column on different board")
 
