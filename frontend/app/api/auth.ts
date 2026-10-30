@@ -41,6 +41,10 @@ export interface AuthMessage {
   detail: string
 }
 
+export interface SignInProviders {
+  providers: string[]
+}
+
 // Matches backend/users/schemas.py; user profiles are fetched separately via /me.
 export class AuthApi {
   readonly endpoint = '/api/auth'
@@ -71,6 +75,15 @@ export class AuthApi {
 
   confirmPasswordReset(details: PasswordResetConfirmation): Promise<AuthMessage> {
     return apiService.post<AuthMessage>(`${this.endpoint}/password-reset/confirm`, details, { auth: false })
+  }
+
+  // Google sign-in is a full-page navigation, not a request: the backend
+  // redirects the browser to Google, which sends it back to /oauth/callback.
+  readonly googleSignInUrl = `${this.endpoint}/oauth/google/start`
+
+  /** Sign-in providers the backend has credentials for. */
+  providers(): Promise<SignInProviders> {
+    return apiService.get<SignInProviders>(`${this.endpoint}/oauth/providers`, undefined, { auth: false })
   }
 }
 
