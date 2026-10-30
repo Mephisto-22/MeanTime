@@ -134,3 +134,7 @@ EMAIL_BACKEND = (
 DEFAULT_FROM_EMAIL = "noreply@meantime.local"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_RESET_TIMEOUT = 3600
+
+# Sign in with Google (users/oauth.py). Turned off unless both are set.
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")

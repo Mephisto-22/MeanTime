@@ -37,6 +37,19 @@ users_router = Router(tags=["Users"])
 INVALID_RESET_LINK = "This password reset link is invalid or expired. Request a new link."
 
 
+def issue_tokens(user):
+    """JWTs for a user who just signed in, by password or through Google."""
+    refresh = RefreshToken.for_user(user)
+    # Changing the password bumps password_version, which revokes these tokens.
+    refresh["password_version"] = user.password_version
+    return {
+        "access_token": str(refresh.access_token),
+        "refresh_token": str(refresh),
+        "token_type": "bearer",
+        "expires_in": 900,
+    }
+
+
 def deliver_reset_link(user):
     # The fragment keeps the secret out of frontend HTTP access logs.
     fragment = urlencode({
@@ -129,15 +142,7 @@ def login(request, payload: LoginIn):
     if user.password_reset_active():
         return 403, {"detail": "Password reset is in progress. Complete the reset before logging in."}
 
-    refresh = RefreshToken.for_user(user)
-    refresh["password_version"] = user.password_version
-    return 200, {
-        "access_token": str(refresh.access_token),
-        "refresh_token": str(refresh),
-        "token_type": "bearer",
-        "expires_in": 900,
-        "user": user,
-    }
+    return 200, {**issue_tokens(user), "user": user}
 
 
 @auth_router.post(
