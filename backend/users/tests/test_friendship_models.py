@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from users.models import Friendship, FriendshipStatus
 
@@ -45,16 +45,35 @@ class FriendshipModelTests(TestCase):
                 receiver=self.user1,
             )
 
-    def test_unique_requester_receiver_constraint(self):
+    def test_unique_friendship_pair_constraint(self):
         Friendship.objects.create(
             requester=self.user1,
             receiver=self.user2,
         )
+        # Duplicate in the same direction raises IntegrityError
         with self.assertRaises(IntegrityError):
-            Friendship.objects.create(
-                requester=self.user1,
-                receiver=self.user2,
-            )
+            with transaction.atomic():
+                Friendship.objects.create(
+                    requester=self.user1,
+                    receiver=self.user2,
+                )
+        # Duplicate in reverse direction also raises IntegrityError
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Friendship.objects.create(
+                    requester=self.user2,
+                    receiver=self.user1,
+                )
+
+    def test_blocked_by_field(self):
+        friendship = Friendship.objects.create(
+            requester=self.user1,
+            receiver=self.user2,
+            status=FriendshipStatus.BLOCKED,
+            blocked_by=self.user1,
+        )
+        self.assertEqual(friendship.blocked_by, self.user1)
+        self.assertIn(friendship, self.user1.blocked_friendships.all())
 
     def test_cascade_delete_on_user_removal(self):
         Friendship.objects.create(
