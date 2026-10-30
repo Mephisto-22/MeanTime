@@ -8,8 +8,10 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase, override_settings
 
+from users.api import issue_tokens
 from users.models import ExternalAccount
 
 User = get_user_model()
@@ -225,3 +227,90 @@ class GoogleSignInTests(TestCase):
     def test_unverified_email_is_rejected(self):
         self.assertLoginError(self.sign_in(email_verified=False), "email_unverified")
         self.assertFalse(User.objects.exists())
+
+    def test_email_of_a_password_account_is_refused_and_nothing_changes(self):
+        user = User.objects.create_user(
+            email="person@example.com", password="OriginalSecure482!", display_name="Owner"
+        )
+        before = User.objects.values().get(pk=user.pk)
+
+        # The claims' "Person@Example.com" differs only in case.
+        self.assertLoginError(self.sign_in(), "email_in_use")
+        self.assertEqual(User.objects.values().get(pk=user.pk), before)
+        self.assertFalse(ExternalAccount.objects.exists())
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_email_of_another_google_account_is_refused(self):
+        self.sign_in()
+        # A different Google account that now reports the first one's email.
+        self.assertLoginError(self.sign_in(sub="google-user-2"), "email_in_use")
+        self.assertEqual(ExternalAccount.objects.count(), 1)
+
+    def test_deactivated_user_is_refused(self):
+        self.sign_in()
+        User.objects.update(is_active=False)
+        self.assertLoginError(self.sign_in(), "inactive")
+
+
+class AccountWithoutPasswordTests(TestCase):
+    """An account created through Google has no password."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="google@example.com", password=None, display_name="Google User"
+        )
+        ExternalAccount.objects.create(
+            user=self.user, provider=ExternalAccount.Provider.GOOGLE, subject="google-user-1"
+        )
+
+    def post(self, path, payload):
+        return self.client.post(path, json.dumps(payload), content_type="application/json")
+
+    def delete_me(self, user, payload):
+        token = issue_tokens(user)["access_token"]
+        return self.client.delete(
+            "/api/users/me", json.dumps(payload), content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+
+    def test_password_login_is_rejected_like_a_wrong_password(self):
+        for password in ("", "anything"):
+            with self.subTest(password=password):
+                response = self.post(
+                    "/api/auth/login", {"email": "google@example.com", "password": password}
+                )
+                self.assertEqual(response.status_code, 401)
+                self.assertEqual(response.json(), {"detail": "Invalid email or password."})
+
+    def test_password_reset_sends_nothing(self):
+        response = self.post("/api/auth/password-reset", {"email": "google@example.com"})
+        unknown = self.post("/api/auth/password-reset", {"email": "nobody@example.com"})
+        self.assertEqual(response.json(), unknown.json())
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_registering_the_same_email_conflicts(self):
+        response = self.post("/api/auth/register", {
+            "email": "Google@Example.com", "password": "AnotherSecure482!", "display_name": "Other",
+        })
+        self.assertEqual(response.status_code, 409)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.has_usable_password())
+
+    def test_delete_is_confirmed_with_the_email(self):
+        wrong = self.delete_me(self.user, {"email": "someone@example.com"})
+        self.assertEqual(wrong.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
+
+        response = self.delete_me(self.user, {"email": " Google@Example.com "})
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+
+    def test_password_accounts_still_confirm_delete_with_the_password(self):
+        user = User.objects.create_user(
+            email="password@example.com", password="OriginalSecure482!", display_name="Owner"
+        )
+        self.assertEqual(self.delete_me(user, {"email": "password@example.com"}).status_code, 400)
+        response = self.delete_me(user, {"password": "OriginalSecure482!"})
+        self.assertEqual(response.status_code, 200)

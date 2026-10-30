@@ -21,7 +21,7 @@ import urllib.request
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from ninja import Router, Schema
 
@@ -118,8 +118,14 @@ def user_for(claims):
         provider=ExternalAccount.Provider.GOOGLE, subject=claims["sub"]
     ).first()
     if account:
+        if not account.user.is_active:
+            raise OAuthError("inactive")
         return account.user
     email = claims["email"].strip().lower()
+    # Never link to an account that already uses this email: its owner signs
+    # in with their password, and accounts are never merged automatically.
+    if User.objects.filter(email__iexact=email).exists():
+        raise OAuthError("email_in_use")
     name = (claims.get("name") or "").strip() or email.split("@")[0]
     user = User.objects.create_user(email=email, password=None, display_name=name[:50])
     ExternalAccount.objects.create(
@@ -175,6 +181,9 @@ def google_callback(request, state: str = "", code: str = "", error: str = ""):
         user = user_for(claims)
     except OAuthError as err:
         return login_error(err.reason)
+    except IntegrityError:
+        # Two first sign-ins at once; the other one created the account.
+        return login_error("failed")
     tokens = issue_tokens(user)
     fragment = urlencode(
         {"access_token": tokens["access_token"], "refresh_token": tokens["refresh_token"]}

@@ -264,14 +264,20 @@ def update_me(request, payload: UserUpdateIn):
 def delete_me(request, payload: DeleteAccountIn):
     """
     Soft-delete the user account by setting is_active to False.
-    Requires password verification to prevent accidental deactivation.
+    Requires the password to prevent accidental deactivation, or the account's
+    email address for accounts created through Google, which have no password.
     """
     user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return 401, {"detail": "Authentication required."}
 
-    if not user.check_password(payload.password):
-        return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+    if user.has_usable_password():
+        if not user.check_password(payload.password):
+            return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+    elif payload.email.strip().lower() != user.email:
+        return 400, {
+            "detail": "Enter your account's email to confirm. Account deactivation cancelled."
+        }
 
     user.is_active = False
     user.save(update_fields=["is_active"])
