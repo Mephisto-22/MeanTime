@@ -1,12 +1,30 @@
 import type { ComputedRef, InjectionKey } from 'vue'
 import { apiService } from '~/services/ApiService'
 
+export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
+
+export const TASK_PRIORITY_CONFIG = {
+  HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
+  MEDIUM: { label: 'Medium', dotClass: 'bg-amber-500', badgeClass: 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
+  LOW: { label: 'Low', dotClass: 'bg-sky-500', badgeClass: 'border-sky-500 text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+} as const
+
+export interface TagDto {
+  id: string | number
+  name: string
+  created_at?: string
+}
+
 export interface KanbanTaskDto {
   id: string | number
   title: string
   description?: string
   position: number
-  columnId: string | number
+  columnId?: string | number
+  column_id?: string | number
+  priority?: TaskPriorityType
+  tags?: TagDto[]
+  tag_ids?: Array<string | number>
 }
 
 export interface KanbanColumnDto {
@@ -52,10 +70,15 @@ export interface TaskDialogSavePayload {
   mode: 'create' | 'edit'
   columnId?: string | number | null
   taskId?: string | number | null
+  priority?: TaskPriorityType
+  tags?: TagDto[]
+  tag_ids?: Array<string | number>
 }
 
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
+  availableTags?: ComputedRef<TagDto[]>
+  createTag?: (payload: { name: string } | string) => Promise<TagDto>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
   openCreateTaskDialog: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void
@@ -127,6 +150,18 @@ export class KanbanApi {
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -----------------
+  // Tag Endpoints
+  // -----------------
+
+  listTags(): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
+  }
+
+  createTag(payload: { name: string }): Promise<TagDto> {
+    return apiService.post<TagDto>(`${this.endpoint}/tags`, payload)
   }
 }
 

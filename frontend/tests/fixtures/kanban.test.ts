@@ -2,10 +2,30 @@ import { describe, expect, it } from 'vitest'
 import {
   createBoardFixture,
   createColumnFixture,
+  createTagFixture,
   createTaskFixture,
 } from './kanban'
 
 describe('Domain Fixture Factories', () => {
+  describe('createTagFixture', () => {
+    it('creates a tag with default id and name', () => {
+      const tag = createTagFixture()
+      expect(tag.id).toBeDefined()
+      expect(tag.name).toBeTruthy()
+    })
+
+    it('allows overriding tag fields', () => {
+      const tag = createTagFixture({
+        id: 'tag-custom',
+        name: 'Urgent',
+        created_at: '2026-10-27T00:00:00Z',
+      })
+      expect(tag.id).toBe('tag-custom')
+      expect(tag.name).toBe('Urgent')
+      expect(tag.created_at).toBe('2026-10-27T00:00:00Z')
+    })
+  })
+
   describe('createTaskFixture', () => {
     it('creates a task with valid default title, position, and id', () => {
       const task = createTaskFixture()
@@ -16,19 +36,24 @@ describe('Domain Fixture Factories', () => {
       expect(task.columnId).toBeDefined()
     })
 
-    it('allows overriding task fields', () => {
+    it('allows overriding task fields including priority and tags', () => {
+      const tag = createTagFixture({ id: 'tag-1', name: 'Design' })
       const task = createTaskFixture({
         id: 'custom-task-1',
         title: 'Custom Title',
         position: 3,
         description: 'Custom description',
         columnId: 'custom-col-1',
+        priority: 'HIGH',
+        tags: [tag],
       })
       expect(task.id).toBe('custom-task-1')
       expect(task.title).toBe('Custom Title')
       expect(task.position).toBe(3)
       expect(task.description).toBe('Custom description')
       expect(task.columnId).toBe('custom-col-1')
+      expect(task.priority).toBe('HIGH')
+      expect(task.tags).toEqual([tag])
     })
   })
 
