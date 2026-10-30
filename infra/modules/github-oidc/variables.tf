@@ -4,9 +4,9 @@ variable "environment" {
 }
 
 variable "github_repository" {
-  description = "GitHub repository allowed to use the role, as owner/name."
+  description = "GitHub repository allowed to use the role, as it appears in the OIDC subject. The repository uses immutable subjects, so that's owner@owner-id/name@repo-id rather than owner/name."
   type        = string
-  default     = "Mephisto-22/MeanTime"
+  default     = "Mephisto-22@127533986/MeanTime@1393919934"
 }
 
 variable "allowed_branches" {
