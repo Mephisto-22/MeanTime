@@ -86,6 +86,22 @@ class ErrorDetail(Schema):
     detail: str
 
 
+class PasswordRequirementsIn(Schema):
+    password: str = Field(default="", max_length=128)
+    email: str = Field(default="", max_length=254)
+    display_name: str = Field(default="", max_length=50)
+
+
+class PasswordRequirementOut(Schema):
+    id: str
+    description: str
+    met: bool
+
+
+class PasswordRequirementsOut(Schema):
+    requirements: list[PasswordRequirementOut]
+
+
 class PasswordResetRequestIn(Schema):
     email: str = Field(..., max_length=254)
 
