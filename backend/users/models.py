@@ -123,7 +123,11 @@ class Friendship(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["requester", "receiver"],
+    models.UniqueConstraint(
+        Least("requester_id", "receiver_id"),
+        Greatest("requester_id", "receiver_id"),
+        name="unique_friendship_pair",
+    ),
                 name="unique_friendship_request",
             ),
             models.CheckConstraint(
