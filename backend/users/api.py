@@ -7,7 +7,7 @@ from django.contrib.auth.password_validation import validate_password, get_defau
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import models, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -15,6 +15,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from ninja import Router
 from ninja_jwt.tokens import RefreshToken
 
+from users.models import Friendship, FriendshipStatus, UserBlock
 from users.schemas import (
     PasswordRequirementsIn,
     PasswordRequirementsOut,
@@ -29,6 +30,7 @@ from users.schemas import (
     PasswordResetRequestIn,
     PasswordResetLinkIn,
     PasswordResetConfirmIn,
+    UserSearchResultOut,
     UserUpdateIn,
 )
 
@@ -299,3 +301,54 @@ def delete_me(request, payload: DeleteAccountIn):
     user.save(update_fields=["is_active"])
 
     return 200, {"detail": "Account successfully deactivated."}
+
+
+@users_router.get(
+    "/search",
+    response={200: list[UserSearchResultOut], 400: ErrorDetail, 401: ErrorDetail},
+    summary="Search active users by exact display name or email",
+)
+def search_users(request, q: str = ""):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    query = q.strip()
+    if not query:
+        return 400, {"detail": "Search query cannot be empty."}
+
+    # Find matching active users (exclude self)
+    matches = User.objects.filter(
+        models.Q(display_name__iexact=query) | models.Q(email__iexact=query),
+        is_active=True,
+    ).exclude(id=user.id)
+
+    # Exclude blocked relationships in either direction
+    blocked_by_me = UserBlock.objects.filter(blocker=user).values_list("blocked_id", flat=True)
+    blocking_me = UserBlock.objects.filter(blocked=user).values_list("blocker_id", flat=True)
+    excluded_ids = set(blocked_by_me).union(set(blocking_me))
+    matches = matches.exclude(id__in=excluded_ids)
+
+    results = []
+    for match in matches:
+        # Determine relationship status
+        friendship = Friendship.objects.filter(
+            models.Q(requester=user, receiver=match) | models.Q(requester=match, receiver=user)
+        ).first()
+
+        rel_status = "none"
+        if friendship:
+            if friendship.status == FriendshipStatus.ACCEPTED:
+                rel_status = "friend"
+            elif friendship.status == FriendshipStatus.PENDING:
+                rel_status = "pending_outgoing" if friendship.requester_id == user.id else "pending_incoming"
+
+        results.append({
+            "id": match.id,
+            "email": match.email,
+            "display_name": match.display_name,
+            "timezone": match.timezone,
+            "relationship_status": rel_status,
+        })
+
+    return 200, results
