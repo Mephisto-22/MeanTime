@@ -4,6 +4,7 @@
       <template #title><h2 class="text-2xl font-bold">Register</h2></template>
       <template #content>
         <RegistrationForm :loading="loading" @submit="register" />
+        <GoogleSignInButton class="mt-4" />
         <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
         <p class="mt-4">
           Already have an account?

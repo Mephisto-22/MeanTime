@@ -64,6 +64,10 @@ module "app" {
   aws_profile = "meantime-prod"
   source_root = abspath("${path.root}/../../../..")
 
+  # HTTPS on the domain from the base layer (#93). Remove this line to go back
+  # to plain HTTP at the load balancer's own address.
+  domain_name = "meantime.click"
+
   vpc_id                          = module.network.vpc_id
   task_subnet_ids                 = module.network.task_subnet_ids
   task_assign_public_ip           = module.network.task_assign_public_ip

@@ -3,7 +3,7 @@
 Terraform for MeanTime's AWS environments lives in the `infra/` folder. Dev and Prod live in **separate AWS accounts** (members of one AWS Organization) and are built from the same modules.
 
 - **Dev** is private: no public IP, load balancer or domain. Developers reach it through a Session Manager tunnel.
-- **Prod** is public, behind a load balancer.
+- **Prod** is public, behind a load balancer, at https://meantime.click.
 
 Each environment can be brought up for testing or a demo and torn down afterwards.
 
@@ -14,11 +14,11 @@ Each environment can be brought up for testing or a demo and torn down afterward
 ```text
 infra/
 ├── modules/
-│   ├── app/               # ECS cluster, service and task; builds and pushes images; Prod load balancer
+│   ├── app/               # ECS cluster, service and task; builds and pushes images; Prod load balancer and HTTPS
 │   ├── ecr/               # image repositories for our own images
 │   ├── github-oidc/       # lets GitHub Actions sign in to AWS (see "From GitHub")
 │   ├── network/           # VPC: private with a NAT gateway (Dev) or public for the load balancer (Prod)
-│   ├── persistent-data/   # the database's files (EFS) and secrets, kept when the app is torn down
+│   ├── persistent-data/   # the database's files (EFS), secrets and Google sign-in entries, kept when the app is torn down
 │   └── state-bucket/      # S3 bucket that stores Terraform state (used by bootstrap)
 ├── bootstrap/
 │   ├── dev/               # one-time: creates Dev's state bucket, writes envs/dev/backend.hcl
@@ -30,7 +30,7 @@ infra/
     │   └── app/           # temporary: network and ECS service
     └── prod/
         ├── backend.hcl
-        ├── base/
+        ├── base/          # as in Dev, plus the domain's DNS zone and HTTPS certificate (domain.tf)
         └── app/
 ```
 
@@ -109,7 +109,9 @@ terraform destroy                                # tear it down
 
 `apply` in an `app` folder builds any image that isn't in ECR yet (see [Images](#images)), and waits until the app is running and healthy. Expect about 5 minutes. The database keeps its data between `destroy` and `apply` (see [Database](#database)).
 
-While an environment is up it costs a few cents an hour (Dev: task and NAT gateway; Prod: task and load balancer). `destroy` stops all of it, and a nightly run tears down anything left up (see [From GitHub](#from-github)).
+While an environment is up it costs a few cents an hour (Dev: task and NAT gateway; Prod: task and load balancer). `destroy` stops all of it, and a nightly run tears down anything left up (see [From GitHub](#from-github)). Prod's DNS zone costs $0.50 a month whether the app is up or not (see [Domain and HTTPS](#domain-and-https)).
+
+The `app` layer reads entries the `base` layer creates, so apply `base` first whenever it has changed. Otherwise the `app` apply fails because it can't find them.
 
 ---
 
@@ -164,12 +166,28 @@ Paste the printed command into the same kind of shell and leave it running, then
 
 ## Open Prod
 
-```bash
-cd infra/envs/prod/app
-terraform output app_url
-```
+Prod is at **https://meantime.click** once the app layer is up. `http://` addresses redirect to HTTPS. `terraform output app_url` in `envs/prod/app` prints the same URL.
 
-The URL changes every time Prod is rebuilt, so check it after each `apply`. It's plain HTTP for now, so browsers mark it "Not secure".
+---
+
+## Domain and HTTPS
+
+`meantime.click` is registered at Porkbun, which only handles the registration. Porkbun's nameservers for the domain point to a Route 53 hosted zone, so AWS answers for it:
+
+| Layer | What | Where |
+|---|---|---|
+| Prod `base` | The hosted zone, and a free ACM certificate for the domain, validated through a DNS record in the zone. ACM renews it on its own. | `envs/prod/base/domain.tf` |
+| Prod `app` | An HTTPS listener on the load balancer with that certificate, HTTP redirected to HTTPS, and the domain's record pointing at the load balancer | `modules/app/load_balancer.tf`, turned on by `domain_name` in `envs/prod/app/main.tf` |
+
+The zone and certificate are in `base`, so bringing the app layer up doesn't change the nameservers or wait for a new certificate. Dev has no domain.
+
+If the zone is ever recreated, it gets new nameservers. Print them with `terraform output name_servers` in `envs/prod/base` and enter them at Porkbun under **Authoritative Nameservers**.
+
+**Removing the domain.** The domain is only needed for about a month. To stop using it:
+
+1. In `envs/prod/app/main.tf`, delete the `domain_name` line. On the next `apply`, Prod goes back to plain HTTP at the load balancer's own address (`terraform output app_url`). Remove `https://meantime.click/...` from the Google OAuth client's redirect URIs, and add the new address's URI if Google sign-in should keep working (see the [Google sign-in guide](../google-sign-in.md)). Google only accepts `http://` redirect URIs for `localhost`, so Google sign-in won't work on Prod over plain HTTP.
+2. With the app layer down or already applied without the domain, delete the certificate and zone resources from `envs/prod/base/domain.tf` and `apply` in `envs/prod/base`. This stops the $0.50 a month.
+3. Make sure auto-renew is off for the domain at Porkbun.
 
 ---
 
@@ -196,6 +214,8 @@ terraform apply -replace=module.persistent_data.aws_efs_file_system.db
 
 Destroying the `base` layer deletes the data for good.
 
+The `base` layer also creates two Parameter Store entries for Google sign-in, `/meantime/<env>/google-oauth-client-id` and `/meantime/<env>/google-oauth-client-secret`. Unlike the generated password and key, their values are pasted in by hand in the AWS console, once per account. See the [Google sign-in guide](../google-sign-in.md#in-aws).
+
 Third-party images, such as `postgres:18-alpine`, are pulled straight from Docker Hub. Dev's task has no public IP, but it reaches the internet through a NAT gateway.
 
 ---
@@ -206,5 +226,7 @@ Third-party images, such as `postgres:18-alpine`, are pulled straight from Docke
 - **`terraform` not recognized right after installing it:** restart VS Code (or open a new terminal outside it) so it picks up the new `PATH`.
 - **`terraform init` fails with "connection forcibly closed":** a flaky download from HashiCorp's servers. Run it again.
 - **The tunnel says port 3000 is in use:** stop the local dev stack's frontend, or whatever else is on port 3000.
+- **`app` apply fails with "couldn't find resource" for an SSM parameter:** that environment's `base` layer hasn't been applied since the entry was added. Apply `base` first.
+- **The Google sign-in button is missing, or Google says "invalid_client":** the Google entries in Parameter Store still hold the placeholder or were pasted incompletely. Fix them, then bring the app layer up again.
 - **Logs:** each container's logs are in CloudWatch under `terraform output log_group`.
 

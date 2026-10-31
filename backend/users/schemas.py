@@ -146,6 +146,11 @@ class UserUpdateIn(Schema):
 
 
 class DeleteAccountIn(Schema):
-    """Payload for confirming account deletion with current password."""
+    """Payload for confirming account deletion.
 
-    password: str = Field(..., min_length=1)
+    Accounts with a password confirm with it. Accounts created through Google
+    have none, so they confirm by typing their email address instead.
+    """
+
+    password: str = ""
+    email: str = ""

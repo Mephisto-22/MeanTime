@@ -165,6 +165,18 @@ export const useAuthStore = defineStore('auth', {
         throw error
       }
     },
+    // Google sign-in hands the tokens to /oauth/callback instead of answering a login request.
+    async loginWithTokens(tokens: AuthTokens) {
+      this.clearTokens()
+      this.sessionInitialized = true
+      try {
+        this.setTokens(tokens)
+        await this.fetchUser()
+      } catch (error) {
+        this.clearTokens()
+        throw error
+      }
+    },
     async register(details: RegistrationRequest) {
       return await authApi.register(details)
     },
