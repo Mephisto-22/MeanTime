@@ -133,6 +133,9 @@ EMAIL_BACKEND = (
 )
 DEFAULT_FROM_EMAIL = "noreply@meantime.local"
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+# Only send the session cookie (used during Google sign-in) over HTTPS when
+# the app is served over HTTPS (Prod).
+SESSION_COOKIE_SECURE = FRONTEND_URL.startswith("https://")
 PASSWORD_RESET_TIMEOUT = 3600
 
 # Sign in with Google (users/oauth.py). Turned off unless both are set.

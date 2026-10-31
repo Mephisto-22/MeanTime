@@ -18,6 +18,12 @@ variable "aws_profile" {
   type        = string
 }
 
+variable "domain_name" {
+  description = "Domain to serve the app at over HTTPS (Prod only). Its Route 53 zone and ACM certificate come from the base layer. null: plain HTTP at the load balancer's own address."
+  type        = string
+  default     = null
+}
+
 variable "source_root" {
   description = "Absolute path to the repository root, where the backend/ and frontend/ folders are."
   type        = string

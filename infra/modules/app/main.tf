@@ -222,6 +222,9 @@ resource "aws_ecs_task_definition" "this" {
         { name = "POSTGRES_PORT", value = "5432" },
         # Requests reach Django only through the frontend's proxy on localhost.
         { name = "DJANGO_ALLOWED_HOSTS", value = "localhost,127.0.0.1" },
+        # The address people open the app at, for links and the Google
+        # sign-in callback. Dev is opened through the tunnel on localhost.
+        { name = "FRONTEND_URL", value = coalesce(local.app_url, "http://localhost:3000") },
       ]
       secrets = [
         { name = "POSTGRES_PASSWORD", valueFrom = data.aws_ssm_parameter.db_password.arn },
@@ -312,6 +315,7 @@ resource "aws_ecs_service" "this" {
 
   depends_on = [
     aws_lb_listener.http,
+    aws_lb_listener.https,
     aws_efs_mount_target.db,
     aws_vpc_security_group_ingress_rule.db_storage_from_task,
   ]
