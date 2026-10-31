@@ -88,6 +88,16 @@ class User(AbstractBaseUser, PermissionsMixin):
             status=FriendshipStatus.ACCEPTED,
         ).exists()
 
+    def is_blocking(self, user) -> bool:
+        if not user or not user.is_authenticated or user == self:
+            return False
+        return UserBlock.objects.filter(blocker=self, blocked=user).exists()
+
+    def is_blocked_by(self, user) -> bool:
+        if not user or not user.is_authenticated or user == self:
+            return False
+        return UserBlock.objects.filter(blocker=user, blocked=self).exists()
+
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
 
@@ -145,3 +155,35 @@ class Friendship(models.Model):
         req = self.requester.display_name or self.requester.email
         rec = self.receiver.display_name or self.receiver.email
         return f"{req} -> {rec} ({self.status})"
+
+
+class UserBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_user_records",
+    )
+    blocked = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocked_by_user_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "user_blocks"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["blocker", "blocked"],
+                name="unique_user_block",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(blocker=models.F("blocked")),
+                name="prevent_self_blocking",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.blocker} blocked {self.blocked}"
+
