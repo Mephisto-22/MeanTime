@@ -181,3 +181,41 @@ class FriendRequestAPITests(TestCase):
         self.assertEqual(len(data["outgoing"]), 1)
         self.assertEqual(data["outgoing"][0]["user"]["id"], self.user2.id)
 
+
+class FriendsAPITests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(email="alice@example.com", password="password123", display_name="Alice")
+        self.user2 = User.objects.create_user(email="bob@example.com", password="password123", display_name="Bob")
+        self.user3 = User.objects.create_user(email="carol@example.com", password="password123", display_name="Carol")
+        refresh = RefreshToken.for_user(self.user1)
+        self.auth1 = {"HTTP_AUTHORIZATION": f"Bearer {str(refresh.access_token)}"}
+
+    def test_list_friends_empty(self):
+        res = self.client.get("/api/users/friends", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), [])
+
+    def test_list_friends_returns_accepted_friends_symmetrically(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.ACCEPTED)
+        Friendship.objects.create(requester=self.user3, receiver=self.user1, status=FriendshipStatus.ACCEPTED)
+
+        res = self.client.get("/api/users/friends", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        friends = res.json()
+        self.assertEqual(len(friends), 2)
+        friend_ids = {f["id"] for f in friends}
+        self.assertEqual(friend_ids, {self.user2.id, self.user3.id})
+
+    def test_unfriend_success_deletes_record(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.ACCEPTED)
+        res = self.client.delete(f"/api/users/friends/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "Friend removed successfully."})
+        self.assertFalse(self.user1.is_friends_with(self.user2))
+
+    def test_unfriend_non_friend_returns_404(self):
+        res = self.client.delete(f"/api/users/friends/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"detail": "Friend not found."})
+

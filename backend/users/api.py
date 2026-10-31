@@ -493,3 +493,40 @@ def list_friend_requests(request):
 
     return 200, {"incoming": incoming, "outgoing": outgoing}
 
+
+@users_router.get(
+    "/friends",
+    response={200: list[UserOut], 401: ErrorDetail},
+    summary="List all accepted friends of the current user",
+)
+def list_friends(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friends = user.get_friends().filter(is_active=True).order_by("display_name")
+    return 200, list(friends)
+
+
+@users_router.delete(
+    "/friends/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Remove an existing friend",
+)
+def unfriend_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        models.Q(requester=user, receiver_id=user_id) | models.Q(requester_id=user_id, receiver=user),
+        status=FriendshipStatus.ACCEPTED,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Friend not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend removed successfully."}
+
+
