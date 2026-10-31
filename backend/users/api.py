@@ -22,6 +22,8 @@ from users.schemas import (
     AuthTokenOut,
     DeleteAccountIn,
     ErrorDetail,
+    FriendRequestOut,
+    FriendRequestsListOut,
     LoginIn,
     RefreshIn,
     RegisterIn,
@@ -352,3 +354,142 @@ def search_users(request, q: str = ""):
         })
 
     return 200, results
+
+
+@users_router.post(
+    "/friends/requests/{user_id}",
+    response={201: FriendRequestOut, 400: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail, 409: ErrorDetail},
+    summary="Send a friend request to a user",
+)
+def send_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if user.id == user_id:
+        return 400, {"detail": "You cannot send a friend request to yourself."}
+
+    target = User.objects.filter(id=user_id, is_active=True).first()
+    if not target:
+        return 404, {"detail": "User not found."}
+
+    # Check blocking in either direction
+    if user.is_blocking(target) or target.is_blocking(user):
+        return 400, {"detail": "Unable to send friend request."}
+
+    # Check existing friendship record
+    existing = Friendship.objects.filter(
+        models.Q(requester=user, receiver=target) | models.Q(requester=target, receiver=user)
+    ).first()
+
+    if existing:
+        if existing.status == FriendshipStatus.ACCEPTED:
+            return 400, {"detail": "You are already friends with this user."}
+        if existing.status == FriendshipStatus.PENDING:
+            if existing.requester_id == user.id:
+                return 409, {"detail": "Friend request already sent."}
+            else:
+                return 400, {"detail": "This user has already sent you a friend request. Accept their request instead."}
+        # If declined, delete old row so a new request can be created cleanly
+        existing.delete()
+
+    friendship = Friendship.objects.create(
+        requester=user,
+        receiver=target,
+        status=FriendshipStatus.PENDING,
+    )
+    return 201, {"id": friendship.id, "user": target, "created_at": friendship.created_at}
+
+
+@users_router.post(
+    "/friends/requests/{user_id}/accept",
+    response={200: UserOut, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Accept an incoming friend request",
+)
+def accept_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester_id=user_id,
+        receiver=user,
+        status=FriendshipStatus.PENDING,
+    ).select_related("requester").first()
+
+    if not friendship:
+        return 404, {"detail": "Pending friend request not found."}
+
+    friendship.status = FriendshipStatus.ACCEPTED
+    friendship.save(update_fields=["status", "updated_at"])
+    return 200, friendship.requester
+
+
+@users_router.post(
+    "/friends/requests/{user_id}/decline",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Decline an incoming friend request",
+)
+def decline_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester_id=user_id,
+        receiver=user,
+        status=FriendshipStatus.PENDING,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Pending friend request not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend request declined."}
+
+
+@users_router.delete(
+    "/friends/requests/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Cancel an outgoing pending friend request",
+)
+def cancel_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester=user,
+        receiver_id=user_id,
+        status=FriendshipStatus.PENDING,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Outgoing friend request not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend request cancelled."}
+
+
+@users_router.get(
+    "/friends/requests",
+    response={200: FriendRequestsListOut, 401: ErrorDetail},
+    summary="List all pending incoming and outgoing friend requests",
+)
+def list_friend_requests(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    incoming_qs = Friendship.objects.filter(
+        receiver=user, status=FriendshipStatus.PENDING
+    ).select_related("requester")
+    outgoing_qs = Friendship.objects.filter(
+        requester=user, status=FriendshipStatus.PENDING
+    ).select_related("receiver")
+
+    incoming = [{"id": f.id, "user": f.requester, "created_at": f.created_at} for f in incoming_qs]
+    outgoing = [{"id": f.id, "user": f.receiver, "created_at": f.created_at} for f in outgoing_qs]
+
+    return 200, {"incoming": incoming, "outgoing": outgoing}
+

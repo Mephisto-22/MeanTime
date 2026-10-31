@@ -89,3 +89,95 @@ class UserSearchAPITests(TestCase):
         Friendship.objects.create(requester=self.target, receiver=self.me, status=FriendshipStatus.PENDING)
         res3 = self.client.get(f"{self.search_url}?q=alice@example.com", **self.auth_headers)
         self.assertEqual(res3.json()[0]["relationship_status"], "pending_incoming")
+
+
+class FriendRequestAPITests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(email="u1@example.com", password="password123", display_name="User 1")
+        self.user2 = User.objects.create_user(email="u2@example.com", password="password123", display_name="User 2")
+        refresh1 = RefreshToken.for_user(self.user1)
+        self.auth1 = {"HTTP_AUTHORIZATION": f"Bearer {str(refresh1.access_token)}"}
+        refresh2 = RefreshToken.for_user(self.user2)
+        self.auth2 = {"HTTP_AUTHORIZATION": f"Bearer {str(refresh2.access_token)}"}
+
+    def test_send_request_success(self):
+        res = self.client.post(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 201)
+        data = res.json()
+        self.assertEqual(data["user"]["id"], self.user2.id)
+        self.assertTrue(Friendship.objects.filter(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING).exists())
+
+    def test_send_request_to_self_returns_400(self):
+        res = self.client.post(f"/api/users/friends/requests/{self.user1.id}", **self.auth1)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "You cannot send a friend request to yourself."})
+
+    def test_send_request_nonexistent_user_returns_404(self):
+        res = self.client.post("/api/users/friends/requests/99999", **self.auth1)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"detail": "User not found."})
+
+    def test_send_request_when_blocked_returns_400(self):
+        UserBlock.objects.create(blocker=self.user2, blocked=self.user1)
+        res = self.client.post(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "Unable to send friend request."})
+
+    def test_send_request_already_friends_returns_400(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.ACCEPTED)
+        res = self.client.post(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "You are already friends with this user."})
+
+    def test_send_request_duplicate_pending_returns_409(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING)
+        res = self.client.post(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json(), {"detail": "Friend request already sent."})
+
+    def test_send_request_reciprocal_pending_returns_400(self):
+        Friendship.objects.create(requester=self.user2, receiver=self.user1, status=FriendshipStatus.PENDING)
+        res = self.client.post(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "This user has already sent you a friend request. Accept their request instead."})
+
+    def test_accept_request_success(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING)
+        res = self.client.post(f"/api/users/friends/requests/{self.user1.id}/accept", **self.auth2)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["id"], self.user1.id)
+        self.assertTrue(self.user1.is_friends_with(self.user2))
+
+    def test_accept_nonexistent_request_returns_404(self):
+        res = self.client.post(f"/api/users/friends/requests/{self.user1.id}/accept", **self.auth2)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"detail": "Pending friend request not found."})
+
+    def test_decline_request_success_deletes_record(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING)
+        res = self.client.post(f"/api/users/friends/requests/{self.user1.id}/decline", **self.auth2)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "Friend request declined."})
+        self.assertFalse(Friendship.objects.filter(requester=self.user1, receiver=self.user2).exists())
+
+    def test_cancel_outgoing_request_success_deletes_record(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING)
+        res = self.client.delete(f"/api/users/friends/requests/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "Friend request cancelled."})
+        self.assertFalse(Friendship.objects.filter(requester=self.user1, receiver=self.user2).exists())
+
+    def test_list_requests_grouped_incoming_outgoing(self):
+        user3 = User.objects.create_user(email="u3@example.com", password="password123", display_name="User 3")
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.PENDING)
+        Friendship.objects.create(requester=user3, receiver=self.user1, status=FriendshipStatus.PENDING)
+
+        res = self.client.get("/api/users/friends/requests", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["incoming"]), 1)
+        self.assertEqual(data["incoming"][0]["user"]["id"], user3.id)
+        self.assertEqual(len(data["outgoing"]), 1)
+        self.assertEqual(data["outgoing"][0]["user"]["id"], self.user2.id)
+
