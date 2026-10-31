@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime
 from ninja import Schema
 from enum import Enum
