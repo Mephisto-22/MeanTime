@@ -2,7 +2,20 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from users.forms import CustomUserChangeForm, CustomUserCreationForm
-from users.models import User
+from users.models import ExternalAccount, User
+
+
+class ExternalAccountInline(admin.TabularInline):
+    """Google (or other provider) accounts that sign in as this user. Read-only."""
+
+    model = ExternalAccount
+    fields = ("provider", "subject", "created_at")
+    readonly_fields = fields
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(User)
@@ -11,6 +24,7 @@ class UserAdmin(BaseUserAdmin):
 
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
+    inlines = (ExternalAccountInline,)
 
     list_display = ("email", "display_name", "timezone", "is_active", "is_staff", "created_at")
     list_filter = ("is_active", "is_staff", "is_superuser")

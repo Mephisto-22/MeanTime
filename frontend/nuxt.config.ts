@@ -24,7 +24,12 @@ export default defineNuxtConfig({
   nitro: {
     routeRules: {
       '/api/**': {
-        proxy: `${process.env.BACKEND_INTERNAL_URL}/api/**`,
+        proxy: {
+          to: `${process.env.BACKEND_INTERNAL_URL}/api/**`,
+          // Pass the backend's redirects (such as to Google's sign-in page) to
+          // the browser instead of following them on the server.
+          fetchOptions: { redirect: 'manual' },
+        },
       },
     },
   },

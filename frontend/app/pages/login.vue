@@ -7,6 +7,7 @@
           Account created. Please log in.
         </p>
         <LoginForm :loading="loading" @submit="login" />
+        <GoogleSignInButton class="mt-4" />
         <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
         <NuxtLink to="/forgot-password" class="mt-4 block text-primary underline">Forgot your password?</NuxtLink>
         <p class="mt-4">
@@ -24,10 +25,22 @@ import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ public: true })
 
+// Why Google sign-in sent the browser back here (oauth_error in backend/users/oauth.py).
+const googleErrors: Record<string, string> = {
+  cancelled: 'Google sign-in was cancelled.',
+  email_in_use: 'An account with this email already exists. Log in with your email and password.',
+  email_unverified: 'Your Google account\'s email address isn\'t verified, so it can\'t be used to sign in.',
+  inactive: 'This account is inactive.',
+  unavailable: 'Google sign-in isn\'t available right now. Log in with your email and password.',
+}
+
 const authStore = useAuthStore()
 const route = useRoute()
 const loading = ref(false)
-const error = ref('')
+const oauthError = route.query.oauth_error
+const error = ref(typeof oauthError === 'string'
+  ? googleErrors[oauthError] ?? 'Google sign-in failed. Please try again.'
+  : '')
 
 async function login(credentials: LoginRequest) {
   if (loading.value) return

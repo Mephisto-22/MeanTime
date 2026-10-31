@@ -145,3 +145,25 @@ class Friendship(models.Model):
         req = self.requester.display_name or self.requester.email
         rec = self.receiver.display_name or self.receiver.email
         return f"{req} -> {rec} ({self.status})"
+
+
+class ExternalAccount(models.Model):
+    """An account at another provider (Google) that signs in as a MeanTime user."""
+
+    class Provider(models.TextChoices):
+        GOOGLE = "google", "Google"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="external_accounts")
+    provider = models.CharField(max_length=20, choices=Provider.choices)
+    # The provider's permanent ID for the account (the ID token's "sub"). Emails can change.
+    subject = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    class Meta:
+        db_table = "external_accounts"
+        constraints = [
+            models.UniqueConstraint(fields=["provider", "subject"], name="unique_external_account"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_provider_display()} account of {self.user.email}"
