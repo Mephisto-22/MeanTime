@@ -219,3 +219,68 @@ class FriendsAPITests(TestCase):
         self.assertEqual(res.status_code, 404)
         self.assertEqual(res.json(), {"detail": "Friend not found."})
 
+
+class UserBlockAPITests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(email="alice@example.com", password="password123", display_name="Alice")
+        self.user2 = User.objects.create_user(email="bob@example.com", password="password123", display_name="Bob")
+        refresh1 = RefreshToken.for_user(self.user1)
+        self.auth1 = {"HTTP_AUTHORIZATION": f"Bearer {str(refresh1.access_token)}"}
+        refresh2 = RefreshToken.for_user(self.user2)
+        self.auth2 = {"HTTP_AUTHORIZATION": f"Bearer {str(refresh2.access_token)}"}
+
+    def test_block_user_success_and_dissolves_friendship(self):
+        Friendship.objects.create(requester=self.user1, receiver=self.user2, status=FriendshipStatus.ACCEPTED)
+        res = self.client.post(f"/api/users/blocks/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "User blocked successfully."})
+        self.assertTrue(self.user1.is_blocking(self.user2))
+        self.assertFalse(Friendship.objects.filter(requester=self.user1, receiver=self.user2).exists())
+        self.assertFalse(self.user1.is_friends_with(self.user2))
+
+    def test_block_self_returns_400(self):
+        res = self.client.post(f"/api/users/blocks/{self.user1.id}", **self.auth1)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {"detail": "You cannot block yourself."})
+
+    def test_block_nonexistent_returns_404(self):
+        res = self.client.post("/api/users/blocks/99999", **self.auth1)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"detail": "User not found."})
+
+    def test_block_already_blocked_is_idempotent_200(self):
+        UserBlock.objects.create(blocker=self.user1, blocked=self.user2)
+        res = self.client.post(f"/api/users/blocks/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "User is already blocked."})
+
+    def test_mutual_blocking_and_isolated_unblock(self):
+        # Both block each other
+        self.client.post(f"/api/users/blocks/{self.user2.id}", **self.auth1)
+        self.client.post(f"/api/users/blocks/{self.user1.id}", **self.auth2)
+        self.assertTrue(self.user1.is_blocking(self.user2))
+        self.assertTrue(self.user2.is_blocking(self.user1))
+
+        # user1 unblocks user2
+        res = self.client.delete(f"/api/users/blocks/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"detail": "User unblocked successfully."})
+        self.assertFalse(self.user1.is_blocking(self.user2))
+        # user2 block remains active
+        self.assertTrue(self.user2.is_blocking(self.user1))
+
+    def test_unblock_non_blocked_user_returns_404(self):
+        res = self.client.delete(f"/api/users/blocks/{self.user2.id}", **self.auth1)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json(), {"detail": "Blocked user not found."})
+
+    def test_list_blocked_users(self):
+        UserBlock.objects.create(blocker=self.user1, blocked=self.user2)
+        res = self.client.get("/api/users/blocks", **self.auth1)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["id"], self.user2.id)
+
+

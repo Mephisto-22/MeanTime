@@ -530,3 +530,68 @@ def unfriend_user(request, user_id: int):
     return 200, {"detail": "Friend removed successfully."}
 
 
+@users_router.post(
+    "/blocks/{user_id}",
+    response={200: ErrorDetail, 400: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Block a user",
+)
+def block_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if user.id == user_id:
+        return 400, {"detail": "You cannot block yourself."}
+
+    target = User.objects.filter(id=user_id, is_active=True).first()
+    if not target:
+        return 404, {"detail": "User not found."}
+
+    if user.is_blocking(target):
+        return 200, {"detail": "User is already blocked."}
+
+    # Dissolve any existing friendship or pending request in either direction
+    Friendship.objects.filter(
+        models.Q(requester=user, receiver=target) | models.Q(requester=target, receiver=user)
+    ).delete()
+
+    UserBlock.objects.create(blocker=user, blocked=target)
+    return 200, {"detail": "User blocked successfully."}
+
+
+@users_router.delete(
+    "/blocks/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Unblock a user",
+)
+def unblock_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    block_record = UserBlock.objects.filter(blocker=user, blocked_id=user_id).first()
+    if not block_record:
+        return 404, {"detail": "Blocked user not found."}
+
+    block_record.delete()
+    return 200, {"detail": "User unblocked successfully."}
+
+
+@users_router.get(
+    "/blocks",
+    response={200: list[UserOut], 401: ErrorDetail},
+    summary="List all users blocked by current user",
+)
+def list_blocked_users(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    blocked_users = User.objects.filter(
+        blocked_by_user_records__blocker=user,
+        is_active=True,
+    ).order_by("display_name")
+    return 200, list(blocked_users)
+
+
+
