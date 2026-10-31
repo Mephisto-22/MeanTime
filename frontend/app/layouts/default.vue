@@ -7,6 +7,15 @@
           <span class="text-xl font-bold tracking-tight">MeanTime</span>
         </div>
         <div class="flex items-center gap-4">
+          <Button
+            v-if="authStore.isAuthenticated && authStore.user"
+            data-testid="user-profile-button"
+            :label="authStore.user.display_name"
+            icon="pi pi-user"
+            text
+            severity="secondary"
+            @click="goToProfile"
+          />
           <Tag value="v0.1.0-dev" severity="info" />
         </div>
       </div>
@@ -19,3 +28,16 @@
     </footer>
   </div>
 </template>
+
+<script setup lang="ts">
+import { useAuthStore } from '~/stores/auth'
+
+const authStore = useAuthStore()
+
+function goToProfile() {
+  const userId = authStore.user?.id
+  if (userId) {
+    navigateTo(`/users/${userId}`)
+  }
+}
+</script>
