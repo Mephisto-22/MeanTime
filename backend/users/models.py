@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Greatest, Least
 from django.conf import settings
 from django.utils import timezone as django_timezone
 from datetime import timedelta
@@ -19,6 +20,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     resetting_password = models.BooleanField(default=False)
     password_reset_started_at = models.DateTimeField(null=True, blank=True)
     password_version = models.PositiveIntegerField(default=0, editable=False)
+    # Directional M2M tracking outgoing requests and connections.
+    # Note: user.friends.all() returns outgoing connections of all statuses.
+    # Use user.get_friends() to retrieve confirmed/accepted mutual friends.
+    friends = models.ManyToManyField(
+        "self",
+        through="Friendship",
+        symmetrical=False,
+        through_fields=("requester", "receiver"),
+        related_name="friended_by",
+        blank=True,
+    )
 
     def password_reset_active(self):
         """An abandoned reset stops blocking login after the reset timeout."""
@@ -59,12 +71,84 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = self.email.lower()
         super().save(*args, **kwargs)
 
+    def get_friends(self):
+        """Return QuerySet of users who have an ACCEPTED friendship with self in either direction."""
+        from django.db.models import Q
+        return User.objects.filter(
+            Q(friendships_received__requester=self, friendships_received__status=FriendshipStatus.ACCEPTED) |
+            Q(friendships_initiated__receiver=self, friendships_initiated__status=FriendshipStatus.ACCEPTED)
+        ).distinct()
+
+    def is_friends_with(self, user):
+        """Check whether self and user have an ACCEPTED friendship."""
+        if not user or not user.is_authenticated or user == self:
+            return False
+        return Friendship.objects.filter(
+            models.Q(requester=self, receiver=user) | models.Q(requester=user, receiver=self),
+            status=FriendshipStatus.ACCEPTED,
+        ).exists()
+
     def __str__(self):
         return f"{self.display_name} <{self.email}>" if self.display_name else self.email
 
 
+class FriendshipStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    ACCEPTED = "ACCEPTED", "Accepted"
+    DECLINED = "DECLINED", "Declined"
+    BLOCKED = "BLOCKED", "Blocked"
+
+
+class Friendship(models.Model):
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_initiated",
+    )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_received",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=FriendshipStatus.choices,
+        default=FriendshipStatus.PENDING,
+        db_index=True,
+    )
+    blocked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="blocked_friendships",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "friendships"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                Least("requester_id", "receiver_id"),
+                Greatest("requester_id", "receiver_id"),
+                name="unique_friendship_pair",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(requester=models.F("receiver")),
+                name="prevent_self_friending",
+            ),
+        ]
+
+    def __str__(self):
+        req = self.requester.display_name or self.requester.email
+        rec = self.receiver.display_name or self.receiver.email
+        return f"{req} -> {rec} ({self.status})"
+
+
 class ExternalAccount(models.Model):
-    """An account at another provider (such as Google) that signs in as a MeanTime user."""
+    """An account at another provider (Google) that signs in as a MeanTime user."""
 
     class Provider(models.TextChoices):
         GOOGLE = "google", "Google"
