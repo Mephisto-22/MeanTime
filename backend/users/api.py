@@ -3,11 +3,12 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.password_validation import validate_password, get_default_password_validators
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import transaction
+from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -15,6 +16,8 @@ from ninja import Router
 from ninja_jwt.tokens import RefreshToken
 
 from users.schemas import (
+    PasswordRequirementsIn,
+    PasswordRequirementsOut,
     AuthTokenOut,
     DeleteAccountIn,
     ErrorDetail,
@@ -80,6 +83,30 @@ def get_reset_user(uid, token, *, lock=False):
     except (ValueError, TypeError, OverflowError, UnicodeDecodeError, User.DoesNotExist):
         return None
     return user if user.has_usable_password() and default_token_generator.check_token(user, token) else None
+
+
+@auth_router.post("/password-requirements", response=PasswordRequirementsOut, auth=None)
+def password_requirements(request, payload: PasswordRequirementsIn):
+    """Evaluate the same configured validators used during registration; persist nothing."""
+    user = User(email=payload.email.strip().lower(), display_name=payload.display_name.strip())
+    requirements = []
+    for validator in get_default_password_validators():
+        try:
+            validator.validate(payload.password, user=user)
+            met = bool(payload.password)
+        except ValidationError:
+            met = False
+        requirements.append({
+            "id": type(validator).__name__,
+            "description": str(validator.get_help_text()),
+            "met": met,
+        })
+    requirements.append({
+        "id": "MaximumLength",
+        "description": "Use no more than 128 characters.",
+        "met": bool(payload.password) and len(payload.password) <= 128,
+    })
+    return JsonResponse({"requirements": requirements}, headers={"Cache-Control": "no-store"})
 
 
 @auth_router.post(

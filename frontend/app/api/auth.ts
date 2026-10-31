@@ -11,6 +11,16 @@ export interface RegistrationRequest extends LoginRequest {
   timezone?: string
 }
 
+export interface PasswordRequirement {
+  id: string
+  description: string
+  met: boolean
+}
+
+export interface PasswordRequirementsResponse {
+  requirements: PasswordRequirement[]
+}
+
 export interface AuthTokens {
   access_token: string
   refresh_token: string
@@ -48,6 +58,10 @@ export interface SignInProviders {
 // Matches backend/users/schemas.py; user profiles are fetched separately via /me.
 export class AuthApi {
   readonly endpoint = '/api/auth'
+
+  passwordRequirements(details: { password: string; email: string; display_name: string }): Promise<PasswordRequirementsResponse> {
+    return apiService.post<PasswordRequirementsResponse>(`${this.endpoint}/password-requirements`, details, { auth: false })
+  }
 
   login(credentials: LoginRequest): Promise<LoginResponse> {
     return apiService.post<LoginResponse>(`${this.endpoint}/login`, credentials, { auth: false })
