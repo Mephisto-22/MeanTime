@@ -1,7 +1,7 @@
 <template>
   <div class="mx-auto max-w-4xl px-6 py-10">
     <!-- Top-Left Navigation Back to Boards -->
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6">
       <Button
         data-testid="back-to-boards-button"
         label="Your boards"
@@ -10,14 +10,6 @@
         severity="secondary"
         @click="navigateTo('/')"
       />
-    </div>
-
-    <!-- Page Title -->
-    <div class="mb-8">
-      <h2 class="text-3xl font-bold tracking-tight">Account Information</h2>
-      <p class="mt-1 text-surface-600 dark:text-surface-300">
-        View and manage your account details and profile preferences.
-      </p>
     </div>
 
     <!-- Error Banner -->
@@ -45,137 +37,143 @@
     </Message>
 
     <!-- Account Details Card -->
-    <div class="rounded-xl border border-surface-200 bg-surface-0 p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-      <div class="divide-y divide-surface-200 dark:divide-surface-800">
-        <!-- Username / Email (Read-Only: No Edit Button) -->
-        <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="sm:w-1/3">
-            <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">Username / Email</span>
-          </div>
-          <div class="flex flex-1 items-center justify-between gap-4">
-            <span data-testid="field-email" class="text-surface-900 dark:text-surface-0">
-              {{ currentUser?.email || 'N/A' }}
-            </span>
-            <span class="text-xs text-surface-400 italic">Read-only</span>
-          </div>
-        </div>
-
-        <!-- Display Name (Editable) -->
-        <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="sm:w-1/3">
-            <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">Display Name</span>
-          </div>
-          <div class="flex flex-1 items-center justify-between gap-4">
-            <div class="flex-1">
-              <InputText
-                v-if="isEditingDisplayName"
-                v-model="draftDisplayName"
-                data-testid="input-display-name"
-                fluid
-                autofocus
-              />
-              <span v-else data-testid="field-display-name" class="text-surface-900 dark:text-surface-0">
-                {{ currentUser?.display_name || 'N/A' }}
-              </span>
+    <Card class="mb-8">
+      <template #title>
+        <h2 class="text-2xl font-bold">Account Information</h2>
+      </template>
+      <template #subtitle>
+        View and manage your account details and profile preferences.
+      </template>
+      <template #content>
+        <div class="flex flex-col gap-4">
+          <!-- Username / Email (Read-Only: No Edit Button) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label class="sm:w-1/3">Username / Email</Label>
+            <div class="flex flex-1 items-center justify-between gap-4">
+              <span data-testid="field-email">{{ currentUser?.email || 'N/A' }}</span>
+              <Tag value="Read-only" severity="secondary" />
             </div>
-            <Button
-              v-if="!isEditingDisplayName"
-              data-testid="edit-display-name-button"
-              label="Edit"
-              icon="pi pi-pencil"
-              size="small"
-              text
-              @click="isEditingDisplayName = true"
-            />
           </div>
-        </div>
 
-        <!-- Timezone (Editable) -->
-        <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="sm:w-1/3">
-            <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">Timezone</span>
-          </div>
-          <div class="flex flex-1 items-center justify-between gap-4">
-            <div class="flex-1">
-              <InputText
-                v-if="isEditingTimezone"
-                v-model="draftTimezone"
-                data-testid="input-timezone"
-                fluid
+          <Divider />
+
+          <!-- Display Name (Editable) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label for="input-display-name" class="sm:w-1/3">Display Name</Label>
+            <div class="flex flex-1 items-center justify-between gap-4">
+              <div class="flex-1">
+                <InputText
+                  v-if="isEditingDisplayName"
+                  id="input-display-name"
+                  v-model="draftDisplayName"
+                  data-testid="input-display-name"
+                  fluid
+                  autofocus
+                />
+                <span v-else data-testid="field-display-name">{{ currentUser?.display_name || 'N/A' }}</span>
+              </div>
+              <Button
+                v-if="!isEditingDisplayName"
+                data-testid="edit-display-name-button"
+                label="Edit"
+                icon="pi pi-pencil"
+                size="small"
+                text
+                @click="isEditingDisplayName = true"
               />
-              <span v-else data-testid="field-timezone" class="text-surface-900 dark:text-surface-0">
-                {{ currentUser?.timezone || 'UTC' }}
-              </span>
             </div>
-            <Button
-              v-if="!isEditingTimezone"
-              data-testid="edit-timezone-button"
-              label="Edit"
-              icon="pi pi-pencil"
-              size="small"
-              text
-              @click="isEditingTimezone = true"
-            />
           </div>
-        </div>
 
-        <!-- Password (Has Edit Button, but No-Op) -->
-        <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="sm:w-1/3">
-            <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">Password</span>
+          <Divider />
+
+          <!-- Timezone (Editable) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label for="input-timezone" class="sm:w-1/3">Timezone</Label>
+            <div class="flex flex-1 items-center justify-between gap-4">
+              <div class="flex-1">
+                <InputText
+                  v-if="isEditingTimezone"
+                  id="input-timezone"
+                  v-model="draftTimezone"
+                  data-testid="input-timezone"
+                  fluid
+                />
+                <span v-else data-testid="field-timezone">{{ currentUser?.timezone || 'UTC' }}</span>
+              </div>
+              <Button
+                v-if="!isEditingTimezone"
+                data-testid="edit-timezone-button"
+                label="Edit"
+                icon="pi pi-pencil"
+                size="small"
+                text
+                @click="isEditingTimezone = true"
+              />
+            </div>
           </div>
-          <div class="flex flex-1 items-center justify-between gap-4">
-            <span data-testid="field-password" class="text-surface-900 tracking-widest dark:text-surface-0">
-              ••••••••
-            </span>
-            <Button
-              data-testid="edit-password-button"
-              label="Edit"
-              icon="pi pi-pencil"
-              size="small"
-              text
-              @click="onPasswordEdit"
-            />
+
+          <Divider />
+
+          <!-- Password (Has Edit Button, but No-Op) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Label class="sm:w-1/3">Password</Label>
+            <div class="flex flex-1 items-center justify-between gap-4">
+              <span data-testid="field-password" class="tracking-widest">••••••••</span>
+              <Button
+                data-testid="edit-password-button"
+                label="Edit"
+                icon="pi pi-pencil"
+                size="small"
+                text
+                @click="onPasswordEdit"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- Save / Cancel Editing Actions -->
-      <div v-if="isEditing" class="mt-6 flex justify-end gap-2 border-t border-surface-200 pt-4 dark:border-surface-800">
-        <Button
-          data-testid="cancel-edit-button"
-          label="Cancel"
-          severity="secondary"
-          text
-          @click="cancelEditing"
-        />
-        <Button
-          data-testid="save-profile-button"
-          label="Save"
-          icon="pi pi-check"
-          @click="openSaveDialog"
-        />
-      </div>
-    </div>
+      <template v-if="isEditing" #footer>
+        <div class="flex justify-end gap-2">
+          <Button
+            data-testid="cancel-edit-button"
+            label="Cancel"
+            severity="secondary"
+            text
+            @click="cancelEditing"
+          />
+          <Button
+            data-testid="save-profile-button"
+            label="Save"
+            icon="pi pi-check"
+            @click="openSaveDialog"
+          />
+        </div>
+      </template>
+    </Card>
 
     <!-- Danger Zone: Delete Account -->
-    <div class="mt-12 rounded-xl border border-red-200 bg-red-50/50 p-6 dark:border-red-950 dark:bg-red-950/20">
-      <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h3 class="text-lg font-semibold text-red-900 dark:text-red-300">Delete Account</h3>
-          <p class="text-sm text-red-700 dark:text-red-400">
-            Deactivate your user account. This action cannot be undone.
-          </p>
+    <Card class="border border-red-200 dark:border-red-950">
+      <template #title>
+        <span class="text-red-700 dark:text-red-400">Delete Account</span>
+      </template>
+      <template #content>
+        <p class="text-sm text-surface-600 dark:text-surface-400">
+          Deactivate your user account. This action cannot be undone.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end">
+          <Button
+            data-testid="delete-account-button"
+            label="Delete Account"
+            severity="danger"
+            icon="pi pi-trash"
+            @click="openDeleteDialog"
+          />
         </div>
-        <Button
-          data-testid="delete-account-button"
-          label="Delete Account"
-          severity="danger"
-          icon="pi pi-trash"
-          @click="openDeleteDialog"
-        />
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Confirmation Modal for Saving Changes -->
     <SaveConfirmDialog

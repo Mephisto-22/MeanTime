@@ -13,9 +13,9 @@
       </p>
 
       <div class="flex flex-col gap-2">
-        <label for="delete-password-input" class="text-sm font-medium">
+        <Label for="delete-password-input">
           Enter your password to confirm:
-        </label>
+        </Label>
         <InputText
           id="delete-password-input"
           v-model="password"
