@@ -87,6 +87,8 @@ data "aws_acm_certificate" "this" {
 
   domain   = var.domain_name
   statuses = ["ISSUED"]
+  # While the base layer replaces the certificate, both are issued.
+  most_recent = true
 }
 
 resource "aws_lb_listener" "https" {
