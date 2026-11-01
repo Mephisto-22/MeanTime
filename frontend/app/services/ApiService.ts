@@ -6,12 +6,15 @@
 
 export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'method' | 'body' | 'query'> {
   headers?: Record<string, string>
+  /** Maximum request duration in milliseconds (passed through to ofetch). */
+  timeout?: number
   /** Disable automatic bearer authentication for public/authentication endpoints. */
   auth?: boolean
 }
 
 export interface ApiAuthHandler {
   getAccessToken(): string | null
+  getSessionRevision?(): number
   refresh(): Promise<void>
   expireSession(): Promise<void>
 }
@@ -49,6 +52,8 @@ export class ApiService {
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
     const sentToken = handler?.getAccessToken()
+    const sentRevision = handler?.getSessionRevision?.()
+    const sameSession = () => !handler?.getSessionRevision || handler.getSessionRevision() === sentRevision
     const execute = (token?: string | null) => $fetch<T>(endpoint, {
       ...fetchOptions,
       method,
@@ -67,18 +72,20 @@ export class ApiService {
         return await execute(sentToken)
       } catch (error: any) {
         if (!handler || (error.statusCode || error.response?.status) !== 401) throw error
+        if (!sameSession()) throw error
         if (!sentToken || !handler.getAccessToken()) {
           await handler.expireSession()
           throw error
         }
         // Another concurrent request may have already refreshed this token.
         if (handler.getAccessToken() === sentToken) await handler.refresh()
+        if (!sameSession()) throw error
         const updatedToken = handler.getAccessToken()
         if (!updatedToken) throw error
         try {
           return await execute(updatedToken)
         } catch (retryError: any) {
-          if ((retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
+          if (sameSession() && (retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
           throw retryError
         }
       }

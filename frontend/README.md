@@ -360,6 +360,9 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+See [Clean logout](../docs/clean-logout.md) for navbar logout, persistent token
+blacklisting, migration/cleanup commands, and tests.
+
 Registration displays a live password checklist and password confirmation. See
 [Live registration password requirements](../docs/frontend/password-requirements.md)
 for policy details and test commands.

@@ -55,6 +55,11 @@ class RefreshIn(Schema):
     refresh_token: str
 
 
+class LogoutIn(Schema):
+    refresh_token: str = Field(..., min_length=1, max_length=8192)
+    access_token: str | None = Field(default=None, min_length=1, max_length=8192)
+
+
 class UserOut(Schema):
     """Public user profile returned in responses."""
 

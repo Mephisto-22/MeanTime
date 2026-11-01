@@ -3,6 +3,9 @@
     <Card>
       <template #title><h2 class="text-2xl font-bold">Log in</h2></template>
       <template #content>
+        <p v-if="route.query.logout === 'unconfirmed'" role="alert" class="mb-4">
+          You are signed out on this device, but server token revocation could not be confirmed.
+        </p>
         <p v-if="route.query.registered === '1'" role="status" class="mb-4">
           Account created. Please log in.
         </p>

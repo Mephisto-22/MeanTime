@@ -14,6 +14,8 @@ export interface AuthState {
   refreshToken: string | null
   user: User | null
   sessionInitialized: boolean
+  loggingOut: boolean
+  sessionRevision: number
 }
 
 export const AUTH_STORAGE_KEY = 'meantime.auth'
@@ -32,7 +34,7 @@ function invalidCredentials(error: unknown): boolean {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({ accessToken: null, refreshToken: null, user: null, sessionInitialized: false }),
+  state: (): AuthState => ({ accessToken: null, refreshToken: null, user: null, sessionInitialized: false, loggingOut: false, sessionRevision: 0 }),
   getters: {
     isAuthenticated: (state): boolean => !!(state.accessToken && state.refreshToken && state.user),
   },
@@ -98,8 +100,12 @@ export const useAuthStore = defineStore('auth', {
     },
     clearTokens() {
       const initialized = this.sessionInitialized
+      const loggingOut = this.loggingOut
+      const revision = this.sessionRevision + 1
       this.$reset()
       this.sessionInitialized = initialized
+      this.loggingOut = loggingOut
+      this.sessionRevision = revision
       this.persist()
     },
     async expireSession() {
@@ -113,6 +119,7 @@ export const useAuthStore = defineStore('auth', {
       let pending = refreshes.get(this)
       if (!pending) {
         const refreshToken = this.refreshToken
+        const revision = this.sessionRevision
         pending = (async () => {
           if (!refreshToken) {
             await this.expireSession()
@@ -121,13 +128,13 @@ export const useAuthStore = defineStore('auth', {
           try {
             const response = await authApi.refresh(refreshToken)
             // A completed old request must never resurrect a cleared/new session.
-            if (this.refreshToken !== refreshToken) throw new Error('The session changed while refreshing.')
+            if (this.refreshToken !== refreshToken || this.sessionRevision !== revision) throw new Error('The session changed while refreshing.')
             if (typeof response?.access_token !== 'string' || !response.access_token) {
               throw Object.assign(new Error('Invalid token refresh response.'), { statusCode: 401 })
             }
             this.setTokens({ access_token: response.access_token, refresh_token: refreshToken })
           } catch (error) {
-            if (this.refreshToken === refreshToken && invalidCredentials(error)) await this.expireSession()
+            if (this.refreshToken === refreshToken && this.sessionRevision === revision && invalidCredentials(error)) await this.expireSession()
             throw error
           }
         })().finally(() => refreshes.delete(this))
@@ -137,31 +144,37 @@ export const useAuthStore = defineStore('auth', {
     },
     async fetchUser() {
       if (!this.accessToken) throw new Error('No access token is available.')
+      const revision = this.sessionRevision
       this.user = null
       try {
         let user: User
         try {
           user = await authApi.me(this.accessToken)
         } catch (error) {
+          if (this.sessionRevision !== revision) throw new Error('The session changed while loading the user.')
           if ((error as { statusCode?: number } | null)?.statusCode !== 401) throw error
           await this.refresh()
           user = await authApi.me(this.accessToken!)
         }
+        if (this.sessionRevision !== revision) throw new Error('The session changed while loading the user.')
         this.setUser(user)
         return user
       } catch (error) {
-        if (invalidCredentials(error)) await this.expireSession()
+        if (this.sessionRevision === revision && invalidCredentials(error)) await this.expireSession()
         throw error
       }
     },
     async login(credentials: LoginRequest) {
       this.clearTokens()
       this.sessionInitialized = true
+      const revision = this.sessionRevision
       try {
-        this.setTokens(await authApi.login(credentials))
+        const tokens = await authApi.login(credentials)
+        if (this.sessionRevision !== revision) throw new Error('The session changed while signing in.')
+        this.setTokens(tokens)
         await this.fetchUser()
       } catch (error) {
-        this.clearTokens()
+        if (this.sessionRevision === revision) this.clearTokens()
         throw error
       }
     },
@@ -169,12 +182,35 @@ export const useAuthStore = defineStore('auth', {
     async loginWithTokens(tokens: AuthTokens) {
       this.clearTokens()
       this.sessionInitialized = true
+      const revision = this.sessionRevision
       try {
         this.setTokens(tokens)
         await this.fetchUser()
       } catch (error) {
-        this.clearTokens()
+        if (this.sessionRevision === revision) this.clearTokens()
         throw error
+      }
+    },
+    async logout(): Promise<boolean> {
+      if (this.loggingOut) return false
+      const refreshToken = this.refreshToken
+      const accessToken = this.accessToken
+      const revocation = refreshToken
+        ? authApi.logout(refreshToken, accessToken).then(() => true, () => false)
+        : Promise.resolve(!accessToken)
+      this.clearTokens()
+      this.sessionInitialized = true
+      this.loggingOut = true
+      if (import.meta.client) clearNuxtData()
+      try {
+        if (import.meta.client) await navigateTo('/login', { replace: true })
+        const revoked = await revocation
+        if (!revoked && import.meta.client && !this.isAuthenticated) {
+          await navigateTo('/login?logout=unconfirmed', { replace: true })
+        }
+        return revoked
+      } finally {
+        this.loggingOut = false
       }
     },
     async register(details: RegistrationRequest) {
