@@ -13,7 +13,11 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from ninja import Router
-from ninja_jwt.tokens import RefreshToken
+from ninja_jwt.tokens import RefreshToken, AccessToken, UntypedToken
+from ninja_jwt.exceptions import TokenError
+from ninja_jwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from ninja_jwt.utils import datetime_from_epoch
+from ninja_jwt.settings import api_settings
 
 from users.schemas import (
     PasswordRequirementsIn,
@@ -22,6 +26,7 @@ from users.schemas import (
     DeleteAccountIn,
     ErrorDetail,
     LoginIn,
+    LogoutIn,
     RefreshIn,
     RegisterIn,
     TokenRefreshOut,
@@ -45,6 +50,9 @@ def issue_tokens(user):
     refresh = RefreshToken.for_user(user)
     # Changing the password bumps password_version, which revokes these tokens.
     refresh["password_version"] = user.password_version
+    # Access tokens carry the refresh JTI so logout revokes the whole session,
+    # including access tokens created by an in-flight refresh.
+    refresh["session_jti"] = refresh["jti"]
     return {
         "access_token": str(refresh.access_token),
         "refresh_token": str(refresh),
@@ -187,6 +195,8 @@ def refresh_token(request, payload: RefreshIn):
         user = User.objects.get(pk=token["user_id"], is_active=True)
         if user.password_reset_active() or token.get("password_version", 0) != user.password_version:
             return 401, {"detail": "Complete your password reset before signing in again."}
+        # Also upgrades refresh tokens issued before session_jti was introduced.
+        token["session_jti"] = token["jti"]
         return 200, {
             "access_token": str(token.access_token),
             "token_type": "bearer",
@@ -194,6 +204,51 @@ def refresh_token(request, payload: RefreshIn):
         }
     except Exception:
         return 401, {"detail": "Invalid or expired refresh token."}
+
+
+@auth_router.post("/logout", response={200: ErrorDetail, 400: ErrorDetail, 401: ErrorDetail}, auth=None)
+@transaction.atomic
+def logout(request, payload: LogoutIn):
+    """Possession of a signed refresh token authorizes revoking that session only."""
+    try:
+        # Verify signature/expiry without rejecting an already-blacklisted token.
+        # This makes repeated logout requests idempotent without trusting unsigned data.
+        verified = UntypedToken(payload.refresh_token)
+        if verified.get("token_type") != "refresh":
+            return 400, {"detail": "A refresh token is required to log out."}
+        refresh = RefreshToken(payload.refresh_token, verify=False)
+    except TokenError:
+        return 401, {"detail": "Invalid or expired refresh token."}
+
+    access = None
+    if payload.access_token:
+        try:
+            access = AccessToken(payload.access_token)
+        except TokenError:
+            # An expired/invalid access token is already unusable. A valid refresh
+            # is sufficient to revoke its linked session even after access expiry.
+            pass
+        if access is not None and (
+            access.get("user_id") != refresh.get("user_id") or
+            access.get("session_jti", refresh["jti"]) != refresh["jti"]
+        ):
+            return 400, {"detail": "The supplied tokens belong to different sessions."}
+
+    refresh.blacklist()
+    # A refresh issued just before its expiry can produce an access token that
+    # outlives it. Keep revocation until that last access token must also expire.
+    OutstandingToken.objects.filter(jti=refresh["jti"]).update(
+        expires_at=datetime_from_epoch(refresh["exp"]) + api_settings.ACCESS_TOKEN_LIFETIME,
+    )
+    if access is not None:
+        # Also revoke legacy access tokens which do not carry a session claim.
+        outstanding, _ = OutstandingToken.objects.get_or_create(
+            jti=access["jti"], defaults={
+                "token": str(access), "expires_at": datetime_from_epoch(access["exp"]),
+            },
+        )
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+    return {"detail": "Logged out successfully."}
 
 
 @auth_router.get(

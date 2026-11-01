@@ -75,6 +75,13 @@ export class AuthApi {
     return apiService.post<RefreshResponse>(`${this.endpoint}/refresh`, { refresh_token: refreshToken }, { auth: false })
   }
 
+  logout(refreshToken: string, accessToken?: string | null): Promise<AuthMessage> {
+    return apiService.post<AuthMessage>(`${this.endpoint}/logout`, {
+      refresh_token: refreshToken,
+      ...(accessToken ? { access_token: accessToken } : {}),
+    }, { auth: false, timeout: 10000 })
+  }
+
   me(accessToken: string): Promise<User> {
     return apiService.get<User>(`${this.endpoint}/me`, undefined)
   }

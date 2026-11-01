@@ -1,5 +1,8 @@
 # Frontend Developer Guide
 
+See [Clean logout](../clean-logout.md) for navbar logout, session cleanup, and
+revocation-failure behavior.
+
 See [Live registration password requirements](password-requirements.md) for the
 password checklist, confirmation behavior, API contract, and verification.
 
