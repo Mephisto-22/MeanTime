@@ -74,6 +74,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+.superpowers/
 
 # Terraform (infra/)
 .terraform/
