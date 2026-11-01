@@ -125,3 +125,19 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Development-only delivery; Mailgun/external email is intentionally deferred.
+EMAIL_BACKEND = (
+    "django.core.mail.backends.console.EmailBackend" if DEBUG
+    else "django.core.mail.backends.dummy.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = "noreply@meantime.local"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+# Only send the session cookie (used during Google sign-in) over HTTPS when
+# the app is served over HTTPS (Prod).
+SESSION_COOKIE_SECURE = FRONTEND_URL.startswith("https://")
+PASSWORD_RESET_TIMEOUT = 3600
+
+# Sign in with Google (users/oauth.py). Turned off unless both are set.
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")

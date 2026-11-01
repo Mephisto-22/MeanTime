@@ -364,10 +364,23 @@ The app uses shared PrimeVue notifications and required-field validation. See
 [Notifications and required fields](../docs/frontend/notifications.md) for usage
 and testing conventions.
 
+Registration displays a live password checklist and password confirmation. See
+[Live registration password requirements](../docs/frontend/password-requirements.md)
+for policy details and test commands.
+
+### Password reset
+
+Login links to `/forgot-password`; the reset link opens the public `/reset-password`
+page. Forms call `AuthApi` to request, validate, and confirm a reset. With backend
+debug enabled, reset links print in backend container logs. Mailgun and inbox
+delivery are deferred. See [the reset guide](../docs/password-reset.md) for setup,
+database changes, endpoint contracts, and manual tests.
+
 ### Authentication frontend
 
 - `/login` submits email/password, stores tokens, fetches the authenticated profile from `/api/auth/me`, and navigates to the requested protected page (or home) only after that succeeds.
 - `/register` submits `display_name`, email, and password (optional `timezone`, default UTC), then redirects to login.
+- Login and register show **Continue with Google** (`app/components/GoogleSignInButton.vue`) when `/api/auth/oauth/providers` lists Google. It's a plain link to the backend, which sends the browser to Google and back to the public `/oauth/callback` page with tokens in the URL fragment. That page calls `loginWithTokens` and opens the board. Failures return to `/login?oauth_error=<reason>`, which the login page explains. See [the Google sign-in guide](../docs/google-sign-in.md).
 - `app/api/auth.ts` matches `backend/users/schemas.py`: login returns `access_token`, `refresh_token`, `token_type`, and `expires_in`; registration and `/me` return `UserOut`. The frontend does not rely on the backend's current extra login `user` field.
 - `app/stores/auth.ts` exports `useAuthStore`, `User`, and `AuthState`. Only access and refresh tokens persist under `meantime.auth`. User details and `isAuthenticated` are never stored locally. Old saved profiles are discarded on restoration.
 - Client navigation waits for session restoration and a `/me` check. A 401 triggers `/refresh` with `refresh_token`, persists the new access token, and retries once. Concurrent refreshes share one request. Rejected or malformed refresh credentials clear the session and redirect to login; network/server outages preserve tokens for retry.

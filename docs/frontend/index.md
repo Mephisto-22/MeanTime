@@ -3,6 +3,9 @@
 See [Notifications and required fields](notifications.md) for toast usage,
 error formatting, form-validation conventions, and verification.
 
+See [Live registration password requirements](password-requirements.md) for the
+password checklist, confirmation behavior, API contract, and verification.
+
 The MeanTime frontend is a reactive, containerized **Nuxt 4 / Vue 3** Single Page Application styled with **PrimeVue 5** (Aura preset) and **Tailwind CSS**, managed via **Pinia** state stores.
 
 ---

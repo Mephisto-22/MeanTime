@@ -4,6 +4,7 @@
       <template #title><h2 class="text-2xl font-bold">Register</h2></template>
       <template #content>
         <RegistrationForm :loading="loading" @submit="register" />
+        <GoogleSignInButton class="mt-4" />
         <p class="mt-4">
           Already have an account?
           <NuxtLink to="/login" class="text-primary underline">Log in</NuxtLink>

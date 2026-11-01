@@ -24,7 +24,7 @@ locals {
 
 output "app_url" {
   description = "Public URL of the app (Prod only; null in Dev)."
-  value       = var.public ? "http://${aws_lb.this[0].dns_name}" : null
+  value       = local.app_url
 }
 
 output "dev_tunnel_command" {

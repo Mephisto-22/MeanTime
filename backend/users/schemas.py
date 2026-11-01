@@ -86,6 +86,41 @@ class ErrorDetail(Schema):
     detail: str
 
 
+class PasswordRequirementsIn(Schema):
+    password: str = Field(default="", max_length=128)
+    email: str = Field(default="", max_length=254)
+    display_name: str = Field(default="", max_length=50)
+
+
+class PasswordRequirementOut(Schema):
+    id: str
+    description: str
+    met: bool
+
+
+class PasswordRequirementsOut(Schema):
+    requirements: list[PasswordRequirementOut]
+
+
+class PasswordResetRequestIn(Schema):
+    email: str = Field(..., max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def validate_reset_email(cls, value: str) -> str:
+        return RegisterIn.validate_email_field(value)
+
+
+class PasswordResetLinkIn(Schema):
+    uid: str = Field(..., min_length=1, max_length=64)
+    token: str = Field(..., min_length=1, max_length=128)
+
+
+class PasswordResetConfirmIn(PasswordResetLinkIn):
+    password: str = Field(..., min_length=8, max_length=128)
+    password_confirm: str = Field(..., min_length=8, max_length=128)
+
+
 class UserUpdateIn(Schema):
     """Payload for partial user profile update."""
 
@@ -111,6 +146,11 @@ class UserUpdateIn(Schema):
 
 
 class DeleteAccountIn(Schema):
-    """Payload for confirming account deletion with current password."""
+    """Payload for confirming account deletion.
 
-    password: str = Field(..., min_length=1)
+    Accounts with a password confirm with it. Accounts created through Google
+    have none, so they confirm by typing their email address instead.
+    """
+
+    password: str = ""
+    email: str = ""

@@ -165,6 +165,9 @@ Your new endpoints will immediately appear in the interactive Swagger docs at `/
 
 ## Management & Testing Commands
 
+See [Password reset](../password-reset.md) for reset endpoints, user fields,
+authentication restrictions, console delivery, and test commands.
+
 Execute commands in the running backend container via `docker compose exec`:
 
 ```bash
@@ -205,9 +208,12 @@ Django's tests cover the API and database, and the frontend's `pnpm test:smoke` 
 
 If it fails, the last numbered line printed in the **Smoke check** step is the check that failed. The **Show container logs** step below it has the frontend, backend and database logs.
 
-#### Branch protection (one-time setup)
+#### Branch protection
 
-A repository admin sets this up once, after the workflow has run at least once (GitHub only lists checks it has seen). In the repository's **Settings → Branches**, add a branch protection rule for `dev`, and another for `main`:
+Branch protection is active on `dev` and `main` via branch protection rules and repository rulesets (**PR Review** and **Unit Tests and Smoke Checks**):
 
-- Turn on **Require a pull request before merging**.
-- Turn on **Require status checks to pass before merging**, and add **Backend unit tests**, **Frontend unit tests** and **Smoke check against the running app**.
+- **Require a pull request before merging**: at least 1 approving review required before merging.
+- **Require status checks to pass before merging**:
+  - `Backend unit tests`
+  - `Frontend unit tests`
+  - `Smoke check against the running app`

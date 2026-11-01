@@ -41,9 +41,10 @@ network errors offer a retry message. Never put credentials into error messages.
   saves and preserve optimistic-task rollback behavior.
 - Load-error screens retain retry/back controls; toasts carry the detailed failure.
 
-Login, registration, board, and task forms follow these conventions. Password reset
-is a separate PR and is not part of this dev-based branch; apply the same pattern
-when integrating it.
+Login, registration, board, and task forms follow these conventions. Registration
+also retains the live backend password checklist and local password confirmation.
+Password reset and OAuth callback pages retain their recovery guidance; other
+features should use this notification pattern when updating request feedback.
 
 ## Verification
 

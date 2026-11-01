@@ -2,6 +2,8 @@
 
 Welcome to the **MeanTime** documentation.
 
+See the [password reset guide](password-reset.md) for the Sprint 2 flow and local testing, and the [Google sign-in guide](google-sign-in.md) for signing in with a Google account.
+
 MeanTime is a modern, containerized full-stack web application designed for task management, kanban tracking, and productivity workflows.
 
 The project is built on a containerized microservice architecture featuring a **Nuxt 4 / Vue 3** frontend, an asynchronous **Django Ninja** backend, and a **PostgreSQL 18** database.
@@ -49,4 +51,4 @@ Navigate through the guides below to get started or dive into service architectu
 - **[Architecture & Domain](architecture.md)**: Container topology, internal Docker networking, proxy routing, and canonical domain concepts.
 - **[Backend Service Guide](backend/index.md)**: Django Ninja setup, database models, schema contracts, migrations lifecycle, unit testing, and interactive Swagger/ReDoc links.
 - **[Frontend Service Guide](frontend/index.md)**: Nuxt 4, Vue 3, PrimeVue 5 + Tailwind CSS layering, Pinia stores, and the centralized `ApiService` pattern.
-- **[Infrastructure Guide](infrastructure/index.md)**: Terraform for the AWS Dev and Prod environments: bringing them up and down, opening Dev, and finding Prod's URL.
+- **[Infrastructure Guide](infrastructure/index.md)**: Terraform for the AWS Dev and Prod environments: bringing them up and down, opening Dev, and Prod's domain and HTTPS.

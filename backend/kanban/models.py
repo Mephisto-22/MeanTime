@@ -72,10 +72,12 @@ class BoardColumn(models.Model):
 
 class Task(models.Model):
     priority = models.CharField(
-            max_length=10,
-            choices=TaskPriority.choices,
-            default=TaskPriority.MEDIUM
-        )
+        max_length=10,
+        choices=TaskPriority.choices,
+        default=None,
+        null=True,
+        blank=True,
+    )
     tags = models.ManyToManyField(
             to=Tag,
             blank=True,

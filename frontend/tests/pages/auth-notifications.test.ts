@@ -6,6 +6,7 @@ import ToastEventBus from 'primevue/toasteventbus'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Login from '~/pages/login.vue'
 import Register from '~/pages/register.vue'
+import { authApi } from '~/api/auth'
 import { useAuthStore } from '~/stores/auth'
 
 let wrapper: VueWrapper | undefined
@@ -31,6 +32,7 @@ describe('Authentication notifications', () => {
 
   it('formats registration validation details as a toast', async () => {
     const auth = useAuthStore(useNuxtApp().$pinia as Pinia)
+    vi.spyOn(authApi, 'passwordRequirements').mockResolvedValue({ requirements: [{ id: 'checked', description: 'All checks passed', met: true }] })
     vi.spyOn(auth, 'register').mockRejectedValue({ statusCode: 422, data: { detail: [
       { loc: ['body', 'payload', 'password'], msg: 'Choose a stronger password.', input: 'do-not-show-this' },
     ] } })
@@ -39,6 +41,8 @@ describe('Authentication notifications', () => {
     await wrapper.get('input[name="display_name"]').setValue('Name')
     await wrapper.get('input[name="email"]').setValue('user@example.com')
     await wrapper.get('input[name="password"]').setValue('Password982!')
+    await wrapper.get('input[name="password_confirm"]').setValue('Password982!')
+    await vi.waitFor(() => expect(wrapper!.get('button[type="submit"]').attributes('disabled')).toBeUndefined())
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(toast).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', summary: 'Unable to register', detail: 'password: Choose a stronger password.' }))

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import LoginForm from '~/components/LoginForm.vue'
 import RegistrationForm from '~/components/RegistrationForm.vue'
 import BoardFormDialog from '~/components/kanban/BoardFormDialog.vue'
+import { authApi } from '~/api/auth'
 import { kanbanApi } from '~/api/kanban'
 
 afterEach(() => vi.restoreAllMocks())
@@ -30,6 +31,7 @@ describe('Consistent required fields', () => {
   })
 
   it('rejects whitespace-only display names and short passwords in registration', async () => {
+    vi.spyOn(authApi, 'passwordRequirements').mockResolvedValue({ requirements: [{ id: 'checked', description: 'All checks passed', met: true }] })
     const wrapper = mount(RegistrationForm, { global })
     await wrapper.get('input[name="display_name"]').setValue('   ')
     await wrapper.get('input[name="email"]').setValue('user@example.com')
@@ -37,9 +39,12 @@ describe('Consistent required fields', () => {
     expect(wrapper.get('button').attributes('disabled')).toBeDefined()
     await wrapper.get('input[name="display_name"]').setValue(' Name ')
     await wrapper.get('input[name="password"]').setValue('StrongPassword982!')
+    await wrapper.get('input[name="password_confirm"]').setValue('StrongPassword982!')
+    await vi.waitFor(() => expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined())
     expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]).toEqual([{ display_name: 'Name', email: 'user@example.com', password: 'StrongPassword982!' }])
+    wrapper.unmount()
   })
 
   it('never submits a busy auth form even with valid fields', async () => {

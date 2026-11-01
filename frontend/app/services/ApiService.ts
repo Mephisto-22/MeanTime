@@ -46,7 +46,7 @@ export class ApiService {
     data?: any,
     options: ApiRequestOptions = {},
   ): Promise<T> {
-    const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH'
+    const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH' || (method === 'DELETE' && data !== undefined)
     const { auth = true, headers, ...fetchOptions } = options
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
@@ -124,8 +124,8 @@ export class ApiService {
   /**
    * Send a DELETE request.
    */
-  delete<T>(url: string, options?: ApiRequestOptions): Promise<T> {
-    return this.request<T>(url, 'DELETE', undefined, options)
+  delete<T>(url: string, body?: any, options?: ApiRequestOptions): Promise<T> {
+    return this.request<T>(url, 'DELETE', body, options)
   }
 }
 
