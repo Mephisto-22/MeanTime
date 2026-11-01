@@ -21,7 +21,9 @@
           autofocus
           fluid
           :maxlength="TITLE_MAX_LENGTH"
+          required
           :invalid="showTitleError"
+          :aria-invalid="showTitleError"
           :aria-describedby="showTitleError ? 'board-title-error' : undefined"
         />
         <Message
@@ -47,15 +49,6 @@
         />
       </div>
 
-      <Message
-        v-if="saveFailed"
-        data-testid="board-save-error"
-        severity="error"
-        :closable="false"
-      >
-        We couldn't save the board. Try again.
-      </Message>
-
       <div class="flex justify-end gap-2">
         <Button
           type="button"
@@ -70,6 +63,7 @@
           data-testid="board-save-button"
           :label="isEditing ? 'Save' : 'Create'"
           :loading="isSaving"
+          :disabled="isSaving || showTitleError"
         />
       </div>
     </form>
@@ -100,14 +94,13 @@ const visible = defineModel<boolean>('visible', {required: true});
 
 const title = ref('');
 const description = ref('');
-const wasSubmitted = ref(false);
 const isSaving = ref(false);
-const saveFailed = ref(false);
+const notify = useNotifications();
 
 const isEditing = computed(() => props.board !== null);
 const trimmedTitle = computed(() => title.value.trim());
 const showTitleError = computed(
-  () => wasSubmitted.value && trimmedTitle.value === '',
+  () => trimmedTitle.value === '',
 );
 
 // Start from a clean form every time the dialog opens, so values and errors
@@ -118,12 +111,9 @@ watch(visible, isOpen => {
   }
   title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
-  wasSubmitted.value = false;
-  saveFailed.value = false;
-});
+}, {immediate: true});
 
 async function save(): Promise<void> {
-  wasSubmitted.value = true;
   if (trimmedTitle.value === '' || isSaving.value) {
     return;
   }
@@ -135,16 +125,16 @@ async function save(): Promise<void> {
   };
 
   isSaving.value = true;
-  saveFailed.value = false;
   try {
     const saved =
       props.board !== null
         ? await kanbanApi.updateBoard(props.board.id, payload)
         : await kanbanApi.createBoard(payload);
+    notify.success(props.board ? 'Board updated.' : 'Board created.');
     emit('saved', saved);
     visible.value = false;
-  } catch {
-    saveFailed.value = true;
+  } catch (error) {
+    notify.error(error, 'Unable to save board');
   } finally {
     isSaving.value = false;
   }

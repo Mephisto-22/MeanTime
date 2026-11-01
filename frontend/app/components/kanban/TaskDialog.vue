@@ -16,10 +16,17 @@
           v-model="title"
           data-testid="task-title-input"
           autofocus
+          required
+          :class="isSaveDisabled ? '!border-red-500 dark:!border-red-400' : ''"
+          maxlength="200"
+          :invalid="isSaveDisabled"
+          :aria-invalid="isSaveDisabled"
+          :aria-describedby="isSaveDisabled ? 'task-title-error' : undefined"
           fluid
           placeholder="Task title..."
           class="text-xl font-bold tracking-tight border-0 border-b border-surface-200/90 rounded-none px-0 py-2 focus:ring-0 focus:border-primary-500 dark:border-surface-700 bg-transparent placeholder-surface-400"
         />
+        <small v-if="isSaveDisabled" id="task-title-error" class="text-red-600 dark:text-red-400">Enter a title for the task.</small>
       </div>
 
       <!-- Properties Section: Left (Stacked Dropdowns) & Right (Static Add Tag + Flowing Attached Tags + In-Layout Suggestions) -->
@@ -433,8 +440,8 @@ const addTagFromInput = async () => {
           tagInputText.value = ''
           return
         }
-      } catch (err) {
-        console.warn('Failed to create tag via context:', err)
+      } catch {
+        // The board reports the failed request through the shared toast host.
         return
       }
     }

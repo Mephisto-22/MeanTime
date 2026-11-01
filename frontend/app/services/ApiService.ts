@@ -1,3 +1,5 @@
+import { getErrorMessage } from '~/utils/errors'
+
 /**
  * ApiService provides a centralized HTTP client wrapper around Nuxt's $fetch.
  * It encapsulates standard HTTP methods (GET, POST, PUT, DELETE), manages headers,
@@ -83,12 +85,9 @@ export class ApiService {
         }
       }
     } catch (err: any) {
-      const statusCode = err.statusCode || err.response?.status || 500
+      const statusCode = err.statusCode || err.response?.status
       const errorData = err.data || err.response?._data
-      const message =
-        (typeof errorData === 'object' && (errorData?.detail || errorData?.message)) ||
-        err.message ||
-        'An unexpected API error occurred.'
+      const message = getErrorMessage({ statusCode, data: errorData, message: err.message }, 'Unable to reach the server. Please try again.')
 
       throw new ApiError(message, statusCode, errorData)
     }

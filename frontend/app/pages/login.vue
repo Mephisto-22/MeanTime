@@ -3,12 +3,8 @@
     <Card>
       <template #title><h2 class="text-2xl font-bold">Log in</h2></template>
       <template #content>
-        <p v-if="route.query.registered === '1'" role="status" class="mb-4">
-          Account created. Please log in.
-        </p>
         <LoginForm :loading="loading" @submit="login" />
         <GoogleSignInButton class="mt-4" />
-        <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
         <NuxtLink to="/forgot-password" class="mt-4 block text-primary underline">Forgot your password?</NuxtLink>
         <p class="mt-4">
           Need an account?
@@ -37,15 +33,17 @@ const googleErrors: Record<string, string> = {
 const authStore = useAuthStore()
 const route = useRoute()
 const loading = ref(false)
+const notify = useNotifications()
 const oauthError = route.query.oauth_error
-const error = ref(typeof oauthError === 'string'
-  ? googleErrors[oauthError] ?? 'Google sign-in failed. Please try again.'
-  : '')
+onMounted(async () => {
+  // Let the client-only toast host mount before announcing a redirect error.
+  await nextTick()
+  if (typeof oauthError === 'string') notify.error(new Error(googleErrors[oauthError] ?? 'Google sign-in failed. Please try again.'), 'Unable to sign in with Google')
+})
 
 async function login(credentials: LoginRequest) {
   if (loading.value) return
   loading.value = true
-  error.value = ''
   try {
     await authStore.login(credentials)
     const redirect = route.query.redirect
@@ -55,7 +53,7 @@ async function login(credentials: LoginRequest) {
       !/^\/(login|register)(?:[/?#]|$)/.test(redirect) ? redirect : '/'
     await navigateTo(destination)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Unable to log in. Please try again.'
+    notify.error(err, 'Unable to log in')
   } finally {
     loading.value = false
   }

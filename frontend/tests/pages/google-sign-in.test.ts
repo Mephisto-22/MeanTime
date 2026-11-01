@@ -1,6 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { useNuxtApp, useRouter } from '#app'
+import ToastEventBus from 'primevue/toasteventbus'
 import type { Pinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '~/api/auth'
@@ -78,18 +79,19 @@ describe('Google sign-in errors on the login page', () => {
   })
 
   it('explains an email that already has an account', async () => {
+    const toast = vi.spyOn(ToastEventBus, 'emit')
     const wrapper = await mount(Login, '/login?oauth_error=email_in_use')
-    expect(wrapper.get('[role="alert"]').text()).toBe(
-      'An account with this email already exists. Log in with your email and password.',
-    )
+    expect(toast).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'An account with this email already exists. Log in with your email and password.' }))
   })
 
   it('shows a general message for reasons it doesn\'t know', async () => {
+    const toast = vi.spyOn(ToastEventBus, 'emit')
     const wrapper = await mount(Login, '/login?oauth_error=failed')
-    expect(wrapper.get('[role="alert"]').text()).toBe('Google sign-in failed. Please try again.')
+    expect(toast).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Google sign-in failed. Please try again.' }))
   })
 
   it('shows no error without one', async () => {
+    const toast = vi.spyOn(ToastEventBus, 'emit')
     const wrapper = await mount(Login, '/login')
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
   })
