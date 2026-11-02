@@ -21,7 +21,6 @@
               class="w-full pr-10"
               data-testid="user-search-input"
               :disabled="isSearching"
-              @keydown.enter.prevent="handleSearch"
             />
             <button
               v-if="searchQuery.length > 0"
@@ -43,7 +42,6 @@
             :loading="isSearching"
             :disabled="!searchQuery.trim() || isSearching"
             class="shrink-0"
-            @click="handleSearch"
           />
         </form>
       </div>
@@ -153,7 +151,7 @@
                 icon="pi pi-user-plus"
                 size="small"
                 :data-testid="'send-request-button-' + user.id"
-                @click="emit('send-request', user.id)"
+                @click="handleSendRequest(user.id)"
               />
               <Button
                 label="Block User"
@@ -200,7 +198,7 @@
                 size="small"
                 icon="pi pi-check"
                 :data-testid="'accept-request-button-' + user.id"
-                @click="emit('accept-request', user.id)"
+                @click="handleAcceptRequest(user.id)"
               />
               <Button
                 label="Decline"
@@ -209,7 +207,7 @@
                 size="small"
                 icon="pi pi-times"
                 :data-testid="'decline-request-button-' + user.id"
-                @click="emit('decline-request', user.id)"
+                @click="handleDeclineRequest(user.id)"
               />
               <Button
                 label="Block User"
@@ -236,7 +234,7 @@
                 size="small"
                 icon="pi pi-times"
                 :data-testid="'cancel-request-button-' + user.id"
-                @click="emit('cancel-request', user.id)"
+                @click="handleCancelRequest(user.id)"
               />
             </template>
           </div>
@@ -403,6 +401,35 @@ function clearSearch() {
   errorMessage.value = null
 }
 
+function updateStatus(userId: number, status: UserSearchResultOut['relationship_status']) {
+  if (searchResults.value) {
+    const item = searchResults.value.find(u => u.id === userId)
+    if (item) {
+      item.relationship_status = status
+    }
+  }
+}
+
+function handleSendRequest(userId: number) {
+  updateStatus(userId, 'pending_outgoing')
+  emit('send-request', userId)
+}
+
+function handleAcceptRequest(userId: number) {
+  updateStatus(userId, 'friend')
+  emit('accept-request', userId)
+}
+
+function handleDeclineRequest(userId: number) {
+  updateStatus(userId, 'none')
+  emit('decline-request', userId)
+}
+
+function handleCancelRequest(userId: number) {
+  updateStatus(userId, 'none')
+  emit('cancel-request', userId)
+}
+
 function openUnfriendDialog(user: UserSearchResultOut) {
   targetUser.value = user
   isUnfriendDialogOpen.value = true
@@ -415,7 +442,9 @@ function closeUnfriendDialog() {
 
 function confirmUnfriend() {
   if (targetUser.value) {
-    emit('unfriend', targetUser.value.id)
+    const userId = targetUser.value.id
+    updateStatus(userId, 'none')
+    emit('unfriend', userId)
   }
   closeUnfriendDialog()
 }
@@ -432,7 +461,11 @@ function closeBlockDialog() {
 
 function confirmBlock() {
   if (targetUser.value) {
-    emit('block', targetUser.value.id)
+    const userId = targetUser.value.id
+    if (searchResults.value) {
+      searchResults.value = searchResults.value.filter(u => u.id !== userId)
+    }
+    emit('block', userId)
   }
   closeBlockDialog()
 }

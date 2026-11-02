@@ -32,7 +32,6 @@
               text
               severity="secondary"
               size="small"
-              @click="navigateToProfile"
             />
           </template>
         </div>
@@ -71,11 +70,6 @@ const fetchPendingRequests = async () => {
   }
 }
 
-const navigateToProfile = () => {
-  if (authStore.user?.id) {
-    navigateTo(`/users/${authStore.user.id}`)
-  }
-}
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
