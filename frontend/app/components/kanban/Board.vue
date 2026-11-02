@@ -47,6 +47,8 @@ import type {
   TaskDialogSavePayload,
   TagDto,
   TaskPriorityType,
+  TaskTimerDto,
+  TaskTimeEntryDto,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -474,6 +476,119 @@ const handleCreateTag = async (payload: { name: string } | string): Promise<TagD
   }
 }
 
+const findTaskById = (taskId: string | number): KanbanTaskDto | undefined => {
+  for (const col of localColumns.value) {
+    const t = col.tasks.find(task => sameId(task.id, taskId))
+    if (t) return t
+  }
+  return undefined
+}
+
+const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task) return
+
+  const nowIso = new Date().toISOString()
+  const updatedTimer: TaskTimerDto = {
+    taskId,
+    mode: defaultTimer?.mode || task.timer?.mode || 'COUNT_DOWN',
+    targetDurationSeconds: defaultTimer?.targetDurationSeconds ?? task.timer?.targetDurationSeconds ?? 1500,
+    state: 'RUNNING',
+    startedAt: nowIso,
+    elapsedSeconds: task.timer?.elapsedSeconds || 0,
+  }
+
+  task.timer = { ...updatedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, updatedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to start timer')
+  }
+}
+
+const handlePauseTimer = async (taskId: string | number): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+
+  const currentTimer = task.timer
+  let accumulated = currentTimer.elapsedSeconds || 0
+  if (currentTimer.state === 'RUNNING' && currentTimer.startedAt) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(currentTimer.startedAt).getTime()) / 1000))
+    accumulated += delta
+  }
+
+  const pausedTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'PAUSED',
+    startedAt: null,
+    elapsedSeconds: accumulated,
+  }
+
+  task.timer = { ...pausedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, pausedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to pause timer')
+  }
+}
+
+const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+
+  const currentTimer = task.timer
+  let totalElapsed = currentTimer.elapsedSeconds || 0
+  if (currentTimer.state === 'RUNNING' && currentTimer.startedAt) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(currentTimer.startedAt).getTime()) / 1000))
+    totalElapsed += delta
+  }
+
+  const idleTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'IDLE',
+    startedAt: null,
+    elapsedSeconds: totalElapsed,
+  }
+
+  task.timer = {
+    ...idleTimer,
+    elapsedSeconds: 0,
+  }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, idleTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to stop timer')
+  }
+}
+
+const handleTimerExpired = (task: KanbanTaskDto, entry: TaskTimeEntryDto): void => {
+  notify.success(`Focus session completed for "${task.title}"!`)
+}
+
 provide(kanbanContextKey, {
   columns: columnRegistry,
   availableTags: computed(() => availableTags.value),
@@ -484,6 +599,10 @@ provide(kanbanContextKey, {
   createTask: handleCreateTask,
   updateTask: handleUpdateTask,
   deleteTask: handleDeleteTask,
+  startTimer: handleStartTimer,
+  pauseTimer: handlePauseTimer,
+  stopTimer: handleStopTimer,
+  onTimerExpired: handleTimerExpired,
 })
 
 defineExpose({
@@ -503,5 +622,9 @@ defineExpose({
   handleUpdateTask,
   handleDeleteTask,
   handleSaveTask,
+  handleStartTimer,
+  handlePauseTimer,
+  handleStopTimer,
+  handleTimerExpired,
 })
 </script>
