@@ -12,7 +12,7 @@ export type RelationshipStatus = 'none' | 'friend' | 'pending_incoming' | 'pendi
 
 export interface UserSearchResultOut {
   id: number
-  email: string
+  email?: string | null
   display_name: string
   timezone: string
   relationship_status: RelationshipStatus

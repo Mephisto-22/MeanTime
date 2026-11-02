@@ -1,6 +1,5 @@
 <template>
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-    <Toast />
 
     <!-- Top-Left Navigation Back to Boards -->
     <div class="mb-6">
@@ -109,6 +108,7 @@
 
         <TabPanel value="search">
           <UserSearch
+            ref="userSearchRef"
             @send-request="handleSendRequest"
             @accept-request="handleAccept"
             @decline-request="handleDecline"
@@ -140,7 +140,6 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Badge from 'primevue/badge'
-import Toast from 'primevue/toast'
 import FriendsList from '~/components/friends/FriendsList.vue'
 import FriendRequestsList from '~/components/friends/FriendRequestsList.vue'
 import UserSearch from '~/components/friends/UserSearch.vue'
@@ -152,6 +151,7 @@ import {
 } from '~/api/friends'
 
 const toast = useToast()
+const userSearchRef = ref<InstanceType<typeof UserSearch> | null>(null)
 
 const loading = ref(true)
 const friends = ref<UserOut[]>([])
@@ -187,6 +187,7 @@ async function loadData() {
 async function handleUnfriend(userId: number) {
   try {
     await friendsApi.unfriend(userId)
+    userSearchRef.value?.updateStatus(userId, 'none')
     friends.value = friends.value.filter((f) => f.id !== userId)
     toast.add({
       severity: 'success',
@@ -213,6 +214,7 @@ async function handleBlock(userId: number) {
       outgoingRequests.value.find((r) => r.user.id === userId)?.user
 
     await friendsApi.blockUser(userId)
+    userSearchRef.value?.removeUser(userId)
 
     friends.value = friends.value.filter((f) => f.id !== userId)
     incomingRequests.value = incomingRequests.value.filter((r) => r.user.id !== userId)
@@ -250,6 +252,7 @@ async function handleAccept(userId: number) {
   try {
     const existingReq = incomingRequests.value.find((r) => r.user.id === userId)
     await friendsApi.acceptRequest(userId)
+    userSearchRef.value?.updateStatus(userId, 'friend')
     incomingRequests.value = incomingRequests.value.filter((r) => r.user.id !== userId)
 
     if (existingReq?.user) {
@@ -285,6 +288,7 @@ async function handleAccept(userId: number) {
 async function handleDecline(userId: number) {
   try {
     await friendsApi.declineRequest(userId)
+    userSearchRef.value?.updateStatus(userId, 'none')
     incomingRequests.value = incomingRequests.value.filter((r) => r.user.id !== userId)
     toast.add({
       severity: 'success',
@@ -306,6 +310,7 @@ async function handleDecline(userId: number) {
 async function handleCancel(userId: number) {
   try {
     await friendsApi.cancelRequest(userId)
+    userSearchRef.value?.updateStatus(userId, 'none')
     outgoingRequests.value = outgoingRequests.value.filter((r) => r.user.id !== userId)
     toast.add({
       severity: 'success',
@@ -348,6 +353,7 @@ async function handleUnblock(userId: number) {
 async function handleSendRequest(userId: number) {
   try {
     const newReq = await friendsApi.sendRequest(userId)
+    userSearchRef.value?.updateStatus(userId, 'pending_outgoing')
     if (newReq && !outgoingRequests.value.some((r) => r.id === newReq.id)) {
       outgoingRequests.value.push(newReq)
     }

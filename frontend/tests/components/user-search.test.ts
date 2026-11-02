@@ -208,7 +208,7 @@ describe('UserSearch Component Suite', () => {
   })
 
   describe('Relationship status controls and action emits', () => {
-    it('handles relationship_status === "none": shows Send Friend Request and Block User buttons and reactively updates status to pending_outgoing on send', async () => {
+    it('handles relationship_status === "none": emits send-request without optimistically changing status, updates status when updateStatus is called', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[0]]) // Alice: status none
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -229,7 +229,12 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('send-request')).toBeTruthy()
       expect(wrapper.emitted('send-request')![0]).toEqual([1])
 
-      // Reactive update: status is now pending_outgoing
+      // Not optimistic: status remains none until parent calls updateStatus
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="send-request-button-1"]').exists()).toBe(true)
+
+      // When parent successfully completes API call and calls updateStatus:
+      wrapper.vm.updateStatus(1, 'pending_outgoing')
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid="send-request-button-1"]').exists()).toBe(false)
       const requestSentTag = wrapper.find('[data-testid="request-sent-tag-1"]')
@@ -238,7 +243,7 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.find('[data-testid="cancel-request-button-1"]').exists()).toBe(true)
     })
 
-    it('handles relationship_status === "friend": shows Friends tag and Unfriend button and reactively updates status to none on confirmed unfriend', async () => {
+    it('handles relationship_status === "friend": shows Friends tag and Unfriend button and updates status to none when updateStatus is called', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[1]]) // Bob: status friend
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -267,21 +272,26 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('unfriend')).toBeFalsy()
       expect(wrapper.find('[data-testid="friend-tag-2"]').exists()).toBe(true)
 
-      // Confirm emits unfriend with userId and updates status reactively to none
+      // Confirm emits unfriend with userId without optimistically mutating status
       await unfriendBtn.trigger('click')
       await wrapper.find('[data-testid="confirm-unfriend-button"]').trigger('click')
       expect(wrapper.emitted('unfriend')).toBeTruthy()
       expect(wrapper.emitted('unfriend')![0]).toEqual([2])
       expect(wrapper.find('[data-testid="unfriend-confirm-dialog"]').exists()).toBe(false)
 
-      // Reactive update: status is now none
+      // Status remains friend until parent confirms success
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="friend-tag-2"]').exists()).toBe(true)
+
+      // When parent calls updateStatus:
+      wrapper.vm.updateStatus(2, 'none')
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid="friend-tag-2"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="unfriend-button-2"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="send-request-button-2"]').exists()).toBe(true)
     })
 
-    it('handles relationship_status === "pending_incoming": shows Accept and Decline buttons and reactively updates status to friend on accept', async () => {
+    it('handles relationship_status === "pending_incoming": shows Accept and Decline buttons and updates status when updateStatus is called', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[2]]) // Charlie: pending_incoming
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -302,7 +312,12 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('accept-request')).toBeTruthy()
       expect(wrapper.emitted('accept-request')![0]).toEqual([3])
 
-      // Reactive update: status is now friend
+      // Not optimistic: buttons remain until parent updates
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="accept-request-button-3"]').exists()).toBe(true)
+
+      // When parent updates status to friend
+      wrapper.vm.updateStatus(3, 'friend')
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid="accept-request-button-3"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="decline-request-button-3"]').exists()).toBe(false)
@@ -312,7 +327,7 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.find('[data-testid="unfriend-button-3"]').exists()).toBe(true)
     })
 
-    it('handles relationship_status === "pending_incoming": reactively updates status to none on decline', async () => {
+    it('handles relationship_status === "pending_incoming": updates status to none when decline updateStatus is called', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[2]]) // Charlie: pending_incoming
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -328,14 +343,19 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('decline-request')).toBeTruthy()
       expect(wrapper.emitted('decline-request')![0]).toEqual([3])
 
-      // Reactive update: status is now none
+      // Not optimistic
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="decline-request-button-3"]').exists()).toBe(true)
+
+      // When parent updates status to none
+      wrapper.vm.updateStatus(3, 'none')
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid="accept-request-button-3"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="decline-request-button-3"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="send-request-button-3"]').exists()).toBe(true)
     })
 
-    it('handles relationship_status === "pending_outgoing": shows Request Sent tag and Cancel Request button and reactively updates status to none on cancel', async () => {
+    it('handles relationship_status === "pending_outgoing": shows Request Sent tag and Cancel Request button and updates status on updateStatus', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[3]]) // David: pending_outgoing
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -356,14 +376,19 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('cancel-request')).toBeTruthy()
       expect(wrapper.emitted('cancel-request')![0]).toEqual([4])
 
-      // Reactive update: status is now none
+      // Not optimistic
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="request-sent-tag-4"]').exists()).toBe(true)
+
+      // When parent updates status to none
+      wrapper.vm.updateStatus(4, 'none')
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid="request-sent-tag-4"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="cancel-request-button-4"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="send-request-button-4"]').exists()).toBe(true)
     })
 
-    it('handles block flow: opens block confirmation dialog, emits block on confirmation, and removes user from results reactively', async () => {
+    it('handles block flow: opens block confirmation dialog, emits block on confirmation, and removes user only when removeUser is called', async () => {
       vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([getMockResults()[0]]) // Alice: status none
       const wrapper = mountUserSearch()
       const searchInput = wrapper.find('[data-testid="user-search-input"]')
@@ -386,17 +411,58 @@ describe('UserSearch Component Suite', () => {
       expect(wrapper.emitted('block')).toBeFalsy()
       expect(wrapper.findAll('[data-testid="search-result-card"]').length).toBe(1)
 
-      // Confirm emits block with userId and removes user card from results
+      // Confirm emits block with userId without removing immediately
       await blockBtn.trigger('click')
       await wrapper.find('[data-testid="confirm-block-button"]').trigger('click')
       expect(wrapper.emitted('block')).toBeTruthy()
       expect(wrapper.emitted('block')![0]).toEqual([1])
       expect(wrapper.find('[data-testid="block-confirm-dialog"]').exists()).toBe(false)
 
-      // Reactive update: card removed, empty state shown
+      // Card still exists before removeUser
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid-user="1"]').exists()).toBe(true)
+
+      // When parent calls removeUser on success:
+      wrapper.vm.removeUser(1)
       await wrapper.vm.$nextTick()
       expect(wrapper.find('[data-testid-user="1"]').exists()).toBe(false)
       expect(wrapper.findAll('[data-testid="search-result-card"]').length).toBe(0)
+    })
+
+    it('only renders email when email is provided in search results', async () => {
+      vi.spyOn(friendsApi, 'searchUser').mockResolvedValue([
+        {
+          id: 10,
+          display_name: 'No Email User',
+          email: null,
+          timezone: 'UTC',
+          relationship_status: 'none',
+        },
+        {
+          id: 11,
+          display_name: 'Has Email User',
+          email: 'hasemail@example.com',
+          timezone: 'UTC',
+          relationship_status: 'none',
+        },
+      ])
+      const wrapper = mountUserSearch()
+      const searchInput = wrapper.find('[data-testid="user-search-input"]')
+
+      await searchInput.setValue('user')
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      const cards = wrapper.findAll('[data-testid="search-result-card"]')
+      expect(cards.length).toBe(2)
+
+      // User 10 has no email
+      expect(cards[0].find('[data-testid="user-email"]').exists()).toBe(false)
+      expect(cards[0].find('[data-testid="user-avatar"]').text()).toBe('NU')
+
+      // User 11 has email
+      expect(cards[1].find('[data-testid="user-email"]').exists()).toBe(true)
+      expect(cards[1].find('[data-testid="user-email"]').text()).toBe('hasemail@example.com')
     })
   })
 

@@ -161,7 +161,7 @@ class UserSearchResultOut(Schema):
     """User profile returned by exact search with relationship state."""
 
     id: int
-    email: str
+    email: str | None = None
     display_name: str
     timezone: str
     relationship_status: Literal["none", "friend", "pending_incoming", "pending_outgoing"]

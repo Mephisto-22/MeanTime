@@ -478,8 +478,15 @@ describe('Friends Page (/friends)', () => {
     })
   })
 
-  describe('UserSearch Tab Event Forwarding', () => {
-    it('handles send-request from UserSearch: calls sendRequest, adds to outgoing requests, triggers toast', async () => {
+  describe('Global Toast Configuration', () => {
+    it('does not render a local Toast component to prevent duplicate toasts', async () => {
+      const wrapper = await mountPage()
+      expect(wrapper.findComponent({ name: 'Toast' }).exists()).toBe(false)
+    })
+  })
+
+  describe('UserSearch Tab Event Forwarding and Ref Synchronization', () => {
+    it('handles send-request from UserSearch: calls sendRequest, updates search card status, adds to outgoing requests, triggers toast', async () => {
       const newRequest: FriendRequestOut = {
         id: 103,
         user: {
@@ -495,6 +502,7 @@ describe('Friends Page (/friends)', () => {
       const wrapper = await mountPage()
 
       const userSearch = wrapper.findComponent(UserSearch)
+      const updateStatusSpy = vi.spyOn((wrapper.vm as any).userSearchRef, 'updateStatus')
       const requestsList = wrapper.findComponent(FriendRequestsList)
 
       expect(requestsList.props('outgoing').length).toBe(1)
@@ -503,6 +511,7 @@ describe('Friends Page (/friends)', () => {
       await flushPromises()
 
       expect(sendSpy).toHaveBeenCalledWith(6)
+      expect(updateStatusSpy).toHaveBeenCalledWith(6, 'pending_outgoing')
       expect(requestsList.props('outgoing')).toContainEqual(newRequest)
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -511,14 +520,17 @@ describe('Friends Page (/friends)', () => {
       )
     })
 
-    it('shows error toast when sendRequest from UserSearch fails', async () => {
+    it('shows error toast and does not update search card status when sendRequest fails', async () => {
       vi.spyOn(friendsApi, 'sendRequest').mockRejectedValue(new Error('Failed to send request'))
       const wrapper = await mountPage()
 
       const userSearch = wrapper.findComponent(UserSearch)
+      const updateStatusSpy = vi.spyOn((wrapper.vm as any).userSearchRef, 'updateStatus')
+
       await userSearch.vm.$emit('send-request', 6)
       await flushPromises()
 
+      expect(updateStatusSpy).not.toHaveBeenCalled()
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'error',

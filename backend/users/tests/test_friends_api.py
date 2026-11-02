@@ -34,6 +34,7 @@ class UserSearchAPITests(TestCase):
         data = response.json()
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["id"], self.target.id)
+        self.assertEqual(data[0]["email"], self.target.email)
         self.assertEqual(data[0]["relationship_status"], "none")
 
     def test_search_exact_match_display_name_case_insensitive(self):
@@ -42,6 +43,7 @@ class UserSearchAPITests(TestCase):
         data = response.json()
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["id"], self.target.id)
+        self.assertIsNone(data[0]["email"])
 
     def test_search_partial_query_returns_empty(self):
         response = self.client.get(f"{self.search_url}?q=alice", **self.auth_headers)

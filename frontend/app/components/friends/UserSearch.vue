@@ -113,7 +113,7 @@
           <!-- User Details -->
           <div class="flex items-center gap-3">
             <Avatar
-              :label="getInitials(user.display_name, user.email)"
+              :label="getInitials(user.display_name, user.email || undefined)"
               shape="circle"
               size="large"
               data-testid="user-avatar"
@@ -127,6 +127,7 @@
                 {{ user.display_name }}
               </span>
               <span
+                v-if="user.email"
                 data-testid="user-email"
                 class="text-xs text-surface-500 dark:text-surface-400"
               >
@@ -414,23 +415,25 @@ function updateStatus(userId: number, status: UserSearchResultOut['relationship_
   }
 }
 
+function removeUser(userId: number) {
+  if (searchResults.value) {
+    searchResults.value = searchResults.value.filter(u => u.id !== userId)
+  }
+}
+
 function handleSendRequest(userId: number) {
-  updateStatus(userId, 'pending_outgoing')
   emit('send-request', userId)
 }
 
 function handleAcceptRequest(userId: number) {
-  updateStatus(userId, 'friend')
   emit('accept-request', userId)
 }
 
 function handleDeclineRequest(userId: number) {
-  updateStatus(userId, 'none')
   emit('decline-request', userId)
 }
 
 function handleCancelRequest(userId: number) {
-  updateStatus(userId, 'none')
   emit('cancel-request', userId)
 }
 
@@ -447,7 +450,6 @@ function closeUnfriendDialog() {
 function confirmUnfriend() {
   if (targetUser.value) {
     const userId = targetUser.value.id
-    updateStatus(userId, 'none')
     emit('unfriend', userId)
   }
   closeUnfriendDialog()
@@ -466,11 +468,13 @@ function closeBlockDialog() {
 function confirmBlock() {
   if (targetUser.value) {
     const userId = targetUser.value.id
-    if (searchResults.value) {
-      searchResults.value = searchResults.value.filter(u => u.id !== userId)
-    }
     emit('block', userId)
   }
   closeBlockDialog()
 }
+
+defineExpose({
+  updateStatus,
+  removeUser,
+})
 </script>

@@ -356,9 +356,10 @@ def search_users(request, q: str = ""):
             elif friendship.status == FriendshipStatus.PENDING:
                 rel_status = "pending_outgoing" if friendship.requester_id == user.id else "pending_incoming"
 
+        matched_email = match.email if match.email.lower() == query.lower() else None
         results.append({
             "id": match.id,
-            "email": match.email,
+            "email": matched_email,
             "display_name": match.display_name,
             "timezone": match.timezone,
             "relationship_status": rel_status,
