@@ -75,19 +75,50 @@
           </div>
         </div>
       </div>
+
+      <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
+      <TaskTimerDock
+        :task-id="task.id"
+        :timer="task.timer"
+        @start="handleTimerStart"
+        @pause="handleTimerPause"
+        @stop="handleTimerStop"
+      />
     </template>
   </Card>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { KanbanTaskDto } from '~/api/kanban'
+import { computed, inject } from 'vue'
+import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
+import { kanbanContextKey } from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
+import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
 const props = defineProps<{
   task: KanbanTaskDto
   onOpenEdit?: (task: KanbanTaskDto) => void
+  onTimerStart?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
+  onTimerPause?: (taskId: string | number) => void
+  onTimerStop?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
 }>()
+
+const kanbanContext = inject(kanbanContextKey, null)
+
+const handleTimerStart = (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => {
+  if (props.onTimerStart) props.onTimerStart(taskId, defaultTimer)
+  else if (kanbanContext?.startTimer) kanbanContext.startTimer(taskId, defaultTimer)
+}
+
+const handleTimerPause = (taskId: string | number) => {
+  if (props.onTimerPause) props.onTimerPause(taskId)
+  else if (kanbanContext?.pauseTimer) kanbanContext.pauseTimer(taskId)
+}
+
+const handleTimerStop = (taskId: string | number, entry?: TaskTimeEntryDto) => {
+  if (props.onTimerStop) props.onTimerStop(taskId, entry)
+  else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId)
+}
 
 const {
   isDragging,
@@ -184,5 +215,8 @@ defineExpose({
   hasDescription,
   visibleTags,
   overflowTagCount,
+  handleTimerStart,
+  handleTimerPause,
+  handleTimerStop,
 })
 </script>
