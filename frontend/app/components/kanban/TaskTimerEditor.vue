@@ -1,524 +1,550 @@
 <template>
-  <div
+  <Card
     data-testid="task-timer-editor"
-    class="flex flex-col gap-4 rounded-xl border border-surface-200 bg-surface-0 p-4 dark:border-surface-800 dark:bg-surface-900 shadow-xs transition-all"
+    class="border border-surface-200 dark:border-surface-800 shadow-xs"
+    :pt="{ body: 'p-4 flex flex-col gap-4', content: 'p-0 flex flex-col gap-4' }"
   >
-    <!-- Section Header with Mode Dropdown & Status -->
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200/80 pb-3 dark:border-surface-800">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-hourglass text-amber-500 text-sm" />
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-600 dark:text-surface-300">
-          Focus & Work Journal
-        </h3>
-        <span
-          v-if="isRunning"
-          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold"
-          :class="TIMER_STATE_CONFIG.RUNNING.badgeClass"
-        >
-          <span class="h-1.5 w-1.5 rounded-full" :class="TIMER_STATE_CONFIG.RUNNING.dotClass" />
-          {{ TIMER_STATE_CONFIG.RUNNING.label }}
-        </span>
-        <span
-          v-else-if="isPaused"
-          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold"
-          :class="TIMER_STATE_CONFIG.PAUSED.badgeClass"
-        >
-          <i class="pi pi-pause text-[8px]" />
-          {{ TIMER_STATE_CONFIG.PAUSED.label }}
-        </span>
-      </div>
-
-      <!-- Mode Selector: Clean Select Dropdown -->
-      <div class="flex items-center gap-2">
-        <label for="timer-mode-select" class="text-xs text-surface-500">Mode:</label>
-        <Select
-          id="timer-mode-select"
-          v-model="localTimer.mode"
-          :options="modeOptions"
-          option-label="label"
-          option-value="value"
-          size="small"
-          :disabled="isRunning || isPaused"
-          class="!text-xs !w-44"
-          data-testid="timer-mode-select"
-          @change="onModeChange"
-        />
-      </div>
-    </div>
-
-    <!-- Asymmetric 2-Column Split: Left Focus Desk (42%) & Right Activity Chronicle (58%) -->
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
-      <!-- Left Column: Active Focus Instrument (5 cols / ~42%) -->
-      <div class="flex flex-col gap-3 md:col-span-5 md:pr-4 md:border-r md:border-surface-200 dark:md:border-surface-800">
-        <div class="flex items-center justify-between text-xs font-medium text-surface-500">
-          <span>Active Instrument</span>
-          <span v-if="localTimer.mode !== 'NONE'" class="text-[11px] text-surface-400">
-            {{ localTimer.mode === 'COUNT_DOWN' ? 'Countdown Block' : 'Stopwatch' }}
-          </span>
+    <template #content>
+      <!-- Section Header with Mode Dropdown & Status -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200/80 pb-3 dark:border-surface-800">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-hourglass text-amber-500 text-sm" />
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-600 dark:text-surface-300">
+            Focus & Work Journal
+          </h3>
+          <Tag
+            v-if="isRunning"
+            :class="TIMER_STATE_CONFIG.RUNNING.badgeClass"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold"
+          >
+            <span class="h-1.5 w-1.5 rounded-full" :class="TIMER_STATE_CONFIG.RUNNING.dotClass" />
+            {{ TIMER_STATE_CONFIG.RUNNING.label }}
+          </Tag>
+          <Tag
+            v-else-if="isPaused"
+            :class="TIMER_STATE_CONFIG.PAUSED.badgeClass"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold"
+          >
+            <i class="pi pi-pause text-[8px]" />
+            {{ TIMER_STATE_CONFIG.PAUSED.label }}
+          </Tag>
         </div>
 
-        <!-- If Mode is NONE: Clean Callout to Enable -->
-        <div
-          v-if="localTimer.mode === 'NONE'"
-          class="flex flex-col items-center justify-center p-6 text-center rounded-lg border border-dashed border-surface-200 dark:border-surface-800 text-surface-400 text-xs gap-2"
-        >
-          <i class="pi pi-clock text-lg opacity-40" />
-          <span>Timer disabled for this task.</span>
-          <Button
-            label="Enable Countdown (25m)"
+        <!-- Mode Selector: Clean Select Dropdown -->
+        <div class="flex items-center gap-2">
+          <Label for="timer-mode-select" class="text-xs text-surface-500">Mode:</Label>
+          <Select
+            id="timer-mode-select"
+            v-model="localTimer.mode"
+            :options="modeOptions"
+            option-label="label"
+            option-value="value"
             size="small"
-            text
-            class="!text-xs"
-            @click="setMode('COUNT_DOWN')"
+            :disabled="isRunning || isPaused"
+            class="!text-xs !w-44"
+            data-testid="timer-mode-select"
+            @change="onModeChange"
           />
         </div>
+      </div>
 
-        <!-- Active Focus Stage -->
-        <template v-else>
-          <!-- Countdown Duration Config: Presets + Custom Target Input -->
-          <div v-if="localTimer.mode === 'COUNT_DOWN'" class="flex flex-col gap-2">
-            <div class="flex items-center justify-between text-[11px] text-surface-600 dark:text-surface-400">
-              <span class="font-medium">Target duration:</span>
-              <span class="font-bold text-surface-900 dark:text-surface-100 font-mono">{{ targetMinutes }} min</span>
-            </div>
-
-            <!-- Quick-Pick Presets -->
-            <div class="flex items-center gap-1.5">
-              <Button
-                v-for="p in [15, 25, 45, 60]"
-                :key="p"
-                type="button"
-                :label="`${p}m`"
-                size="small"
-                :severity="targetMinutes === p ? 'primary' : 'secondary'"
-                :outlined="targetMinutes !== p"
-                :disabled="isRunning || isPaused"
-                class="!text-xs !py-1 !px-2 flex-1 cursor-pointer"
-                :data-testid="`timer-preset-${p}`"
-                @click="setPresetMinutes(p)"
-              />
-            </div>
+      <!-- Asymmetric 2-Column Split: Left Focus Desk (42%) & Right Activity Chronicle (58%) -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+        <!-- Left Column: Active Focus Instrument (5 cols / ~42%) -->
+        <div class="flex flex-col gap-3 md:col-span-5 md:pr-4 md:border-r md:border-surface-200 dark:md:border-surface-800">
+          <div class="flex items-center justify-between text-xs font-medium text-surface-500">
+            <Label class="text-xs font-medium text-surface-500">Active Instrument</Label>
+            <span v-if="localTimer.mode !== 'NONE'" class="text-[11px] text-surface-400">
+              {{ localTimer.mode === 'COUNT_DOWN' ? 'Countdown Block' : 'Stopwatch' }}
+            </span>
           </div>
 
-          <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
-          <div
-            class="group relative flex flex-col items-center justify-center p-4 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200/80 dark:border-surface-700/60 text-center gap-1 transition-all"
-            :class="{ 'ring-2 ring-primary-500/50 bg-primary-50/20 dark:bg-primary-950/20': isEditingTarget }"
+          <!-- If Mode is NONE: Clean Callout to Enable -->
+          <Card
+            v-if="localTimer.mode === 'NONE'"
+            class="border border-dashed border-surface-200 dark:border-surface-800 text-surface-400 text-xs text-center shadow-none bg-transparent"
+            :pt="{ body: 'p-6 flex flex-col items-center justify-center gap-2', content: 'p-0 flex flex-col items-center gap-2' }"
           >
-            <!-- Header Label / Inline Edit Prompt -->
-            <div class="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-surface-400">
-              <span v-if="isEditingTarget" class="text-primary-600 dark:text-primary-400 flex items-center gap-1">
-                <i class="pi pi-pencil text-[9px]" />
-                Type Target (e.g. 30, 45:00) & Enter
-              </span>
-              <span v-else>
-                {{ isRunning ? 'Remaining Time' : (isPaused ? 'Paused At' : 'Target Interval') }}
-              </span>
-            </div>
-
-            <!-- Readout when NOT editing -->
-            <div
-              v-if="!isEditingTarget"
-              data-testid="timer-digital-readout"
-              class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none transition-transform"
-              :class="{
-                'cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 hover:scale-[1.02]': !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'
-              }"
-              :title="(!isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN') ? 'Double-click to set custom target' : undefined"
-              @dblclick="startEditingTarget"
-            >
-              {{ displayTime }}
-            </div>
-
-            <!-- Inline Input when double-clicked -->
-            <div v-else class="flex items-center justify-center py-0.5">
-              <InputText
-                ref="targetInputRef"
-                v-model="targetInputText"
-                type="text"
-                maxlength="8"
-                class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 !focus:outline-none !w-36 !py-0 !shadow-none"
-                data-testid="timer-inline-target-input"
-                placeholder="25:00"
-                @keydown.enter="commitTargetInput"
-                @keydown.esc="cancelTargetEditing"
-                @blur="commitTargetInput"
+            <template #content>
+              <i class="pi pi-clock text-lg opacity-40" />
+              <span>Timer disabled for this task.</span>
+              <Button
+                label="Enable Countdown (25m)"
+                size="small"
+                text
+                class="!text-xs"
+                @click="setMode('COUNT_DOWN')"
               />
-            </div>
+            </template>
+          </Card>
 
-            <!-- Double-Click Hint (Shown when IDLE in COUNT_DOWN mode) -->
-            <div
-              v-if="!isEditingTarget && !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'"
-              class="text-[10px] text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer select-none"
-              title="Double-click to edit custom target"
-              @click="startEditingTarget"
-            >
-              <i class="pi pi-pencil text-[8px]" />
-              <span>Double-click timer to set time</span>
-            </div>
+          <!-- Active Focus Stage -->
+          <template v-else>
+            <!-- Countdown Duration Config: Presets + Custom Target Input -->
+            <div v-if="localTimer.mode === 'COUNT_DOWN'" class="flex flex-col gap-2">
+              <div class="flex items-center justify-between text-[11px] text-surface-600 dark:text-surface-400">
+                <Label class="font-medium">Target duration:</Label>
+                <Tag
+                  :value="`${targetMinutes} min`"
+                  severity="secondary"
+                  class="font-bold text-surface-900 dark:text-surface-100 font-mono !text-[11px] !py-0.5 !px-2"
+                />
+              </div>
 
-            <!-- Hairline Progress Line -->
-            <div v-if="localTimer.mode === 'COUNT_DOWN'" class="w-full mt-2">
-              <ProgressBar
-                :value="progressPercent"
-                :show-value="false"
-                class="!h-1.5 rounded-full overflow-hidden"
-              />
-              <div class="flex justify-between text-[10px] text-surface-400 mt-1">
-                <span>{{ progressPercent }}% elapsed</span>
-                <span>{{ formatDigital(elapsedSeconds) }}</span>
+              <!-- Quick-Pick Presets -->
+              <div class="flex items-center gap-1.5">
+                <Button
+                  v-for="p in [15, 25, 45, 60]"
+                  :key="p"
+                  type="button"
+                  :label="`${p}m`"
+                  size="small"
+                  :severity="targetMinutes === p ? 'primary' : 'secondary'"
+                  :outlined="targetMinutes !== p"
+                  :disabled="isRunning || isPaused"
+                  class="!text-xs !py-1 !px-2 flex-1 cursor-pointer"
+                  :data-testid="`timer-preset-${p}`"
+                  @click="setPresetMinutes(p)"
+                />
               </div>
             </div>
-          </div>
 
-          <!-- 3 Persistent Rounded-Square Buttons Across the Bottom (Evenly Stretched Full Width) -->
-          <div class="grid grid-cols-3 gap-2 w-full pt-1">
-            <!-- 1. Start / Resume Button (Disabled when RUNNING) -->
-            <Button
-              type="button"
-              severity="primary"
-              :disabled="isRunning"
-              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
-              style="width: 100% !important;"
-              :title="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
-              :aria-label="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
-              data-testid="timer-btn-start"
-              @click="handleStart"
+            <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
+            <Card
+              class="group text-center transition-all border border-surface-200/80 dark:border-surface-700/60 bg-surface-50 dark:bg-surface-800/60 shadow-none"
+              :class="{ 'ring-2 ring-primary-500/50 bg-primary-50/20 dark:bg-primary-950/20': isEditingTarget }"
+              :pt="{ body: 'p-4 flex flex-col items-center justify-center gap-1', content: 'p-0 w-full flex flex-col items-center gap-1' }"
             >
-              <i class="pi pi-play text-base" />
-            </Button>
+              <template #content>
+                <!-- Header Label / Inline Edit Prompt -->
+                <div class="flex items-center justify-center gap-1 text-[10px] uppercase font-bold tracking-wider text-surface-400">
+                  <span v-if="isEditingTarget" class="text-primary-600 dark:text-primary-400 flex items-center gap-1">
+                    <i class="pi pi-pencil text-[9px]" />
+                    Type Target (e.g. 30, 45:00) & Enter
+                  </span>
+                  <span v-else>
+                    {{ isRunning ? 'Remaining Time' : (isPaused ? 'Paused At' : 'Target Interval') }}
+                  </span>
+                </div>
 
-            <!-- 2. Pause Button (Disabled when NOT RUNNING) -->
-            <Button
-              type="button"
-              severity="warn"
-              :disabled="!isRunning"
-              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
-              style="width: 100% !important;"
-              title="Pause Focus Session"
-              aria-label="Pause Focus Session"
-              data-testid="timer-btn-pause"
-              @click="handlePause"
-            >
-              <i class="pi pi-pause text-base" />
-            </Button>
+                <!-- Readout when NOT editing -->
+                <div
+                  v-if="!isEditingTarget"
+                  data-testid="timer-digital-readout"
+                  class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none transition-transform"
+                  :class="{
+                    'cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 hover:scale-[1.02]': !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'
+                  }"
+                  :title="(!isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN') ? 'Double-click to set custom target' : undefined"
+                  @dblclick="startEditingTarget"
+                >
+                  {{ displayTime }}
+                </div>
 
-            <!-- 3. Stop Button (Disabled when IDLE) -->
-            <Button
-              type="button"
-              severity="danger"
-              outlined
-              :disabled="isIdle"
-              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
-              style="width: 100% !important;"
-              title="Stop & Save Session"
-              aria-label="Stop & Save Session"
-              data-testid="timer-btn-stop"
-              @click="handleStop"
-            >
-              <i class="pi pi-stop text-base" />
-            </Button>
-          </div>
-        </template>
-      </div>
+                <!-- Inline Input when double-clicked -->
+                <div v-else class="flex items-center justify-center py-0.5">
+                  <InputText
+                    ref="targetInputRef"
+                    v-model="targetInputText"
+                    type="text"
+                    maxlength="8"
+                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 !focus:outline-none !w-36 !py-0 !shadow-none"
+                    data-testid="timer-inline-target-input"
+                    placeholder="25:00"
+                    @keydown.enter="commitTargetInput"
+                    @keydown.esc="cancelTargetEditing"
+                    @blur="commitTargetInput"
+                  />
+                </div>
 
-      <!-- Right Column: Activity Chronicle & Past Work (7 cols / ~58%) -->
-      <div class="flex flex-col gap-3 md:col-span-7">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 text-xs font-medium text-surface-500">
-            <span>Session Chronicle</span>
-            <span class="font-bold text-surface-700 dark:text-surface-300">
-              ({{ entries.length }})
-            </span>
-            <span v-if="totalDurationSeconds > 0" class="text-xs text-primary-600 dark:text-primary-400 font-semibold">
-              &bull; {{ formatDurationBadge(totalDurationSeconds) }} total
-            </span>
-          </div>
+                <!-- Double-Click Hint (Shown when IDLE in COUNT_DOWN mode) -->
+                <div
+                  v-if="!isEditingTarget && !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'"
+                  class="text-[10px] text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer select-none"
+                  title="Double-click to edit custom target"
+                  @click="startEditingTarget"
+                >
+                  <i class="pi pi-pencil text-[8px]" />
+                  <span>Double-click timer to set time</span>
+                </div>
 
-          <Button
-            type="button"
-            icon="pi pi-plus"
-            :label="isManualLogOpen ? 'Cancel' : 'Log past work'"
-            size="small"
-            text
-            class="!text-xs !py-0.5"
-            data-testid="btn-toggle-log-past-work"
-            @click="toggleManualLog"
-          />
+                <!-- Hairline Progress Line -->
+                <div v-if="localTimer.mode === 'COUNT_DOWN'" class="w-full mt-2">
+                  <ProgressBar
+                    :value="progressPercent"
+                    :show-value="false"
+                    class="!h-1.5 rounded-full overflow-hidden"
+                  />
+                  <div class="flex justify-between text-[10px] text-surface-400 mt-1">
+                    <span>{{ progressPercent }}% elapsed</span>
+                    <span>{{ formatDigital(elapsedSeconds) }}</span>
+                  </div>
+                </div>
+              </template>
+            </Card>
+
+            <!-- 3 Persistent Rounded-Square Buttons Across the Bottom (Evenly Stretched Full Width) -->
+            <div class="grid grid-cols-3 gap-2 w-full pt-1">
+              <!-- 1. Start / Resume Button (Disabled when RUNNING) -->
+              <Button
+                type="button"
+                severity="primary"
+                :disabled="isRunning"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                style="width: 100% !important;"
+                :title="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
+                :aria-label="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
+                data-testid="timer-btn-start"
+                @click="handleStart"
+              >
+                <i class="pi pi-play text-base" />
+              </Button>
+
+              <!-- 2. Pause Button (Disabled when NOT RUNNING) -->
+              <Button
+                type="button"
+                severity="warn"
+                :disabled="!isRunning"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                style="width: 100% !important;"
+                title="Pause Focus Session"
+                aria-label="Pause Focus Session"
+                data-testid="timer-btn-pause"
+                @click="handlePause"
+              >
+                <i class="pi pi-pause text-base" />
+              </Button>
+
+              <!-- 3. Stop Button (Disabled when IDLE) -->
+              <Button
+                type="button"
+                severity="danger"
+                outlined
+                :disabled="isIdle"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                style="width: 100% !important;"
+                title="Stop & Save Session"
+                aria-label="Stop & Save Session"
+                data-testid="timer-btn-stop"
+                @click="handleStop"
+              >
+                <i class="pi pi-stop text-base" />
+              </Button>
+            </div>
+          </template>
         </div>
 
-        <!-- "Log Past Work" Form with Start/End Times and Symmetrical Grid Spacing -->
-        <div
-          v-if="isManualLogOpen"
-          data-testid="manual-work-form"
-          class="flex flex-col gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/80 text-xs shadow-xs"
-        >
-          <div class="flex items-center justify-between border-b border-surface-200 dark:border-surface-700 pb-2">
-            <span class="font-bold text-surface-800 dark:text-surface-100">Log Past Work Session</span>
-            <span class="text-[10px] text-surface-400 font-mono">Calculated duration: {{ formatDurationBadge((Number(manualDurationMinutes) || 0) * 60) }}</span>
-          </div>
-
-          <!-- Row 1: Date (Flex-1) and Duration (Fixed Width Stepper) -->
-          <div class="flex items-center gap-3">
-            <!-- Date (takes natural expanded space) -->
-            <div class="flex-1 min-w-0 flex flex-col gap-1">
-              <label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</label>
-              <InputText
-                id="manual-date"
-                v-model="manualDate"
-                type="date"
-                fluid
-                class="!text-xs !py-1.5 !px-2.5"
-                data-testid="manual-input-date"
+        <!-- Right Column: Activity Chronicle & Past Work (7 cols / ~58%) -->
+        <div class="flex flex-col gap-3 md:col-span-7">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-xs font-medium text-surface-500">
+              <Label class="text-xs font-medium text-surface-500">Session Chronicle</Label>
+              <Tag
+                :value="`(${entries.length})`"
+                severity="secondary"
+                rounded
+                class="!text-[10px] !py-0 !px-1.5 font-bold"
               />
+              <span v-if="totalDurationSeconds > 0" class="text-xs text-primary-600 dark:text-primary-400 font-semibold">
+                &bull; {{ formatDurationBadge(totalDurationSeconds) }} total
+              </span>
             </div>
 
-            <!-- Duration (compact dedicated stepper) -->
-            <div class="w-28 shrink-0 flex flex-col gap-1">
-              <label for="manual-duration-mins" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Duration</label>
-              <InputNumber
-                id="manual-duration-mins"
-                v-model="manualDurationMinutes"
-                suffix=" min"
-                :min="1"
-                :max="1440"
-                fluid
-                input-class="!text-xs !py-1.5 !px-2 !text-center"
-                data-testid="manual-input-duration"
-                @update:model-value="onManualDurationInputChanged"
-              />
-            </div>
-          </div>
-
-          <!-- Row 2: Start Time and End Time (Spacious 2-Column Split) -->
-          <div class="grid grid-cols-2 gap-3">
-            <!-- Start Time -->
-            <div class="flex flex-col gap-1">
-              <label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</label>
-              <InputText
-                id="manual-start-time"
-                v-model="manualStartTime"
-                type="time"
-                fluid
-                class="!text-xs !py-1.5 !px-2.5"
-                data-testid="manual-input-start-time"
-                @change="onManualTimeInputChanged"
-              />
-            </div>
-
-            <!-- End Time -->
-            <div class="flex flex-col gap-1">
-              <label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</label>
-              <InputText
-                id="manual-end-time"
-                v-model="manualEndTime"
-                type="time"
-                fluid
-                class="!text-xs !py-1.5 !px-2.5"
-                data-testid="manual-input-end-time"
-                @change="onManualTimeInputChanged"
-              />
-            </div>
-          </div>
-
-          <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
-          <div class="flex flex-col gap-1">
-            <label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</label>
-            <InputText
-              id="manual-session-note"
-              v-model="manualNote"
-              placeholder="What did you accomplish in this session?"
-              fluid
-              class="!text-xs !py-1.5"
-              data-testid="manual-input-note"
-            />
-          </div>
-
-          <!-- Row 4: Action Buttons -->
-          <div class="flex justify-end gap-2 pt-1 border-t border-surface-200/80 dark:border-surface-700">
             <Button
-              label="Cancel"
+              type="button"
+              icon="pi pi-plus"
+              :label="isManualLogOpen ? 'Cancel' : 'Log past work'"
               size="small"
               text
-              severity="secondary"
-              class="!text-xs"
-              @click="isManualLogOpen = false"
-            />
-            <Button
-              label="Record Session"
-              icon="pi pi-check"
-              size="small"
-              severity="primary"
-              class="!text-xs"
-              data-testid="manual-save-btn"
-              @click="submitManualEntry"
+              class="!text-xs !py-0.5"
+              data-testid="btn-toggle-log-past-work"
+              @click="toggleManualLog"
             />
           </div>
-        </div>
 
-        <!-- Sessions List (With Full Time & Duration Editing) -->
-        <div v-if="entries.length > 0" class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
-          <div
-            v-for="entry in entries"
-            :key="entry.id"
-            :data-testid="`session-entry-${entry.id}`"
-            class="group relative flex flex-col gap-2 rounded-xl border border-surface-200/90 bg-surface-50/50 p-3 text-xs transition-all hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80"
+          <!-- "Log Past Work" Form with Start/End Times and Symmetrical Grid Spacing -->
+          <Card
+            v-if="isManualLogOpen"
+            data-testid="manual-work-form"
+            class="border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/80 shadow-xs"
+            :pt="{ body: 'p-3.5 flex flex-col gap-3 text-xs', content: 'p-0 flex flex-col gap-3' }"
           >
-            <!-- Normal View (When Not Editing this Entry) -->
-            <template v-if="editingEntryId !== entry.id">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="inline-flex items-center rounded-md bg-primary-100/70 px-2 py-0.5 font-mono text-[11px] font-bold text-primary-700 dark:bg-primary-950 dark:text-primary-300">
-                    {{ formatDurationBadge(entry.durationSeconds ?? entry.duration_seconds) }}
-                  </span>
-                  <span class="text-[11px] text-surface-500 font-medium">
-                    {{ formatDateLabel(entry.startedAt ?? entry.started_at) }} &bull; {{ formatTimeRange(entry.startedAt ?? entry.started_at, entry.endedAt ?? entry.ended_at) }}
-                  </span>
-                </div>
-
-                <!-- Actions: Edit & Delete -->
-                <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    type="button"
-                    icon="pi pi-pencil"
-                    size="small"
-                    text
-                    severity="secondary"
-                    class="!h-6 !w-6 !p-0 text-surface-500 hover:text-surface-900 dark:hover:text-surface-100"
-                    title="Edit session time & duration"
-                    aria-label="Edit session"
-                    :data-testid="`btn-edit-session-${entry.id}`"
-                    @click="startEditingSession(entry)"
-                  />
-                  <Button
-                    type="button"
-                    icon="pi pi-trash"
-                    size="small"
-                    text
-                    severity="danger"
-                    class="!h-6 !w-6 !p-0 text-surface-400 hover:text-red-500"
-                    title="Delete session"
-                    aria-label="Delete session"
-                    :data-testid="`btn-delete-session-${entry.id}`"
-                    @click="deleteEntry(entry.id)"
-                  />
-                </div>
+            <template #content>
+              <div class="flex items-center justify-between border-b border-surface-200 dark:border-surface-700 pb-2">
+                <span class="font-bold text-surface-800 dark:text-surface-100">Log Past Work Session</span>
+                <span class="text-[10px] text-surface-400 font-mono">Calculated duration: {{ formatDurationBadge((Number(manualDurationMinutes) || 0) * 60) }}</span>
               </div>
 
-              <!-- Note Display -->
-              <p
-                class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
-                title="Click to edit session"
-                @click="startEditingSession(entry)"
-              >
-                {{ entry.note || '(No session note recorded)' }}
-              </p>
-            </template>
-
-            <!-- Inline Session Editor (When Editing this Entry) -->
-            <div
-              v-else
-              data-testid="inline-session-editor"
-              class="flex flex-col gap-2.5 p-2 rounded-lg bg-surface-0 dark:bg-surface-900 border border-primary-200 dark:border-primary-800"
-            >
-              <div class="text-[11px] font-bold text-primary-600 dark:text-primary-400">
-                Edit Work Session
-              </div>
-
-              <!-- Editable Timestamps & Duration (Spacious Multi-Row Layout) -->
-              <!-- Row 1: Date + Duration Stepper -->
-              <div class="flex items-center gap-2.5">
-                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <label class="text-[10px] uppercase font-semibold text-surface-400">Date</label>
+              <!-- Row 1: Date (Flex-1) and Duration (Fixed Width Stepper) -->
+              <div class="flex items-center gap-3">
+                <!-- Date (takes natural expanded space) -->
+                <div class="flex-1 min-w-0 flex flex-col gap-1">
+                  <Label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</Label>
                   <InputText
-                    v-model="editDate"
+                    id="manual-date"
+                    v-model="manualDate"
                     type="date"
                     fluid
-                    class="!text-xs !py-1 !px-2"
+                    class="!text-xs !py-1.5 !px-2.5"
+                    data-testid="manual-input-date"
                   />
                 </div>
-                <div class="w-28 shrink-0 flex flex-col gap-0.5">
-                  <label class="text-[10px] uppercase font-semibold text-surface-400">Duration</label>
+
+                <!-- Duration (compact dedicated stepper) -->
+                <div class="w-28 shrink-0 flex flex-col gap-1">
+                  <Label for="manual-duration-mins" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Duration</Label>
                   <InputNumber
-                    v-model="editDurationMinutes"
+                    id="manual-duration-mins"
+                    v-model="manualDurationMinutes"
                     suffix=" min"
                     :min="1"
                     :max="1440"
                     fluid
-                    input-class="!text-xs !py-1 !px-2 !text-center"
-                    data-testid="edit-session-duration"
-                    @update:model-value="onEditDurationChanged"
+                    input-class="!text-xs !py-1.5 !px-2 !text-center"
+                    data-testid="manual-input-duration"
+                    @update:model-value="onManualDurationInputChanged"
                   />
                 </div>
               </div>
 
-              <!-- Row 2: Start Time & End Time -->
-              <div class="grid grid-cols-2 gap-2.5">
-                <div class="flex flex-col gap-0.5">
-                  <label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</label>
+              <!-- Row 2: Start Time and End Time (Spacious 2-Column Split) -->
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Start Time -->
+                <div class="flex flex-col gap-1">
+                  <Label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</Label>
                   <InputText
-                    v-model="editStartTime"
+                    id="manual-start-time"
+                    v-model="manualStartTime"
                     type="time"
                     fluid
-                    class="!text-xs !py-1 !px-2"
-                    @change="onEditTimeChanged"
+                    class="!text-xs !py-1.5 !px-2.5"
+                    data-testid="manual-input-start-time"
+                    @change="onManualTimeInputChanged"
                   />
                 </div>
-                <div class="flex flex-col gap-0.5">
-                  <label class="text-[10px] uppercase font-semibold text-surface-400">End Time</label>
+
+                <!-- End Time -->
+                <div class="flex flex-col gap-1">
+                  <Label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</Label>
                   <InputText
-                    v-model="editEndTime"
+                    id="manual-end-time"
+                    v-model="manualEndTime"
                     type="time"
                     fluid
-                    class="!text-xs !py-1 !px-2"
-                    @change="onEditTimeChanged"
+                    class="!text-xs !py-1.5 !px-2.5"
+                    data-testid="manual-input-end-time"
+                    @change="onManualTimeInputChanged"
                   />
                 </div>
               </div>
 
-              <!-- Editable Note -->
-              <div class="flex flex-col gap-0.5">
-                <label class="text-[10px] uppercase font-semibold text-surface-400">Note</label>
+              <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
+              <div class="flex flex-col gap-1">
+                <Label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</Label>
                 <InputText
-                  v-model="editNoteText"
-                  placeholder="Session notes..."
+                  id="manual-session-note"
+                  v-model="manualNote"
+                  placeholder="What did you accomplish in this session?"
                   fluid
-                  class="!text-xs !py-1"
-                  data-testid="edit-session-note"
-                  @keydown.enter="saveSessionEdits(entry)"
+                  class="!text-xs !py-1.5"
+                  data-testid="manual-input-note"
                 />
               </div>
 
-              <!-- Edit Action Buttons -->
-              <div class="flex justify-end gap-1.5 pt-1">
+              <!-- Row 4: Action Buttons -->
+              <div class="flex justify-end gap-2 pt-1 border-t border-surface-200/80 dark:border-surface-700">
                 <Button
                   label="Cancel"
                   size="small"
                   text
                   severity="secondary"
                   class="!text-xs"
-                  @click="editingEntryId = null"
+                  @click="isManualLogOpen = false"
                 />
                 <Button
-                  label="Save Changes"
+                  label="Record Session"
                   icon="pi pi-check"
                   size="small"
                   severity="primary"
                   class="!text-xs"
-                  data-testid="btn-save-session-edits"
-                  @click="saveSessionEdits(entry)"
+                  data-testid="manual-save-btn"
+                  @click="submitManualEntry"
                 />
               </div>
-            </div>
+            </template>
+          </Card>
+
+          <!-- Sessions List (With Full Time & Duration Editing) -->
+          <div v-if="entries.length > 0" class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+            <Card
+              v-for="entry in entries"
+              :key="entry.id"
+              :data-testid="`session-entry-${entry.id}`"
+              class="group relative border border-surface-200/90 bg-surface-50/50 transition-all hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80 shadow-none"
+              :pt="{ body: 'p-3 flex flex-col gap-2 text-xs', content: 'p-0 flex flex-col gap-2' }"
+            >
+              <template #content>
+                <!-- Normal View (When Not Editing this Entry) -->
+                <template v-if="editingEntryId !== entry.id">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <Tag
+                        :value="formatDurationBadge(entry.durationSeconds ?? entry.duration_seconds)"
+                        class="font-mono text-[11px] font-bold !bg-primary-100/70 !text-primary-700 dark:!bg-primary-950 dark:!text-primary-300 !border-0"
+                      />
+                      <span class="text-[11px] text-surface-500 font-medium">
+                        {{ formatDateLabel(entry.startedAt ?? entry.started_at) }} &bull; {{ formatTimeRange(entry.startedAt ?? entry.started_at, entry.endedAt ?? entry.ended_at) }}
+                      </span>
+                    </div>
+
+                    <!-- Actions: Edit & Delete -->
+                    <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        type="button"
+                        icon="pi pi-pencil"
+                        size="small"
+                        text
+                        severity="secondary"
+                        class="!h-6 !w-6 !p-0 text-surface-500 hover:text-surface-900 dark:hover:text-surface-100"
+                        title="Edit session time & duration"
+                        aria-label="Edit session"
+                        :data-testid="`btn-edit-session-${entry.id}`"
+                        @click="startEditingSession(entry)"
+                      />
+                      <Button
+                        type="button"
+                        icon="pi pi-trash"
+                        size="small"
+                        text
+                        severity="danger"
+                        class="!h-6 !w-6 !p-0 text-surface-400 hover:text-red-500"
+                        title="Delete session"
+                        aria-label="Delete session"
+                        :data-testid="`btn-delete-session-${entry.id}`"
+                        @click="deleteEntry(entry.id)"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Note Display -->
+                  <p
+                    class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
+                    title="Click to edit session"
+                    @click="startEditingSession(entry)"
+                  >
+                    {{ entry.note || '(No session note recorded)' }}
+                  </p>
+                </template>
+
+                <!-- Inline Session Editor (When Editing this Entry) -->
+                <Card
+                  v-else
+                  data-testid="inline-session-editor"
+                  class="border border-primary-200 dark:border-primary-800 bg-surface-0 dark:bg-surface-900 shadow-none"
+                  :pt="{ body: 'p-2.5 flex flex-col gap-2.5', content: 'p-0 flex flex-col gap-2.5' }"
+                >
+                  <template #content>
+                    <div class="text-[11px] font-bold text-primary-600 dark:text-primary-400">
+                      Edit Work Session
+                    </div>
+
+                    <!-- Editable Timestamps & Duration (Spacious Multi-Row Layout) -->
+                    <!-- Row 1: Date + Duration Stepper -->
+                    <div class="flex items-center gap-2.5">
+                      <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Date</Label>
+                        <InputText
+                          v-model="editDate"
+                          type="date"
+                          fluid
+                          class="!text-xs !py-1 !px-2"
+                        />
+                      </div>
+                      <div class="w-28 shrink-0 flex flex-col gap-0.5">
+                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Duration</Label>
+                        <InputNumber
+                          v-model="editDurationMinutes"
+                          suffix=" min"
+                          :min="1"
+                          :max="1440"
+                          fluid
+                          input-class="!text-xs !py-1 !px-2 !text-center"
+                          data-testid="edit-session-duration"
+                          @update:model-value="onEditDurationChanged"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Row 2: Start Time & End Time -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                      <div class="flex flex-col gap-0.5">
+                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</Label>
+                        <InputText
+                          v-model="editStartTime"
+                          type="time"
+                          fluid
+                          class="!text-xs !py-1 !px-2"
+                          @change="onEditTimeChanged"
+                        />
+                      </div>
+                      <div class="flex flex-col gap-0.5">
+                        <Label class="text-[10px] uppercase font-semibold text-surface-400">End Time</Label>
+                        <InputText
+                          v-model="editEndTime"
+                          type="time"
+                          fluid
+                          class="!text-xs !py-1 !px-2"
+                          @change="onEditTimeChanged"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Editable Note -->
+                    <div class="flex flex-col gap-0.5">
+                      <Label class="text-[10px] uppercase font-semibold text-surface-400">Note</Label>
+                      <InputText
+                        v-model="editNoteText"
+                        placeholder="Session notes..."
+                        fluid
+                        class="!text-xs !py-1"
+                        data-testid="edit-session-note"
+                        @keydown.enter="saveSessionEdits(entry)"
+                      />
+                    </div>
+
+                    <!-- Edit Action Buttons -->
+                    <div class="flex justify-end gap-1.5 pt-1 border-t border-surface-200/80 dark:border-surface-700">
+                      <Button
+                        label="Cancel"
+                        size="small"
+                        text
+                        severity="secondary"
+                        class="!text-xs"
+                        @click="editingEntryId = null"
+                      />
+                      <Button
+                        label="Save Changes"
+                        icon="pi pi-check"
+                        size="small"
+                        severity="primary"
+                        class="!text-xs"
+                        data-testid="btn-save-session-edits"
+                        @click="saveSessionEdits(entry)"
+                      />
+                    </div>
+                  </template>
+                </Card>
+              </template>
+            </Card>
+          </div>
+
+          <div v-else class="text-xs text-surface-400 italic py-4 text-center">
+            No work sessions recorded yet. Start tracking or click "+ Log past work" above.
           </div>
         </div>
-
-        <div v-else class="text-xs text-surface-400 italic py-4 text-center">
-          No work sessions recorded yet. Start tracking or click "+ Log past work" above.
-        </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </Card>
 </template>
 
 <script setup lang="ts">
