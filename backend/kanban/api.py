@@ -20,6 +20,9 @@ from .schemas import (
     TagOut,
     TaskTimerOut,
     TaskTimerPatchIn,
+    TaskTimeEntryIn,
+    TaskTimeEntryUpdateIn,
+    TaskTimeEntryOut,
 )
 
 router = Router(tags=["Kanban"])
@@ -62,7 +65,7 @@ def reconcile_expired_countdowns(user):
                 timer.save()
 
 def get_board_queryset(user):
-    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
+    task_qs = Task.objects.select_related("timer").prefetch_related("tags", "time_entries")
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
     return Board.objects.filter(owner=user).prefetch_related(Prefetch("columns", queryset=col_qs))
 
@@ -84,10 +87,19 @@ def get_owned_task(user, task_id: int) -> Task:
     """Retrieve a task belonging to the authenticated user."""
     reconcile_expired_countdowns(user)
     return get_object_or_404(
-        Task.objects.select_related("column__board", "timer").filter(
+        Task.objects.select_related("column__board", "timer").prefetch_related("time_entries").filter(
             column__board__owner=user
         ),
         id=task_id
+    )
+
+def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
+    """Retrieve a time entry belonging to the authenticated user's task."""
+    return get_object_or_404(
+        TaskTimeEntry.objects.select_related("task__column__board").filter(
+            task__column__board__owner=user
+        ),
+        id=entry_id
     )
 
 def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
@@ -343,6 +355,78 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
 
         timer.save()
         return timer
+
+# ------------------
+# Time Entry Endpoints
+# ------------------
+
+@router.get("/tasks/{task_id}/time-entries", response=list[TaskTimeEntryOut])
+def list_time_entries(request, task_id: int):
+    """List historical time entries recorded for a task."""
+    task = get_owned_task(request.auth, task_id)
+    return task.time_entries.all()
+
+@router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
+def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
+    """Manually log a past work session for a task."""
+    task = get_owned_task(request.auth, task_id)
+    data = payload.dict()
+    start = data["started_at"]
+    end = data.get("ended_at")
+    duration = data.get("duration_seconds", 0)
+
+    if end is None and duration > 0:
+        end = start + timedelta(seconds=duration)
+    elif end is not None and duration <= 0:
+        duration = max(0, int((end - start).total_seconds()))
+
+    with transaction.atomic():
+        entry = TaskTimeEntry.objects.create(
+            task=task,
+            user=request.auth,
+            started_at=start,
+            ended_at=end,
+            duration_seconds=duration,
+            note=data.get("note", ""),
+        )
+    return 201, entry
+
+@router.patch("/time-entries/{entry_id}", response=TaskTimeEntryOut)
+def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
+    """Partially update a recorded time entry with duration/timestamp synchronization."""
+    entry = get_owned_time_entry(request.auth, entry_id)
+    updates = payload.dict(exclude_unset=True)
+
+    with transaction.atomic():
+        if "duration_seconds" in updates and "ended_at" not in updates:
+            new_duration = updates["duration_seconds"]
+            entry.duration_seconds = new_duration
+            start = updates.get("started_at", entry.started_at)
+            entry.started_at = start
+            entry.ended_at = start + timedelta(seconds=new_duration)
+        elif ("started_at" in updates or "ended_at" in updates) and "duration_seconds" not in updates:
+            start = updates.get("started_at", entry.started_at)
+            end = updates.get("ended_at", entry.ended_at)
+            entry.started_at = start
+            entry.ended_at = end
+            if start and end:
+                entry.duration_seconds = max(0, int((end - start).total_seconds()))
+        else:
+            for field, val in updates.items():
+                setattr(entry, field, val)
+
+        if "note" in updates:
+            entry.note = updates["note"]
+
+        entry.save()
+    return entry
+
+@router.delete("/time-entries/{entry_id}")
+def delete_time_entry(request, entry_id: int):
+    """Delete a recorded work session."""
+    entry = get_owned_time_entry(request.auth, entry_id)
+    entry.delete()
+    return {"success": True}
 
 # ------------------
 # Tag Endpoints

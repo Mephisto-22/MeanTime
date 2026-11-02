@@ -20,6 +20,32 @@ class TaskTimerPatchIn(Schema):
     started_at: datetime | None = None
     elapsed_seconds: int | None = None
 
+# Time entry schemas
+class TaskTimeEntryIn(Schema):
+    """Payload expected when manually recording past work."""
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int = 0
+    note: str = ""
+
+class TaskTimeEntryUpdateIn(Schema):
+    """Payload expected when updating a recorded time entry."""
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    duration_seconds: int | None = None
+    note: str | None = None
+
+class TaskTimeEntryOut(Schema):
+    """Shape of recorded time entry returned to clients."""
+    id: int
+    task_id: int
+    user_id: int | None = None
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int
+    note: str
+    created_at: datetime
+
 # Task schemas
 class TaskIn(Schema):
     """Payload expected when creating a task."""
@@ -38,6 +64,7 @@ class TaskOut(Schema):
     column_id: int
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
+    time_entries: list[TaskTimeEntryOut] = []
     created_at: datetime
     updated_at: datetime
 
