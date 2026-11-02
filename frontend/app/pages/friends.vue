@@ -2,6 +2,18 @@
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
     <Toast />
 
+    <!-- Top-Left Navigation Back to Boards -->
+    <div class="mb-6">
+      <Button
+        data-testid="back-to-boards-button"
+        label="Your boards"
+        icon="pi pi-arrow-left"
+        text
+        severity="secondary"
+        @click="navigateTo('/')"
+      />
+    </div>
+
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
@@ -121,6 +133,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
+import Button from 'primevue/button'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'

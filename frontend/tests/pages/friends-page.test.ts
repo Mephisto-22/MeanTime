@@ -121,6 +121,28 @@ describe('Friends Page (/friends)', () => {
   })
 
   describe('Initial Data Loading & Tabs Rendering', () => {
+    it('renders top-left button that navigates back to YOUR BOARDS (/)', async () => {
+      const auth = useAuthStore(useNuxtApp().$pinia)
+      auth.accessToken = 'mock-access'
+      auth.refreshToken = 'mock-refresh'
+      auth.user = {
+        id: 1,
+        email: 'user@example.com',
+        display_name: 'User',
+        timezone: 'UTC',
+        created_at: '2026-01-01T00:00:00Z',
+      }
+      auth.sessionInitialized = true
+
+      const wrapper = await mountPage()
+      const backBtn = wrapper.find('[data-testid="back-to-boards-button"]')
+      expect(backBtn.exists()).toBe(true)
+      expect(backBtn.text()).toContain('Your boards')
+
+      await backBtn.trigger('click')
+      await vi.waitFor(() => expect(useRouter().currentRoute.value.path).toBe('/'))
+    })
+
     it('calls getFriends, getRequests, and getBlocked on mount and passes data to child components', async () => {
       const wrapper = await mountPage()
 
