@@ -106,7 +106,6 @@ class FriendshipStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     ACCEPTED = "ACCEPTED", "Accepted"
     DECLINED = "DECLINED", "Declined"
-    BLOCKED = "BLOCKED", "Blocked"
 
 
 class Friendship(models.Model):
@@ -125,13 +124,6 @@ class Friendship(models.Model):
         choices=FriendshipStatus.choices,
         default=FriendshipStatus.PENDING,
         db_index=True,
-    )
-    blocked_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="blocked_friendships",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
