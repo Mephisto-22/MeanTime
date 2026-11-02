@@ -64,7 +64,6 @@ class TaskOut(Schema):
     column_id: int
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
-    time_entries: list[TaskTimeEntryOut] = []
     created_at: datetime
     updated_at: datetime
 

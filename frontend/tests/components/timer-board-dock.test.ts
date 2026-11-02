@@ -8,11 +8,7 @@ import Task from '~/components/kanban/Task.vue'
 import Board from '~/components/kanban/Board.vue'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
-const DialogStub = {
-  name: 'Dialog',
-  props: ['visible', 'header'],
-  template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
-}
+import { DialogStub } from '../fixtures/kanban'
 
 function mountBoard(boardData: any) {
   return mount(Board, {

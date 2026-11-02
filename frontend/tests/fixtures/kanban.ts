@@ -53,3 +53,10 @@ export function createBoardFixture(overrides: Partial<KanbanBoardDto> = {}): Kan
     columns,
   }
 }
+
+
+export const DialogStub = {
+  name: 'Dialog',
+  props: ['visible', 'header'],
+  template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
+}

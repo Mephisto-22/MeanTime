@@ -558,7 +558,7 @@ const save = () => {
     tags: [...attachedTags.value],
     tag_ids: attachedTags.value.map(t => t.id),
   }
-  if (timerState.value && timerState.value.mode !== 'NONE') {
+  if (timerState.value && (props.mode === 'edit' || timerState.value.mode !== 'NONE')) {
     payload.timer = timerState.value
   }
   if (timeEntriesState.value && timeEntriesState.value.length > 0) {

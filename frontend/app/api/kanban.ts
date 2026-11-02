@@ -32,6 +32,18 @@ export const TASK_PRIORITY_CONFIG = {
   LOW: { label: 'Low', dotClass: 'bg-sky-500', badgeClass: 'border-sky-500 text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
 } as const
 
+export const TIMER_MODE_CONFIG = {
+  NONE: { label: 'None (Disabled)' },
+  COUNT_DOWN: { label: 'Count down' },
+  COUNT_UP: { label: 'Count up' },
+} as const
+
+export const TIMER_STATE_CONFIG = {
+  IDLE: { label: 'Idle', dotClass: 'bg-surface-400', badgeClass: 'text-surface-500' },
+  RUNNING: { label: 'Live session', dotClass: 'bg-emerald-500 animate-pulse', badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' },
+  PAUSED: { label: 'Paused', dotClass: 'bg-amber-500', badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
+} as const
+
 export interface TagDto {
   id: string | number
   name: string
@@ -114,7 +126,7 @@ export interface KanbanContext {
   deleteTask: (taskId: string | number) => Promise<void> | void
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
   pauseTimer?: (taskId: string | number) => void
-  stopTimer?: (taskId: string | number) => void
+  stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
   onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
 }
 

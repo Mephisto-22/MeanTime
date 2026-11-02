@@ -65,7 +65,7 @@ def reconcile_expired_countdowns(user):
                 timer.save()
 
 def get_board_queryset(user):
-    task_qs = Task.objects.select_related("timer").prefetch_related("tags", "time_entries")
+    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
     return Board.objects.filter(owner=user).prefetch_related(Prefetch("columns", queryset=col_qs))
 
@@ -319,13 +319,14 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
             if total_duration > 0:
                 end_time = timezone.now()
                 start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
+                default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
                 TaskTimeEntry.objects.create(
                     task=task,
                     user=request.auth,
                     started_at=start_time,
                     ended_at=end_time,
                     duration_seconds=total_duration,
-                    note="",
+                    note=default_note,
                 )
 
             # Reset ephemeral runtime fields

@@ -13,13 +13,15 @@
         <span
           v-if="isRunning"
           data-testid="card-timer-pip-running"
-          class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"
+          class="h-1.5 w-1.5 rounded-full shrink-0"
+          :class="TIMER_STATE_CONFIG.RUNNING.dotClass"
         />
         <!-- Paused Pip -->
         <span
           v-else-if="isPaused"
           data-testid="card-timer-pip-paused"
-          class="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0"
+          class="h-1.5 w-1.5 rounded-full shrink-0"
+          :class="TIMER_STATE_CONFIG.PAUSED.dotClass"
         />
         <!-- Idle Clock Icon -->
         <i
@@ -126,6 +128,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
+import { TIMER_MODE_CONFIG, TIMER_STATE_CONFIG } from '~/api/kanban'
 import { useTaskTimer } from '~/composables/useTaskTimer'
 
 const props = withDefaults(
@@ -165,8 +168,7 @@ const targetMinutes = computed(() => {
 })
 
 const isCountDownTask = computed(() => {
-  if (props.timer?.mode === 'COUNT_UP') return false
-  return true
+  return props.timer?.mode === 'COUNT_DOWN'
 })
 
 const progressBarColorClass = computed(() => {
@@ -181,9 +183,9 @@ const idleDisplayLabel = computed(() => {
   if (props.timer?.mode === 'COUNT_UP') {
     return 'Stopwatch'
   }
-  if (props.timer?.mode === 'COUNT_DOWN' || !props.timer || props.timer.mode === 'NONE') {
+  if (props.timer?.mode === 'COUNT_DOWN') {
     const mins = props.timer?.targetDurationSeconds ? Math.floor(props.timer.targetDurationSeconds / 60) : 25
-    return `Timer (${mins}m)`
+    return `${TIMER_MODE_CONFIG.COUNT_DOWN.label} (${mins}m)`
   }
   return 'Ready'
 })

@@ -456,6 +456,21 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       tag_ids: savePayload.tag_ids,
       columnId: savePayload.columnId,
     })
+    if (savePayload.timer) {
+      try {
+        const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
+        const targetTask = findTaskById(savePayload.taskId)
+        if (targetTask && updatedTimer) {
+          targetTask.timer = {
+            ...targetTask.timer,
+            ...updatedTimer,
+            taskId: savePayload.taskId,
+          }
+        }
+      } catch (err) {
+        notify.error(err, 'Unable to update timer configuration')
+      }
+    }
   }
 }
 
@@ -579,6 +594,9 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
         ...persisted,
         taskId,
       }
+    }
+    if (entry) {
+      handleTimerExpired(task, entry)
     }
   } catch (err) {
     notify.error(err, 'Unable to stop timer')

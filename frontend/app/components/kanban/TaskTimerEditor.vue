@@ -12,17 +12,19 @@
         </h3>
         <span
           v-if="isRunning"
-          class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold"
+          :class="TIMER_STATE_CONFIG.RUNNING.badgeClass"
         >
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Live session
+          <span class="h-1.5 w-1.5 rounded-full" :class="TIMER_STATE_CONFIG.RUNNING.dotClass" />
+          {{ TIMER_STATE_CONFIG.RUNNING.label }}
         </span>
         <span
           v-else-if="isPaused"
-          class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold"
+          :class="TIMER_STATE_CONFIG.PAUSED.badgeClass"
         >
           <i class="pi pi-pause text-[8px]" />
-          Paused
+          {{ TIMER_STATE_CONFIG.PAUSED.label }}
         </span>
       </div>
 
@@ -96,7 +98,6 @@
                 @click="setPresetMinutes(p)"
               />
             </div>
-
           </div>
 
           <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
@@ -131,12 +132,12 @@
 
             <!-- Inline Input when double-clicked -->
             <div v-else class="flex items-center justify-center py-0.5">
-              <input
+              <InputText
                 ref="targetInputRef"
                 v-model="targetInputText"
                 type="text"
                 maxlength="8"
-                class="font-mono text-3xl font-bold tracking-normal tabular-nums text-center bg-transparent border-b-2 border-primary-500 text-surface-900 dark:text-surface-100 focus:outline-none w-36 py-0"
+                class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 !focus:outline-none !w-36 !py-0 !shadow-none"
                 data-testid="timer-inline-target-input"
                 placeholder="25:00"
                 @keydown.enter="commitTargetInput"
@@ -262,11 +263,12 @@
             <!-- Date (takes natural expanded space) -->
             <div class="flex-1 min-w-0 flex flex-col gap-1">
               <label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</label>
-              <input
+              <InputText
                 id="manual-date"
                 v-model="manualDate"
                 type="date"
-                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                fluid
+                class="!text-xs !py-1.5 !px-2.5"
                 data-testid="manual-input-date"
               />
             </div>
@@ -293,11 +295,12 @@
             <!-- Start Time -->
             <div class="flex flex-col gap-1">
               <label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</label>
-              <input
+              <InputText
                 id="manual-start-time"
                 v-model="manualStartTime"
                 type="time"
-                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                fluid
+                class="!text-xs !py-1.5 !px-2.5"
                 data-testid="manual-input-start-time"
                 @change="onManualTimeInputChanged"
               />
@@ -306,18 +309,19 @@
             <!-- End Time -->
             <div class="flex flex-col gap-1">
               <label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</label>
-              <input
+              <InputText
                 id="manual-end-time"
                 v-model="manualEndTime"
                 type="time"
-                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                fluid
+                class="!text-xs !py-1.5 !px-2.5"
                 data-testid="manual-input-end-time"
                 @change="onManualTimeInputChanged"
               />
             </div>
           </div>
 
-          <!-- Row 2: Note Field (Dedicated Full-Width Space) -->
+          <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
           <div class="flex flex-col gap-1">
             <label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</label>
             <InputText
@@ -330,7 +334,7 @@
             />
           </div>
 
-          <!-- Row 3: Action Buttons -->
+          <!-- Row 4: Action Buttons -->
           <div class="flex justify-end gap-2 pt-1 border-t border-surface-200/80 dark:border-surface-700">
             <Button
               label="Cancel"
@@ -426,10 +430,11 @@
               <div class="flex items-center gap-2.5">
                 <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                   <label class="text-[10px] uppercase font-semibold text-surface-400">Date</label>
-                  <input
+                  <InputText
                     v-model="editDate"
                     type="date"
-                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                    fluid
+                    class="!text-xs !py-1 !px-2"
                   />
                 </div>
                 <div class="w-28 shrink-0 flex flex-col gap-0.5">
@@ -451,19 +456,21 @@
               <div class="grid grid-cols-2 gap-2.5">
                 <div class="flex flex-col gap-0.5">
                   <label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</label>
-                  <input
+                  <InputText
                     v-model="editStartTime"
                     type="time"
-                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                    fluid
+                    class="!text-xs !py-1 !px-2"
                     @change="onEditTimeChanged"
                   />
                 </div>
                 <div class="flex flex-col gap-0.5">
                   <label class="text-[10px] uppercase font-semibold text-surface-400">End Time</label>
-                  <input
+                  <InputText
                     v-model="editEndTime"
                     type="time"
-                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                    fluid
+                    class="!text-xs !py-1 !px-2"
                     @change="onEditTimeChanged"
                   />
                 </div>
@@ -515,8 +522,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, inject, onMounted } from 'vue'
 import type { TaskTimerDto, TaskTimeEntryDto, TimerMode } from '~/api/kanban'
+import {
+  TIMER_MODE_CONFIG,
+  TIMER_STATE_CONFIG,
+  kanbanApi,
+  kanbanContextKey,
+} from '~/api/kanban'
 import {
   useTaskTimer,
   formatDigital,
@@ -540,10 +553,12 @@ const emit = defineEmits<{
   (e: 'timerExpired', entry: TaskTimeEntryDto): void
 }>()
 
+const kanbanContext = inject(kanbanContextKey, null)
+
 const modeOptions = [
-  { label: 'None (Disabled)', value: 'NONE' },
-  { label: 'Stopwatch (Count up)', value: 'COUNT_UP' },
-  { label: 'Countdown (Target)', value: 'COUNT_DOWN' },
+  { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },
+  { label: `Stopwatch (${TIMER_MODE_CONFIG.COUNT_UP.label})`, value: 'COUNT_UP' },
+  { label: `Countdown (${TIMER_MODE_CONFIG.COUNT_DOWN.label})`, value: 'COUNT_DOWN' },
 ]
 
 const localTimer = ref<TaskTimerDto>({
@@ -556,6 +571,36 @@ const localTimer = ref<TaskTimerDto>({
 })
 
 const entries = ref<TaskTimeEntryDto[]>(props.timeEntries ? [...props.timeEntries] : [])
+
+const isPersistedTaskId = computed(() => {
+  if (!props.taskId) return false
+  const str = String(props.taskId)
+  if (str.startsWith('draft') || str.startsWith('new') || str.startsWith('temp') || str.startsWith('chronicle')) {
+    return false
+  }
+  return true
+})
+
+const loadPersistedEntries = async () => {
+  if (!isPersistedTaskId.value) return
+  try {
+    const data = await kanbanApi.listTimeEntries(props.taskId)
+    if (data && Array.isArray(data)) {
+      entries.value = data
+      syncEntriesOut()
+    }
+  } catch {
+    // Fallback gracefully
+  }
+}
+
+onMounted(() => {
+  if (props.timeEntries && props.timeEntries.length > 0) {
+    entries.value = [...props.timeEntries]
+  } else {
+    loadPersistedEntries()
+  }
+})
 
 watch(
   () => props.timer,
@@ -587,16 +632,17 @@ watch(targetMinutes, (m) => {
 // Inline double-click editing on the digital readout
 const isEditingTarget = ref(false)
 const targetInputText = ref('')
-const targetInputRef = ref<HTMLInputElement | null>(null)
+const targetInputRef = ref<any>(null)
 
 const startEditingTarget = () => {
   if (isRunning.value || isPaused.value || localTimer.value.mode !== 'COUNT_DOWN') return
   isEditingTarget.value = true
   targetInputText.value = formatDigital(localTimer.value.targetDurationSeconds || 1500)
   nextTick(() => {
-    if (targetInputRef.value) {
-      targetInputRef.value.focus()
-      targetInputRef.value.select()
+    const el = targetInputRef.value?.$el ?? targetInputRef.value
+    if (el?.focus) {
+      el.focus()
+      el.select?.()
     }
   })
 }
@@ -657,14 +703,6 @@ const setPresetMinutes = (m: number) => {
   syncTimerOut()
 }
 
-const onCustomMinutesChange = (val: number | null) => {
-  if (isRunning.value || isPaused.value) return
-  if (val && val > 0) {
-    localTimer.value.targetDurationSeconds = val * 60
-    syncTimerOut()
-  }
-}
-
 const onModeChange = () => {
   if (localTimer.value.mode === 'COUNT_DOWN' && !localTimer.value.targetDurationSeconds) {
     localTimer.value.targetDurationSeconds = 1500
@@ -702,6 +740,9 @@ const handleStart = () => {
   localTimer.value.state = 'RUNNING'
   localTimer.value.startedAt = new Date().toISOString()
   syncTimerOut()
+  if (kanbanContext?.startTimer && isPersistedTaskId.value) {
+    kanbanContext.startTimer(props.taskId, localTimer.value)
+  }
 }
 
 const handlePause = () => {
@@ -709,20 +750,44 @@ const handlePause = () => {
   localTimer.value.elapsedSeconds = elapsedSeconds.value
   localTimer.value.startedAt = null
   syncTimerOut()
+  if (kanbanContext?.pauseTimer && isPersistedTaskId.value) {
+    kanbanContext.pauseTimer(props.taskId)
+  }
 }
 
-const handleStop = () => {
+const handleStop = async () => {
   const duration = elapsedSeconds.value
   if (duration > 0) {
-    const newEntry: TaskTimeEntryDto = {
+    const startedAt = localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString()
+    const endedAt = new Date().toISOString()
+    const note = localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session'
+
+    let newEntry: TaskTimeEntryDto = {
       id: `entry-${Date.now()}`,
       taskId: props.taskId,
-      startedAt: localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString(),
-      endedAt: new Date().toISOString(),
+      startedAt,
+      endedAt,
       durationSeconds: duration,
-      note: localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session',
+      note,
       createdAt: new Date().toISOString(),
     }
+
+    if (isPersistedTaskId.value) {
+      try {
+        const persisted = await kanbanApi.createTimeEntry(props.taskId, {
+          startedAt,
+          endedAt,
+          durationSeconds: duration,
+          note,
+        })
+        if (persisted && persisted.id) {
+          newEntry = persisted
+        }
+      } catch {
+        // Fallback to local entry
+      }
+    }
+
     entries.value.unshift(newEntry)
     syncEntriesOut()
   }
@@ -731,6 +796,10 @@ const handleStop = () => {
   localTimer.value.elapsedSeconds = 0
   localTimer.value.startedAt = null
   syncTimerOut()
+
+  if (kanbanContext?.stopTimer && isPersistedTaskId.value) {
+    kanbanContext.stopTimer(props.taskId)
+  }
 }
 
 // -------------------------------------------------------------
@@ -746,18 +815,16 @@ const manualNote = ref('')
 const toggleManualLog = () => {
   isManualLogOpen.value = !isManualLogOpen.value
   if (isManualLogOpen.value) {
-    // initialize to recent times
     const now = new Date()
-    const thirtyMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
+    const twentyFiveMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
     manualDate.value = toLocalDateString(now.toISOString())
-    manualStartTime.value = toLocalTimeString(thirtyMinsAgo.toISOString())
+    manualStartTime.value = toLocalTimeString(twentyFiveMinsAgo.toISOString())
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
     manualNote.value = ''
   }
 }
 
-// Helpers for time string parsing and conversion
 const parseMinutesFromTime = (timeStr: string): number => {
   const parts = timeStr.split(':').map(Number)
   const h = parts[0] ?? 0
@@ -772,38 +839,53 @@ const formatMinutesToTime = (totalMinutes: number): string => {
   return `${eh}:${em}`
 }
 
-// When start or end time changes, recalculate duration
 const onManualTimeInputChanged = () => {
   const startTotalMins = parseMinutesFromTime(manualStartTime.value)
   let endTotalMins = parseMinutesFromTime(manualEndTime.value)
   if (endTotalMins < startTotalMins) {
-    endTotalMins += 24 * 60 // wrap next day
+    endTotalMins += 24 * 60
   }
   const diff = Math.max(1, endTotalMins - startTotalMins)
   manualDurationMinutes.value = diff
 }
 
-// When duration minutes changes, push end time forward from start time
 const onManualDurationInputChanged = (val: number | null) => {
   if (!val || val <= 0) return
   const startMins = parseMinutesFromTime(manualStartTime.value)
   manualEndTime.value = formatMinutesToTime(startMins + val)
 }
 
-const submitManualEntry = () => {
+const submitManualEntry = async () => {
   if (manualDurationMinutes.value <= 0) return
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
   const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
   const durationSec = manualDurationMinutes.value * 60
+  const note = manualNote.value.trim() || 'Manual session'
 
-  const newEntry: TaskTimeEntryDto = {
+  let newEntry: TaskTimeEntryDto = {
     id: `manual-${Date.now()}`,
     taskId: props.taskId,
     startedAt: started,
     endedAt: ended,
     durationSeconds: durationSec,
-    note: manualNote.value.trim() || 'Manual session',
+    note,
     createdAt: new Date().toISOString(),
+  }
+
+  if (isPersistedTaskId.value) {
+    try {
+      const persisted = await kanbanApi.createTimeEntry(props.taskId, {
+        startedAt: started,
+        endedAt: ended,
+        durationSeconds: durationSec,
+        note,
+      })
+      if (persisted && persisted.id) {
+        newEntry = persisted
+      }
+    } catch {
+      // Continue with optimistic / local entry
+    }
   }
 
   entries.value.unshift(newEntry)
@@ -844,21 +926,44 @@ const onEditDurationChanged = (val: number | null) => {
   editEndTime.value = formatMinutesToTime(startMins + val)
 }
 
-const saveSessionEdits = (entry: TaskTimeEntryDto) => {
+const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   const started = combineDateAndTime(editDate.value, editStartTime.value)
   const ended = combineDateAndTime(editDate.value, editEndTime.value)
   const durationSec = editDurationMinutes.value * 60
+  const note = editNoteText.value
 
   entry.startedAt = started
   entry.endedAt = ended
   entry.durationSeconds = durationSec
-  entry.note = editNoteText.value
+  entry.note = note
   editingEntryId.value = null
+
+  if (isPersistedTaskId.value && !String(entry.id).startsWith('manual') && !String(entry.id).startsWith('entry')) {
+    try {
+      await kanbanApi.updateTimeEntry(entry.id, {
+        startedAt: started,
+        endedAt: ended,
+        durationSeconds: durationSec,
+        note,
+      })
+    } catch {
+      // Continue
+    }
+  }
+
   syncEntriesOut()
 }
 
-const deleteEntry = (id: string | number) => {
+const deleteEntry = async (id: string | number) => {
   entries.value = entries.value.filter(e => e.id !== id)
   syncEntriesOut()
+
+  if (isPersistedTaskId.value && !String(id).startsWith('manual') && !String(id).startsWith('entry')) {
+    try {
+      await kanbanApi.deleteTimeEntry(id)
+    } catch {
+      // Continue
+    }
+  }
 }
 </script>
