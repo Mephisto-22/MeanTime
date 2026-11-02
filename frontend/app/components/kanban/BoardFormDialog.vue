@@ -51,36 +51,67 @@
       </div>
     </form>
 
+    <Message
+      v-if="isConfirmingDelete"
+      class="mt-4"
+      data-testid="board-delete-confirmation"
+      severity="error"
+      :closable="false"
+    >
+      Delete "{{ board?.title }}"? Its columns and tasks are deleted too.
+      This can't be undone.
+    </Message>
+
     <template #footer>
-      <Button
-        v-if="isEditing"
-        type="button"
-        class="mr-auto"
-        data-testid="board-delete-button"
-        label="Delete board"
-        severity="danger"
-        text
-        :loading="isDeleting"
-        :disabled="isBusy"
-        @click="deleteBoard"
-      />
-      <Button
-        type="button"
-        label="Cancel"
-        severity="secondary"
-        text
-        :disabled="isBusy"
-        @click="visible = false"
-      />
-      <!-- The footer is outside the form, so the form attribute links Save to it. -->
-      <Button
-        type="submit"
-        form="board-form"
-        data-testid="board-save-button"
-        :label="isEditing ? 'Save' : 'Create'"
-        :loading="isSaving"
-        :disabled="isBusy || showTitleError"
-      />
+      <template v-if="isConfirmingDelete">
+        <Button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          text
+          data-testid="board-cancel-delete-button"
+          :disabled="isDeleting"
+          @click="isConfirmingDelete = false"
+        />
+        <Button
+          type="button"
+          label="Delete board"
+          severity="danger"
+          data-testid="board-confirm-delete-button"
+          :loading="isDeleting"
+          @click="deleteBoard"
+        />
+      </template>
+      <template v-else>
+        <Button
+          v-if="isEditing"
+          type="button"
+          class="mr-auto"
+          data-testid="board-delete-button"
+          label="Delete board"
+          severity="danger"
+          text
+          :disabled="isBusy"
+          @click="isConfirmingDelete = true"
+        />
+        <Button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          text
+          :disabled="isBusy"
+          @click="visible = false"
+        />
+        <!-- The footer is outside the form, so the form attribute links Save to it. -->
+        <Button
+          type="submit"
+          form="board-form"
+          data-testid="board-save-button"
+          :label="isEditing ? 'Save' : 'Create'"
+          :loading="isSaving"
+          :disabled="isBusy || showTitleError"
+        />
+      </template>
     </template>
   </Dialog>
 </template>
@@ -113,6 +144,8 @@ const title = ref('');
 const description = ref('');
 const isSaving = ref(false);
 const isDeleting = ref(false);
+// Deleting asks for confirmation first, in place of the editor's buttons.
+const isConfirmingDelete = ref(false);
 const notify = useNotifications();
 
 const isEditing = computed(() => props.board !== null);
@@ -130,10 +163,12 @@ watch(visible, isOpen => {
   }
   title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
+  isConfirmingDelete.value = false;
 }, {immediate: true});
 
 async function save(): Promise<void> {
-  if (trimmedTitle.value === '' || isBusy.value) {
+  // Enter in a field still submits the form while the confirmation shows.
+  if (trimmedTitle.value === '' || isBusy.value || isConfirmingDelete.value) {
     return;
   }
 
