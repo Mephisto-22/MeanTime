@@ -2,6 +2,29 @@ import type { ComputedRef, InjectionKey } from 'vue'
 import { apiService } from '~/services/ApiService'
 
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
+export type TimerMode = 'NONE' | 'COUNT_UP' | 'COUNT_DOWN'
+export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
+
+export interface TaskTimerDto {
+  id?: number
+  taskId: number | string
+  mode: TimerMode
+  targetDurationSeconds: number | null
+  state: TimerState
+  startedAt: string | null
+  elapsedSeconds: number
+}
+
+export interface TaskTimeEntryDto {
+  id: number | string
+  taskId: number | string
+  userId?: number | string
+  startedAt: string
+  endedAt: string
+  durationSeconds: number
+  note: string
+  createdAt?: string
+}
 
 export const TASK_PRIORITY_CONFIG = {
   HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
@@ -22,6 +45,9 @@ export interface KanbanTaskDto {
   position: number
   columnId?: string | number
   column_id?: string | number
+  timer?: TaskTimerDto | null
+  time_entries?: TaskTimeEntryDto[]
+  timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
   tag_ids?: Array<string | number>
@@ -38,23 +64,22 @@ export interface KanbanColumnDto {
 export interface KanbanBoardDto {
   id: string | number
   title: string
-  description?: string
+  description: string
   columns: KanbanColumnDto[]
-}
-
-export interface TaskMoveRequest {
-  to_column_id: string | number
-  target_position: number
 }
 
 export interface SuccessResponse {
   success: boolean
 }
 
+export interface TaskMoveRequest {
+  to_column_id: number | string
+  target_position: number
+}
+
 export interface KanbanColumnSummary {
   id: string | number
   title: string
-  position: number
 }
 
 export interface TaskMoveContext {
@@ -70,6 +95,8 @@ export interface TaskDialogSavePayload {
   mode: 'create' | 'edit'
   columnId?: string | number | null
   taskId?: string | number | null
+  timer?: TaskTimerDto | null
+  timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
   tag_ids?: Array<string | number>
@@ -85,6 +112,10 @@ export interface KanbanContext {
   createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   deleteTask: (taskId: string | number) => Promise<void> | void
+  startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
+  pauseTimer?: (taskId: string | number) => void
+  stopTimer?: (taskId: string | number) => void
+  onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
 }
 
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')
@@ -150,6 +181,50 @@ export class KanbanApi {
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -----------------
+  // Timer Endpoints
+  // -----------------
+
+  updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
+    return apiService.patch<TaskTimerDto>(`${this.endpoint}/tasks/${taskId}/timer`, {
+      mode: payload.mode,
+      target_duration_seconds: payload.targetDurationSeconds ?? (payload as any).target_duration_seconds,
+      state: payload.state,
+      started_at: payload.startedAt ?? (payload as any).started_at,
+      elapsed_seconds: payload.elapsedSeconds ?? (payload as any).elapsed_seconds,
+    })
+  }
+
+  // -----------------
+  // Time Entry Endpoints
+  // -----------------
+
+  listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
+    return apiService.get<TaskTimeEntryDto[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
+  }
+
+  createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.post<TaskTimeEntryDto>(`${this.endpoint}/tasks/${taskId}/time-entries`, {
+      started_at: payload.startedAt ?? (payload as any).started_at,
+      ended_at: payload.endedAt ?? (payload as any).ended_at,
+      duration_seconds: payload.durationSeconds ?? (payload as any).duration_seconds,
+      note: payload.note ?? '',
+    })
+  }
+
+  updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.patch<TaskTimeEntryDto>(`${this.endpoint}/time-entries/${entryId}`, {
+      started_at: payload.startedAt ?? (payload as any).started_at,
+      ended_at: payload.endedAt ?? (payload as any).ended_at,
+      duration_seconds: payload.durationSeconds ?? (payload as any).duration_seconds,
+      note: payload.note,
+    })
+  }
+
+  deleteTimeEntry(entryId: string | number): Promise<SuccessResponse> {
+    return apiService.delete<SuccessResponse>(`${this.endpoint}/time-entries/${entryId}`)
   }
 
   // -----------------

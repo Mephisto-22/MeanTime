@@ -1,8 +1,24 @@
 from __future__ import annotations
 from datetime import datetime
 from ninja import Schema
-from enum import Enum
-from .models import TaskPriority
+from .models import TaskPriority, TimerMode, TimerState
+
+# Timer schemas
+class TaskTimerOut(Schema):
+    id: int
+    task_id: int
+    mode: TimerMode
+    target_duration_seconds: int | None = None
+    state: TimerState
+    started_at: datetime | None = None
+    elapsed_seconds: int
+
+class TaskTimerPatchIn(Schema):
+    mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    state: TimerState | None = None
+    started_at: datetime | None = None
+    elapsed_seconds: int | None = None
 
 # Task schemas
 class TaskIn(Schema):
@@ -21,8 +37,16 @@ class TaskOut(Schema):
     position: int
     column_id: int
     tags: list[TagOut]
+    timer: TaskTimerOut | None = None
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_timer(obj):
+        try:
+            return obj.timer
+        except Exception:
+            return None
 
 # Allows us to update only part of a task without having to send a full TaskIn Schema
 class TaskUpdateIn(Schema):
