@@ -29,6 +29,38 @@ DEFAULT_COLUMN_TITLES = ("To Do", "In Progress", "Done")
 
 # Helpers
 
+def reconcile_expired_countdowns(user):
+    """
+    Find any RUNNING COUNT_DOWN timers belonging to user's boards that have expired,
+    commit TaskTimeEntry records capped at target_duration_seconds, and reset timers to IDLE.
+    """
+    now = timezone.now()
+    running_timers = TaskTimer.objects.select_related("task__column__board").filter(
+        task__column__board__owner=user,
+        state=TimerState.RUNNING,
+        mode=TimerMode.COUNT_DOWN,
+        started_at__isnull=False,
+    )
+    for timer in running_timers:
+        target = timer.target_duration_seconds or 0
+        elapsed_prior = timer.elapsed_seconds or 0
+        remaining = max(0, target - elapsed_prior)
+        if remaining > 0 and now >= timer.started_at + timedelta(seconds=remaining):
+            with transaction.atomic():
+                ended_at = timer.started_at + timedelta(seconds=remaining)
+                TaskTimeEntry.objects.create(
+                    task=timer.task,
+                    user=user,
+                    started_at=timer.started_at - timedelta(seconds=elapsed_prior),
+                    ended_at=ended_at,
+                    duration_seconds=target,
+                    note="Completed countdown session",
+                )
+                timer.state = TimerState.IDLE
+                timer.started_at = None
+                timer.elapsed_seconds = 0
+                timer.save()
+
 def get_board_queryset(user):
     task_qs = Task.objects.select_related("timer").prefetch_related("tags")
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
@@ -50,6 +82,7 @@ def get_owned_column(user, column_id: int) -> BoardColumn:
 
 def get_owned_task(user, task_id: int) -> Task:
     """Retrieve a task belonging to the authenticated user."""
+    reconcile_expired_countdowns(user)
     return get_object_or_404(
         Task.objects.select_related("column__board", "timer").filter(
             column__board__owner=user
@@ -84,6 +117,7 @@ def _reindex(items):
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by the authenticated user."""
+    reconcile_expired_countdowns(request.auth)
     return get_board_queryset(request.auth)
 
 @router.post("/boards", response={201: BoardOut})
@@ -100,6 +134,7 @@ def create_board(request, payload: BoardIn):
 @router.get("/boards/{board_id}", response=BoardOut)
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
+    reconcile_expired_countdowns(request.auth)
     board = get_object_or_404(
         get_board_queryset(request.auth),
         id=board_id,

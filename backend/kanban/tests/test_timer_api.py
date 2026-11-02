@@ -154,3 +154,50 @@ class TaskTimerApiTests(TestCase):
             **other_auth,
         )
         self.assertEqual(res.status_code, 404)
+
+    def test_board_retrieval_reconciles_expired_offline_countdown(self):
+        """Expired countdown timers are reconciled into TaskTimeEntry on board fetch and reset to IDLE."""
+        # Expired timer: 1500s target duration, started 1600s ago
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1500,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=1600),
+            elapsed_seconds=0,
+        )
+
+        board_res = self.client.get(f"/api/kanban/boards/{self.board_id}", **self.auth)
+        self.assertEqual(board_res.status_code, 200)
+
+        task_data = board_res.json()["columns"][0]["tasks"][0]
+        self.assertIsNotNone(task_data["timer"])
+        self.assertEqual(task_data["timer"]["state"], "IDLE")
+        self.assertEqual(task_data["timer"]["elapsed_seconds"], 0)
+        self.assertEqual(task_data["timer"]["target_duration_seconds"], 1500)
+        self.assertEqual(task_data["timer"]["mode"], "COUNT_DOWN")
+
+        entries = TaskTimeEntry.objects.filter(task_id=self.task_id)
+        self.assertEqual(entries.count(), 1)
+        entry = entries.first()
+        self.assertEqual(entry.duration_seconds, 1500)
+        self.assertEqual(entry.user, self.user)
+        self.assertEqual(entry.note, "Completed countdown session")
+
+    def test_board_retrieval_does_not_reconcile_unexpired_countdown(self):
+        """Active countdown timer with time remaining is left RUNNING."""
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1500,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=300),
+            elapsed_seconds=0,
+        )
+
+        board_res = self.client.get(f"/api/kanban/boards/{self.board_id}", **self.auth)
+        self.assertEqual(board_res.status_code, 200)
+
+        task_data = board_res.json()["columns"][0]["tasks"][0]
+        self.assertEqual(task_data["timer"]["state"], "RUNNING")
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 0)
