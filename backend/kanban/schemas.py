@@ -47,6 +47,11 @@ class BoardColumnOut(Schema):
     created_at: datetime
     updated_at: datetime
 
+class BoardColumnUpdateIn(Schema):
+    """Payload expected for partially updating a board column."""
+    title: str | None = None
+    position: int | None = None
+
 
 # Board Schemas
 class BoardIn(Schema):

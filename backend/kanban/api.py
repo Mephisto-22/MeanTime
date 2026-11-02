@@ -10,7 +10,8 @@ from .schemas import (
     TaskOut, 
     TaskUpdateIn,
     BoardColumnIn, 
-    BoardColumnOut, 
+    BoardColumnOut,
+    BoardColumnUpdateIn, 
     BoardIn, 
     BoardOut,
     BoardShareIn, 
@@ -179,15 +180,25 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
     )
 
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
-def update_column(request, column_id: int, payload: BoardColumnIn):
-    """Update a column's title or position."""
+def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
+    """Update the supplied fields of a column."""
     column = get_accessible_column(request.auth, column_id)
+    updates = payload.dict(exclude_unset=True)
+
+    if not updates:
+        raise HttpError(400, "No fields provided for update.")
+
     with transaction.atomic():
-        column.title = payload.title
-        others = [c for c in column.board.columns.all() if c.id != column.id]
-        idx = max(0, min(payload.position, len(others)))
-        others.insert(idx, column)
-        _reindex(others)
+        if "title" in updates:
+            column.title = updates["title"]
+        if "position" in updates:
+            others = [c for c in column.board.columns.all() if c.id != column.id]
+            idx = max(0, min(updates["position"], len(others)))
+            others.insert(idx, column)
+            _reindex(others)
+        else:
+            column.save()
+
     return column
 
 @router.delete("/columns/{column_id}")
