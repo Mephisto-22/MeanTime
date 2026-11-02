@@ -533,9 +533,8 @@ import {
   TIMER_STATE_CONFIG,
   kanbanApi,
   kanbanContextKey,
-  normalizeTimeEntry,
-  normalizeTaskTimer,
 } from '~/api/kanban'
+import { toCamelCase } from '~/utils/case'
 import {
   useTaskTimer,
   formatDigital,
@@ -577,7 +576,7 @@ const localTimer = ref<TaskTimerDto>({
 })
 
 const entries = ref<TaskTimeEntryDto[]>(
-  props.timeEntries ? props.timeEntries.map(normalizeTimeEntry) : [],
+  props.timeEntries ? props.timeEntries.map(e => toCamelCase<TaskTimeEntryDto>(e)) : [],
 )
 
 const isPersistedTaskId = computed(() => {
@@ -599,10 +598,9 @@ const loadPersistedEntries = async () => {
       const seenIds = new Set<string | number>()
       const deduped: TaskTimeEntryDto[] = []
       for (const item of data) {
-        const normalized = normalizeTimeEntry(item)
-        if (!seenIds.has(normalized.id)) {
-          seenIds.add(normalized.id)
-          deduped.push(normalized)
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id)
+          deduped.push(item)
         }
       }
       entries.value = deduped
@@ -615,7 +613,7 @@ const loadPersistedEntries = async () => {
 
 onMounted(() => {
   if (props.timeEntries && props.timeEntries.length > 0) {
-    entries.value = props.timeEntries.map(normalizeTimeEntry)
+    entries.value = props.timeEntries.map(e => toCamelCase<TaskTimeEntryDto>(e))
   } else {
     loadPersistedEntries()
   }
@@ -635,7 +633,7 @@ watch(
 watch(
   () => props.timer,
   (t) => {
-    if (t) localTimer.value = normalizeTaskTimer(t)
+    if (t) localTimer.value = toCamelCase<TaskTimerDto>(t)
   },
   { deep: true },
 )
@@ -644,7 +642,7 @@ watch(
   () => props.timeEntries,
   (list) => {
     if (list && list.length > 0) {
-      entries.value = list.map(normalizeTimeEntry)
+      entries.value = list.map(e => toCamelCase<TaskTimeEntryDto>(e))
     } else if (list && list.length === 0) {
       entries.value = []
     } else {
@@ -931,7 +929,7 @@ const submitManualEntry = async () => {
       if (persisted && persisted.id) {
         const found = entries.value.find(e => e.id === tempId)
         if (found) {
-          Object.assign(found, normalizeTimeEntry(persisted))
+          Object.assign(found, persisted)
           syncEntriesOut()
         }
       }
@@ -952,13 +950,12 @@ const editDurationMinutes = ref<number | null>(0)
 const editNoteText = ref('')
 
 const startEditingSession = (entry: TaskTimeEntryDto) => {
-  const normalized = normalizeTimeEntry(entry)
-  editingEntryId.value = normalized.id
-  editDate.value = toLocalDateString(normalized.startedAt)
-  editStartTime.value = toLocalTimeString(normalized.startedAt)
-  editEndTime.value = toLocalTimeString(normalized.endedAt)
-  editDurationMinutes.value = Math.max(1, Math.round(normalized.durationSeconds / 60))
-  editNoteText.value = normalized.note
+  editingEntryId.value = entry.id
+  editDate.value = toLocalDateString(entry.startedAt)
+  editStartTime.value = toLocalTimeString(entry.startedAt)
+  editEndTime.value = toLocalTimeString(entry.endedAt)
+  editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
+  editNoteText.value = entry.note
 }
 
 const onEditTimeChanged = () => {
@@ -997,7 +994,7 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
         note,
       })
       if (updated) {
-        Object.assign(entry, normalizeTimeEntry(updated))
+        Object.assign(entry, updated)
         syncEntriesOut()
       }
     } catch {

@@ -26,36 +26,6 @@ export interface TaskTimeEntryDto {
   createdAt?: string
 }
 
-export function normalizeTimeEntry(raw: any): TaskTimeEntryDto {
-  if (!raw) return raw
-  const duration = Number(raw.durationSeconds ?? raw.duration_seconds ?? 0)
-  return {
-    id: raw.id,
-    taskId: raw.taskId ?? raw.task_id,
-    userId: raw.userId ?? raw.user_id,
-    startedAt: raw.startedAt ?? raw.started_at ?? new Date().toISOString(),
-    endedAt: raw.endedAt ?? raw.ended_at ?? null,
-    durationSeconds: isNaN(duration) ? 0 : Math.max(0, duration),
-    note: raw.note ?? '',
-    createdAt: raw.createdAt ?? raw.created_at,
-  }
-}
-
-export function normalizeTaskTimer(raw: any): TaskTimerDto {
-  if (!raw) return raw
-  const elapsed = Number(raw.elapsedSeconds ?? raw.elapsed_seconds ?? 0)
-  const target = raw.targetDurationSeconds ?? raw.target_duration_seconds
-  return {
-    id: raw.id,
-    taskId: raw.taskId ?? raw.task_id,
-    mode: raw.mode ?? 'NONE',
-    targetDurationSeconds: target != null && !isNaN(Number(target)) ? Number(target) : null,
-    state: raw.state ?? 'IDLE',
-    startedAt: raw.startedAt ?? raw.started_at ?? null,
-    elapsedSeconds: isNaN(elapsed) ? 0 : Math.max(0, elapsed),
-  }
-}
-
 export const TASK_PRIORITY_CONFIG = {
   HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
   MEDIUM: { label: 'Medium', dotClass: 'bg-amber-500', badgeClass: 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/40' },

@@ -51,7 +51,7 @@ import type {
   TaskTimerDto,
   TaskTimeEntryDto,
 } from '~/api/kanban'
-import { kanbanContextKey, kanbanApi, normalizeTaskTimer } from '~/api/kanban'
+import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
 const notify = useNotifications()
 
@@ -88,9 +88,6 @@ watch(
       col.tasks?.forEach((t: KanbanTaskDto) => {
         if (t.columnId == null) {
           t.columnId = col.id
-        }
-        if (t.timer) {
-          t.timer = normalizeTaskTimer(t.timer)
         }
       })
     })
