@@ -1,5 +1,6 @@
 import zoneinfo
 from datetime import datetime
+from typing import Literal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
@@ -154,3 +155,28 @@ class DeleteAccountIn(Schema):
 
     password: str = ""
     email: str = ""
+
+
+class UserSearchResultOut(Schema):
+    """User profile returned by exact search with relationship state."""
+
+    id: int
+    email: str
+    display_name: str
+    timezone: str
+    relationship_status: Literal["none", "friend", "pending_incoming", "pending_outgoing"]
+
+
+class FriendRequestOut(Schema):
+    """Outgoing or incoming pending friend request."""
+
+    id: int
+    user: UserOut
+    created_at: datetime
+
+
+class FriendRequestsListOut(Schema):
+    """Grouped pending requests for the authenticated user."""
+
+    incoming: list[FriendRequestOut]
+    outgoing: list[FriendRequestOut]

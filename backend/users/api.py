@@ -7,7 +7,7 @@ from django.contrib.auth.password_validation import validate_password, get_defau
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import models, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -15,12 +15,15 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from ninja import Router
 from ninja_jwt.tokens import RefreshToken
 
+from users.models import Friendship, FriendshipStatus, UserBlock
 from users.schemas import (
     PasswordRequirementsIn,
     PasswordRequirementsOut,
     AuthTokenOut,
     DeleteAccountIn,
     ErrorDetail,
+    FriendRequestOut,
+    FriendRequestsListOut,
     LoginIn,
     RefreshIn,
     RegisterIn,
@@ -29,6 +32,7 @@ from users.schemas import (
     PasswordResetRequestIn,
     PasswordResetLinkIn,
     PasswordResetConfirmIn,
+    UserSearchResultOut,
     UserUpdateIn,
 )
 
@@ -310,3 +314,295 @@ def delete_me(request, payload: DeleteAccountIn):
     user.save(update_fields=["is_active"])
 
     return 200, {"detail": "Account successfully deactivated."}
+
+
+@users_router.get(
+    "/search",
+    response={200: list[UserSearchResultOut], 400: ErrorDetail, 401: ErrorDetail},
+    summary="Search active users by exact display name or email",
+)
+def search_users(request, q: str = ""):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    query = q.strip()
+    if not query:
+        return 400, {"detail": "Search query cannot be empty."}
+
+    # Find matching active users (exclude self)
+    matches = User.objects.filter(
+        models.Q(display_name__iexact=query) | models.Q(email__iexact=query),
+        is_active=True,
+    ).exclude(id=user.id)
+
+    # Exclude blocked relationships in either direction
+    blocked_by_me = UserBlock.objects.filter(blocker=user).values_list("blocked_id", flat=True)
+    blocking_me = UserBlock.objects.filter(blocked=user).values_list("blocker_id", flat=True)
+    excluded_ids = set(blocked_by_me).union(set(blocking_me))
+    matches = matches.exclude(id__in=excluded_ids)
+
+    results = []
+    for match in matches:
+        # Determine relationship status
+        friendship = Friendship.objects.filter(
+            models.Q(requester=user, receiver=match) | models.Q(requester=match, receiver=user)
+        ).first()
+
+        rel_status = "none"
+        if friendship:
+            if friendship.status == FriendshipStatus.ACCEPTED:
+                rel_status = "friend"
+            elif friendship.status == FriendshipStatus.PENDING:
+                rel_status = "pending_outgoing" if friendship.requester_id == user.id else "pending_incoming"
+
+        results.append({
+            "id": match.id,
+            "email": match.email,
+            "display_name": match.display_name,
+            "timezone": match.timezone,
+            "relationship_status": rel_status,
+        })
+
+    return 200, results
+
+
+@users_router.post(
+    "/friends/requests/{user_id}",
+    response={201: FriendRequestOut, 400: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail, 409: ErrorDetail},
+    summary="Send a friend request to a user",
+)
+def send_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if user.id == user_id:
+        return 400, {"detail": "You cannot send a friend request to yourself."}
+
+    target = User.objects.filter(id=user_id, is_active=True).first()
+    if not target:
+        return 404, {"detail": "User not found."}
+
+    # Check blocking in either direction
+    if user.is_blocking(target) or target.is_blocking(user):
+        return 400, {"detail": "Unable to send friend request."}
+
+    # Check existing friendship record
+    existing = Friendship.objects.filter(
+        models.Q(requester=user, receiver=target) | models.Q(requester=target, receiver=user)
+    ).first()
+
+    if existing:
+        if existing.status == FriendshipStatus.ACCEPTED:
+            return 400, {"detail": "You are already friends with this user."}
+        if existing.status == FriendshipStatus.PENDING:
+            if existing.requester_id == user.id:
+                return 409, {"detail": "Friend request already sent."}
+            else:
+                return 400, {"detail": "This user has already sent you a friend request. Accept their request instead."}
+        # If declined, delete old row so a new request can be created cleanly
+        existing.delete()
+
+    friendship = Friendship.objects.create(
+        requester=user,
+        receiver=target,
+        status=FriendshipStatus.PENDING,
+    )
+    return 201, {"id": friendship.id, "user": target, "created_at": friendship.created_at}
+
+
+@users_router.post(
+    "/friends/requests/{user_id}/accept",
+    response={200: UserOut, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Accept an incoming friend request",
+)
+def accept_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester_id=user_id,
+        receiver=user,
+        status=FriendshipStatus.PENDING,
+    ).select_related("requester").first()
+
+    if not friendship:
+        return 404, {"detail": "Pending friend request not found."}
+
+    friendship.status = FriendshipStatus.ACCEPTED
+    friendship.save(update_fields=["status", "updated_at"])
+    return 200, friendship.requester
+
+
+@users_router.post(
+    "/friends/requests/{user_id}/decline",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Decline an incoming friend request",
+)
+def decline_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester_id=user_id,
+        receiver=user,
+        status=FriendshipStatus.PENDING,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Pending friend request not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend request declined."}
+
+
+@users_router.delete(
+    "/friends/requests/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Cancel an outgoing pending friend request",
+)
+def cancel_friend_request(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        requester=user,
+        receiver_id=user_id,
+        status=FriendshipStatus.PENDING,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Outgoing friend request not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend request cancelled."}
+
+
+@users_router.get(
+    "/friends/requests",
+    response={200: FriendRequestsListOut, 401: ErrorDetail},
+    summary="List all pending incoming and outgoing friend requests",
+)
+def list_friend_requests(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    incoming_qs = Friendship.objects.filter(
+        receiver=user, status=FriendshipStatus.PENDING
+    ).select_related("requester")
+    outgoing_qs = Friendship.objects.filter(
+        requester=user, status=FriendshipStatus.PENDING
+    ).select_related("receiver")
+
+    incoming = [{"id": f.id, "user": f.requester, "created_at": f.created_at} for f in incoming_qs]
+    outgoing = [{"id": f.id, "user": f.receiver, "created_at": f.created_at} for f in outgoing_qs]
+
+    return 200, {"incoming": incoming, "outgoing": outgoing}
+
+
+@users_router.get(
+    "/friends",
+    response={200: list[UserOut], 401: ErrorDetail},
+    summary="List all accepted friends of the current user",
+)
+def list_friends(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friends = user.get_friends().filter(is_active=True).order_by("display_name")
+    return 200, list(friends)
+
+
+@users_router.delete(
+    "/friends/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Remove an existing friend",
+)
+def unfriend_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    friendship = Friendship.objects.filter(
+        models.Q(requester=user, receiver_id=user_id) | models.Q(requester_id=user_id, receiver=user),
+        status=FriendshipStatus.ACCEPTED,
+    ).first()
+
+    if not friendship:
+        return 404, {"detail": "Friend not found."}
+
+    friendship.delete()
+    return 200, {"detail": "Friend removed successfully."}
+
+
+@users_router.post(
+    "/blocks/{user_id}",
+    response={200: ErrorDetail, 400: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Block a user",
+)
+def block_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    if user.id == user_id:
+        return 400, {"detail": "You cannot block yourself."}
+
+    target = User.objects.filter(id=user_id, is_active=True).first()
+    if not target:
+        return 404, {"detail": "User not found."}
+
+    if user.is_blocking(target):
+        return 200, {"detail": "User is already blocked."}
+
+    # Dissolve any existing friendship or pending request in either direction
+    Friendship.objects.filter(
+        models.Q(requester=user, receiver=target) | models.Q(requester=target, receiver=user)
+    ).delete()
+
+    UserBlock.objects.create(blocker=user, blocked=target)
+    return 200, {"detail": "User blocked successfully."}
+
+
+@users_router.delete(
+    "/blocks/{user_id}",
+    response={200: ErrorDetail, 401: ErrorDetail, 404: ErrorDetail},
+    summary="Unblock a user",
+)
+def unblock_user(request, user_id: int):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    block_record = UserBlock.objects.filter(blocker=user, blocked_id=user_id).first()
+    if not block_record:
+        return 404, {"detail": "Blocked user not found."}
+
+    block_record.delete()
+    return 200, {"detail": "User unblocked successfully."}
+
+
+@users_router.get(
+    "/blocks",
+    response={200: list[UserOut], 401: ErrorDetail},
+    summary="List all users blocked by current user",
+)
+def list_blocked_users(request):
+    user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return 401, {"detail": "Authentication required."}
+
+    blocked_users = User.objects.filter(
+        blocked_by_user_records__blocker=user,
+        is_active=True,
+    ).order_by("display_name")
+    return 200, list(blocked_users)
+
+
+
