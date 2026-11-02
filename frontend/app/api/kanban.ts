@@ -73,7 +73,7 @@ export const TASK_PRIORITY_CONFIG = {
 } as const
 
 export const TIMER_MODE_CONFIG = {
-  NONE: { label: 'None (Disabled)' },
+  NONE: { label: 'None' },
   COUNT_DOWN: { label: 'Count down' },
   COUNT_UP: { label: 'Count up' },
 } as const

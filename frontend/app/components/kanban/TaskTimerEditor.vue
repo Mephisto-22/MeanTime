@@ -10,24 +10,8 @@
         <div class="flex items-center gap-2">
           <i class="pi pi-hourglass text-amber-500 text-sm" />
           <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-600 dark:text-surface-300">
-            Focus & Work Journal
+            Timer
           </h3>
-          <Tag
-            v-if="isRunning"
-            :class="TIMER_STATE_CONFIG.RUNNING.badgeClass"
-            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold"
-          >
-            <span class="h-1.5 w-1.5 rounded-full" :class="TIMER_STATE_CONFIG.RUNNING.dotClass" />
-            {{ TIMER_STATE_CONFIG.RUNNING.label }}
-          </Tag>
-          <Tag
-            v-else-if="isPaused"
-            :class="TIMER_STATE_CONFIG.PAUSED.badgeClass"
-            class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold"
-          >
-            <i class="pi pi-pause text-[8px]" />
-            {{ TIMER_STATE_CONFIG.PAUSED.label }}
-          </Tag>
         </div>
 
         <!-- Mode Selector: Clean Select Dropdown -->
@@ -52,12 +36,6 @@
       <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
         <!-- Left Column: Active Focus Instrument (5 cols / ~42%) -->
         <div class="flex flex-col gap-3 md:col-span-5 md:pr-4 md:border-r md:border-surface-200 dark:md:border-surface-800">
-          <div class="flex items-center justify-between text-xs font-medium text-surface-500">
-            <Label class="text-xs font-medium text-surface-500">Active Instrument</Label>
-            <span v-if="localTimer.mode !== 'NONE'" class="text-[11px] text-surface-400">
-              {{ localTimer.mode === 'COUNT_DOWN' ? 'Countdown Block' : 'Stopwatch' }}
-            </span>
-          </div>
 
           <!-- If Mode is NONE: Clean Callout to Enable -->
           <Card
@@ -120,7 +98,7 @@
                 <div class="flex items-center justify-center gap-1 text-[10px] uppercase font-bold tracking-wider text-surface-400">
                   <span v-if="isEditingTarget" class="text-primary-600 dark:text-primary-400 flex items-center gap-1">
                     <i class="pi pi-pencil text-[9px]" />
-                    Type Target (e.g. 30, 45:00) & Enter
+                    (e.g. 30, 45:00)
                   </span>
                   <span v-else>
                     {{ isRunning ? 'Remaining Time' : (isPaused ? 'Paused At' : 'Target Interval') }}
@@ -160,7 +138,7 @@
                 <!-- Double-Click Hint (Shown when IDLE in COUNT_DOWN mode) -->
                 <div
                   v-if="!isEditingTarget && !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'"
-                  class="text-[10px] text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 cursor-pointer select-none"
+                  class="text-[10px] text-surface-400 opacity-60 flex items-center justify-center gap-1 cursor-pointer select-none"
                   title="Double-click to edit custom target"
                   @click="startEditingTarget"
                 >
@@ -238,7 +216,7 @@
         <div class="flex flex-col gap-3 md:col-span-7">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 text-xs font-medium text-surface-500">
-              <Label class="text-xs font-medium text-surface-500">Session Chronicle</Label>
+              <Label class="text-xs font-medium text-surface-500">Logs</Label>
               <Tag
                 :value="`(${entries.length})`"
                 severity="secondary"
@@ -253,7 +231,7 @@
             <Button
               type="button"
               icon="pi pi-plus"
-              :label="isManualLogOpen ? 'Cancel' : 'Log past work'"
+              :label="'Log past work'"
               size="small"
               text
               class="!text-xs !py-0.5"
@@ -344,7 +322,7 @@
                 <InputText
                   id="manual-session-note"
                   v-model="manualNote"
-                  placeholder="What did you accomplish in this session?"
+                  placeholder="Add a session note"
                   fluid
                   class="!text-xs !py-1.5"
                   data-testid="manual-input-note"
@@ -539,7 +517,7 @@
           </div>
 
           <div v-else class="text-xs text-surface-400 italic py-4 text-center">
-            No work sessions recorded yet. Start tracking or click "+ Log past work" above.
+            No work sessions recorded yet
           </div>
         </div>
       </div>
@@ -585,8 +563,8 @@ const kanbanContext = inject(kanbanContextKey, null)
 
 const modeOptions = [
   { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },
-  { label: `Stopwatch (${TIMER_MODE_CONFIG.COUNT_UP.label})`, value: 'COUNT_UP' },
-  { label: `Countdown (${TIMER_MODE_CONFIG.COUNT_DOWN.label})`, value: 'COUNT_DOWN' },
+  { label: `Stopwatch`, value: 'COUNT_UP' },
+  { label: `Countdown`, value: 'COUNT_DOWN' },
 ]
 
 const localTimer = ref<TaskTimerDto>({
