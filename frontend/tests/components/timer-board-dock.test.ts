@@ -125,6 +125,46 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
     })
   })
 
+    it('completely removes TaskTimerDock and "ready" bar placeholder if no timer option is selected (mode is NONE or timer is absent)', () => {
+      const taskWithoutTimer: KanbanTaskDto = {
+        id: 'task-no-timer',
+        title: 'Task without timer',
+        position: 0,
+        timer: null,
+      }
+
+      const wrapper1 = mount(Task, {
+        props: { task: taskWithoutTimer },
+        global: { plugins: [PrimeVue] },
+      })
+      expect(wrapper1.findComponent(TaskTimerDock).exists()).toBe(false)
+      expect(wrapper1.find('[data-testid="task-timer-dock"]').exists()).toBe(false)
+      expect(wrapper1.text()).not.toContain('Ready')
+
+      const taskWithNoneMode: KanbanTaskDto = {
+        id: 'task-none-mode',
+        title: 'Task with NONE mode',
+        position: 0,
+        timer: {
+          taskId: 'task-none-mode',
+          mode: 'NONE',
+          targetDurationSeconds: 1500,
+          state: 'IDLE',
+          startedAt: null,
+          elapsedSeconds: 0,
+        },
+      }
+
+      const wrapper2 = mount(Task, {
+        props: { task: taskWithNoneMode },
+        global: { plugins: [PrimeVue] },
+      })
+      expect(wrapper2.findComponent(TaskTimerDock).exists()).toBe(false)
+      expect(wrapper2.find('[data-testid="task-timer-dock"]').exists()).toBe(false)
+      expect(wrapper2.text()).not.toContain('Ready')
+    })
+
+
   describe('Board Multi-Timer Concurrency & Column Move Neutrality', () => {
     it('supports multiple active timers running concurrently across columns', async () => {
       const now = Date.now()

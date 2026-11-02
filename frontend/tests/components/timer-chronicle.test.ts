@@ -170,4 +170,56 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const entries = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
     expect(entries).toHaveLength(0)
   })
+
+  it('correctly handles raw snake_case entries from backend API without displaying NaN', async () => {
+    const rawBackendEntries: any[] = [
+      {
+        id: 101,
+        task_id: 42,
+        user_id: 1,
+        started_at: '2026-11-01T10:00:00.000Z',
+        ended_at: '2026-11-01T10:25:00.000Z',
+        duration_seconds: 1500,
+        note: 'Sprint planning from server',
+        created_at: '2026-11-01T10:25:00.000Z',
+      },
+      {
+        id: 102,
+        task_id: 42,
+        user_id: 1,
+        started_at: '2026-11-01T14:00:00.000Z',
+        ended_at: '2026-11-01T14:45:00.000Z',
+        duration_seconds: 2700,
+        note: 'API development from server',
+        created_at: '2026-11-01T14:45:00.000Z',
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 42,
+        timer: defaultTimer,
+        timeEntries: rawBackendEntries as any,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('NaN')
+    expect(wrapper.text()).toContain('(2)')
+    expect(wrapper.text()).toContain('1h 10m total')
+    expect(wrapper.text()).toContain('25m')
+    expect(wrapper.text()).toContain('45m')
+    expect(wrapper.text()).toContain('Sprint planning from server')
+    expect(wrapper.text()).toContain('API development from server')
+
+    const editBtn = wrapper.find('[data-testid="btn-edit-session-101"]')
+    expect(editBtn.exists()).toBe(true)
+    await editBtn.trigger('click')
+
+    const durationInput = wrapper.find('[data-testid="edit-session-duration"]')
+    expect(durationInput.text()).not.toContain('NaN')
+    expect(wrapper.html()).not.toContain('NaN')
+  })
 })

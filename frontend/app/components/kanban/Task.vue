@@ -78,6 +78,7 @@
 
       <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
       <TaskTimerDock
+        v-if="hasActiveTimer"
         :task-id="task.id"
         :timer="task.timer"
         @start="handleTimerStart"
@@ -104,6 +105,10 @@ const props = defineProps<{
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
+
+const hasActiveTimer = computed(() => {
+  return props.task.timer != null && props.task.timer.mode !== 'NONE'
+})
 
 const handleTimerStart = (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => {
   if (props.onTimerStart) props.onTimerStart(taskId, defaultTimer)

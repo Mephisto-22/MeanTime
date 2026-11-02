@@ -255,7 +255,7 @@
         >
           <div class="flex items-center justify-between border-b border-surface-200 dark:border-surface-700 pb-2">
             <span class="font-bold text-surface-800 dark:text-surface-100">Log Past Work Session</span>
-            <span class="text-[10px] text-surface-400 font-mono">Calculated duration: {{ formatDurationBadge(manualDurationMinutes * 60) }}</span>
+            <span class="text-[10px] text-surface-400 font-mono">Calculated duration: {{ formatDurationBadge((Number(manualDurationMinutes) || 0) * 60) }}</span>
           </div>
 
           <!-- Row 1: Date (Flex-1) and Duration (Fixed Width Stepper) -->
@@ -369,10 +369,10 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span class="inline-flex items-center rounded-md bg-primary-100/70 px-2 py-0.5 font-mono text-[11px] font-bold text-primary-700 dark:bg-primary-950 dark:text-primary-300">
-                    {{ formatDurationBadge(entry.durationSeconds) }}
+                    {{ formatDurationBadge(entry.durationSeconds ?? entry.duration_seconds) }}
                   </span>
                   <span class="text-[11px] text-surface-500 font-medium">
-                    {{ formatDateLabel(entry.startedAt) }} &bull; {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
+                    {{ formatDateLabel(entry.startedAt ?? entry.started_at) }} &bull; {{ formatTimeRange(entry.startedAt ?? entry.started_at, entry.endedAt ?? entry.ended_at) }}
                   </span>
                 </div>
 
@@ -529,6 +529,8 @@ import {
   TIMER_STATE_CONFIG,
   kanbanApi,
   kanbanContextKey,
+  normalizeTimeEntry,
+  normalizeTaskTimer,
 } from '~/api/kanban'
 import {
   useTaskTimer,
@@ -570,23 +572,27 @@ const localTimer = ref<TaskTimerDto>({
   elapsedSeconds: props.timer?.elapsedSeconds ?? 0,
 })
 
-const entries = ref<TaskTimeEntryDto[]>(props.timeEntries ? [...props.timeEntries] : [])
+const entries = ref<TaskTimeEntryDto[]>(
+  props.timeEntries ? props.timeEntries.map(normalizeTimeEntry) : [],
+)
 
 const isPersistedTaskId = computed(() => {
   if (!props.taskId) return false
   const str = String(props.taskId)
-  if (str.startsWith('draft') || str.startsWith('new') || str.startsWith('temp') || str.startsWith('chronicle')) {
-    return false
-  }
-  return true
+  return !str.startsWith('draft') && !str.startsWith('new') && !str.startsWith('temp')
 })
 
 const loadPersistedEntries = async () => {
-  if (!isPersistedTaskId.value) return
+  if (!isPersistedTaskId.value) {
+    if (!props.timeEntries || props.timeEntries.length === 0) {
+      entries.value = []
+    }
+    return
+  }
   try {
     const data = await kanbanApi.listTimeEntries(props.taskId)
     if (data && Array.isArray(data)) {
-      entries.value = data
+      entries.value = data.map(normalizeTimeEntry)
       syncEntriesOut()
     }
   } catch {
@@ -596,16 +602,26 @@ const loadPersistedEntries = async () => {
 
 onMounted(() => {
   if (props.timeEntries && props.timeEntries.length > 0) {
-    entries.value = [...props.timeEntries]
-  } else {
+    entries.value = props.timeEntries.map(normalizeTimeEntry)
+  } else if (!props.timeEntries) {
     loadPersistedEntries()
   }
 })
 
 watch(
+  () => props.taskId,
+  (newId) => {
+    if (newId) {
+      localTimer.value.taskId = newId
+      loadPersistedEntries()
+    }
+  },
+)
+
+watch(
   () => props.timer,
   (t) => {
-    if (t) localTimer.value = { ...t }
+    if (t) localTimer.value = normalizeTaskTimer(t)
   },
   { deep: true },
 )
@@ -613,7 +629,13 @@ watch(
 watch(
   () => props.timeEntries,
   (list) => {
-    if (list) entries.value = [...list]
+    if (list && list.length > 0) {
+      entries.value = list.map(normalizeTimeEntry)
+    } else if (list && list.length === 0) {
+      entries.value = []
+    } else {
+      loadPersistedEntries()
+    }
   },
   { deep: true },
 )
@@ -622,7 +644,10 @@ const syncTimerOut = () => emit('update:timer', { ...localTimer.value })
 const syncEntriesOut = () => emit('update:timeEntries', [...entries.value])
 
 // Target duration & inline editing
-const targetMinutes = computed(() => Math.floor((localTimer.value.targetDurationSeconds ?? 1500) / 60))
+const targetMinutes = computed(() => {
+  const target = localTimer.value.targetDurationSeconds ?? localTimer.value.target_duration_seconds ?? 1500
+  return Math.floor(target / 60)
+})
 const customMinutes = ref(targetMinutes.value)
 
 watch(targetMinutes, (m) => {
@@ -716,7 +741,10 @@ const setMode = (m: TimerMode) => {
 }
 
 const totalDurationSeconds = computed(() => {
-  return entries.value.reduce((acc, cur) => acc + (cur.durationSeconds || 0), 0)
+  return entries.value.reduce((acc, cur) => {
+    const dur = Number(cur.durationSeconds ?? cur.duration_seconds ?? 0)
+    return acc + (isNaN(dur) ? 0 : dur)
+  }, 0)
 })
 
 const {
@@ -757,40 +785,9 @@ const handlePause = () => {
 
 const handleStop = async () => {
   const duration = elapsedSeconds.value
-  if (duration > 0) {
-    const startedAt = localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString()
-    const endedAt = new Date().toISOString()
-    const note = localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session'
-
-    let newEntry: TaskTimeEntryDto = {
-      id: `entry-${Date.now()}`,
-      taskId: props.taskId,
-      startedAt,
-      endedAt,
-      durationSeconds: duration,
-      note,
-      createdAt: new Date().toISOString(),
-    }
-
-    if (isPersistedTaskId.value) {
-      try {
-        const persisted = await kanbanApi.createTimeEntry(props.taskId, {
-          startedAt,
-          endedAt,
-          durationSeconds: duration,
-          note,
-        })
-        if (persisted && persisted.id) {
-          newEntry = persisted
-        }
-      } catch {
-        // Fallback to local entry
-      }
-    }
-
-    entries.value.unshift(newEntry)
-    syncEntriesOut()
-  }
+  const startedAt = localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString()
+  const endedAt = new Date().toISOString()
+  const note = localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session'
 
   localTimer.value.state = 'IDLE'
   localTimer.value.elapsedSeconds = 0
@@ -799,6 +796,34 @@ const handleStop = async () => {
 
   if (kanbanContext?.stopTimer && isPersistedTaskId.value) {
     kanbanContext.stopTimer(props.taskId)
+  } else if (isPersistedTaskId.value) {
+    try {
+      await kanbanApi.updateTaskTimer(props.taskId, {
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      })
+    } catch {
+      // Continue
+    }
+  }
+
+  if (duration > 0) {
+    if (isPersistedTaskId.value) {
+      await loadPersistedEntries()
+    } else {
+      const newEntry: TaskTimeEntryDto = {
+        id: `entry-${Date.now()}`,
+        taskId: props.taskId,
+        startedAt,
+        endedAt,
+        durationSeconds: duration,
+        note,
+        createdAt: new Date().toISOString(),
+      }
+      entries.value.unshift(newEntry)
+      syncEntriesOut()
+    }
   }
 }
 
@@ -809,7 +834,7 @@ const isManualLogOpen = ref(false)
 const manualDate = ref(toLocalDateString(new Date().toISOString()))
 const manualStartTime = ref('09:00')
 const manualEndTime = ref('09:25')
-const manualDurationMinutes = ref(25)
+const manualDurationMinutes = ref<number | null>(25)
 const manualNote = ref('')
 
 const toggleManualLog = () => {
@@ -826,9 +851,11 @@ const toggleManualLog = () => {
 }
 
 const parseMinutesFromTime = (timeStr: string): number => {
+  if (!timeStr) return 0
   const parts = timeStr.split(':').map(Number)
   const h = parts[0] ?? 0
   const m = parts[1] ?? 0
+  if (isNaN(h) || isNaN(m)) return 0
   return h * 60 + m
 }
 
@@ -850,20 +877,22 @@ const onManualTimeInputChanged = () => {
 }
 
 const onManualDurationInputChanged = (val: number | null) => {
-  if (!val || val <= 0) return
+  if (val == null || isNaN(val) || val <= 0) return
   const startMins = parseMinutesFromTime(manualStartTime.value)
   manualEndTime.value = formatMinutesToTime(startMins + val)
 }
 
 const submitManualEntry = async () => {
-  if (manualDurationMinutes.value <= 0) return
+  const durationMins = Number(manualDurationMinutes.value) || 0
+  if (durationMins <= 0) return
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
   const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
-  const durationSec = manualDurationMinutes.value * 60
+  const durationSec = durationMins * 60
   const note = manualNote.value.trim() || 'Manual session'
 
-  let newEntry: TaskTimeEntryDto = {
-    id: `manual-${Date.now()}`,
+  const tempId = `manual-${Date.now()}`
+  const newEntry: TaskTimeEntryDto = {
+    id: tempId,
     taskId: props.taskId,
     startedAt: started,
     endedAt: ended,
@@ -871,6 +900,11 @@ const submitManualEntry = async () => {
     note,
     createdAt: new Date().toISOString(),
   }
+
+  entries.value.unshift(newEntry)
+  syncEntriesOut()
+  isManualLogOpen.value = false
+  manualNote.value = ''
 
   if (isPersistedTaskId.value) {
     try {
@@ -881,17 +915,16 @@ const submitManualEntry = async () => {
         note,
       })
       if (persisted && persisted.id) {
-        newEntry = persisted
+        const found = entries.value.find(e => e.id === tempId)
+        if (found) {
+          Object.assign(found, normalizeTimeEntry(persisted))
+          syncEntriesOut()
+        }
       }
     } catch {
-      // Continue with optimistic / local entry
+      // Continue with optimistic entry
     }
   }
-
-  entries.value.unshift(newEntry)
-  syncEntriesOut()
-  isManualLogOpen.value = false
-  manualNote.value = ''
 }
 
 // -------------------------------------------------------------
@@ -901,16 +934,17 @@ const editingEntryId = ref<string | number | null>(null)
 const editDate = ref('')
 const editStartTime = ref('')
 const editEndTime = ref('')
-const editDurationMinutes = ref(0)
+const editDurationMinutes = ref<number | null>(0)
 const editNoteText = ref('')
 
 const startEditingSession = (entry: TaskTimeEntryDto) => {
-  editingEntryId.value = entry.id
-  editDate.value = toLocalDateString(entry.startedAt)
-  editStartTime.value = toLocalTimeString(entry.startedAt)
-  editEndTime.value = toLocalTimeString(entry.endedAt)
-  editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
-  editNoteText.value = entry.note
+  const normalized = normalizeTimeEntry(entry)
+  editingEntryId.value = normalized.id
+  editDate.value = toLocalDateString(normalized.startedAt)
+  editStartTime.value = toLocalTimeString(normalized.startedAt)
+  editEndTime.value = toLocalTimeString(normalized.endedAt)
+  editDurationMinutes.value = Math.max(1, Math.round(normalized.durationSeconds / 60))
+  editNoteText.value = normalized.note
 }
 
 const onEditTimeChanged = () => {
@@ -921,15 +955,16 @@ const onEditTimeChanged = () => {
 }
 
 const onEditDurationChanged = (val: number | null) => {
-  if (!val || val <= 0) return
+  if (val == null || isNaN(val) || val <= 0) return
   const startMins = parseMinutesFromTime(editStartTime.value)
   editEndTime.value = formatMinutesToTime(startMins + val)
 }
 
 const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
+  const durationMins = Number(editDurationMinutes.value) || 0
   const started = combineDateAndTime(editDate.value, editStartTime.value)
   const ended = combineDateAndTime(editDate.value, editEndTime.value)
-  const durationSec = editDurationMinutes.value * 60
+  const durationSec = durationMins * 60
   const note = editNoteText.value
 
   entry.startedAt = started
@@ -937,21 +972,24 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   entry.durationSeconds = durationSec
   entry.note = note
   editingEntryId.value = null
+  syncEntriesOut()
 
   if (isPersistedTaskId.value && !String(entry.id).startsWith('manual') && !String(entry.id).startsWith('entry')) {
     try {
-      await kanbanApi.updateTimeEntry(entry.id, {
+      const updated = await kanbanApi.updateTimeEntry(entry.id, {
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,
         note,
       })
+      if (updated) {
+        Object.assign(entry, normalizeTimeEntry(updated))
+        syncEntriesOut()
+      }
     } catch {
-      // Continue
+      // Continue with optimistic edit
     }
   }
-
-  syncEntriesOut()
 }
 
 const deleteEntry = async (id: string | number) => {

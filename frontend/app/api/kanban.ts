@@ -8,22 +8,62 @@ export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
 export interface TaskTimerDto {
   id?: number
   taskId: number | string
+  task_id?: number | string
   mode: TimerMode
   targetDurationSeconds: number | null
+  target_duration_seconds?: number | null
   state: TimerState
   startedAt: string | null
+  started_at?: string | null
   elapsedSeconds: number
+  elapsed_seconds?: number
 }
 
 export interface TaskTimeEntryDto {
   id: number | string
   taskId: number | string
+  task_id?: number | string
   userId?: number | string
+  user_id?: number | string
   startedAt: string
-  endedAt: string
+  started_at?: string
+  endedAt?: string | null
+  ended_at?: string | null
   durationSeconds: number
+  duration_seconds?: number
   note: string
   createdAt?: string
+  created_at?: string
+}
+
+export function normalizeTimeEntry(raw: any): TaskTimeEntryDto {
+  if (!raw) return raw
+  const duration = Number(raw.durationSeconds ?? raw.duration_seconds ?? 0)
+  return {
+    id: raw.id,
+    taskId: raw.taskId ?? raw.task_id,
+    userId: raw.userId ?? raw.user_id,
+    startedAt: raw.startedAt ?? raw.started_at ?? new Date().toISOString(),
+    endedAt: raw.endedAt ?? raw.ended_at ?? null,
+    durationSeconds: isNaN(duration) ? 0 : Math.max(0, duration),
+    note: raw.note ?? '',
+    createdAt: raw.createdAt ?? raw.created_at,
+  }
+}
+
+export function normalizeTaskTimer(raw: any): TaskTimerDto {
+  if (!raw) return raw
+  const elapsed = Number(raw.elapsedSeconds ?? raw.elapsed_seconds ?? 0)
+  const target = raw.targetDurationSeconds ?? raw.target_duration_seconds
+  return {
+    id: raw.id,
+    taskId: raw.taskId ?? raw.task_id,
+    mode: raw.mode ?? 'NONE',
+    targetDurationSeconds: target != null && !isNaN(Number(target)) ? Number(target) : null,
+    state: raw.state ?? 'IDLE',
+    startedAt: raw.startedAt ?? raw.started_at ?? null,
+    elapsedSeconds: isNaN(elapsed) ? 0 : Math.max(0, elapsed),
+  }
 }
 
 export const TASK_PRIORITY_CONFIG = {
@@ -133,7 +173,7 @@ export interface KanbanContext {
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')
 
 export class KanbanApi {
-  readonly endpoint = '/api/kanban'
+  private readonly endpoint = '/api/kanban'
 
   // -----------------
   // Board Endpoints
@@ -147,11 +187,11 @@ export class KanbanApi {
     return apiService.get<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`)
   }
 
-  createBoard(payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
+  createBoard(payload: { title: string; description?: string }): Promise<KanbanBoardDto> {
     return apiService.post<KanbanBoardDto>(`${this.endpoint}/boards`, payload)
   }
 
-  updateBoard(boardId: string | number, payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
+  updateBoard(boardId: string | number, payload: { title?: string; description?: string }): Promise<KanbanBoardDto> {
     return apiService.patch<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`, payload)
   }
 
@@ -163,11 +203,11 @@ export class KanbanApi {
   // Column Endpoints
   // -----------------
 
-  createColumn(boardId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
+  createColumn(boardId: string | number, payload: { title: string; position?: number }): Promise<KanbanColumnDto> {
     return apiService.post<KanbanColumnDto>(`${this.endpoint}/boards/${boardId}/columns`, payload)
   }
 
-  updateColumn(columnId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
+  updateColumn(columnId: string | number, payload: { title?: string; position?: number }): Promise<KanbanColumnDto> {
     return apiService.patch<KanbanColumnDto>(`${this.endpoint}/columns/${columnId}`, payload)
   }
 
@@ -199,40 +239,44 @@ export class KanbanApi {
   // Timer Endpoints
   // -----------------
 
-  updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
-    return apiService.patch<TaskTimerDto>(`${this.endpoint}/tasks/${taskId}/timer`, {
+  async updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
+    const raw = await apiService.patch<any>(`${this.endpoint}/tasks/${taskId}/timer`, {
       mode: payload.mode,
-      target_duration_seconds: payload.targetDurationSeconds ?? (payload as any).target_duration_seconds,
+      target_duration_seconds: payload.targetDurationSeconds ?? payload.target_duration_seconds,
       state: payload.state,
-      started_at: payload.startedAt ?? (payload as any).started_at,
-      elapsed_seconds: payload.elapsedSeconds ?? (payload as any).elapsed_seconds,
+      started_at: payload.startedAt ?? payload.started_at,
+      elapsed_seconds: payload.elapsedSeconds ?? payload.elapsed_seconds,
     })
+    return normalizeTaskTimer(raw)
   }
 
   // -----------------
   // Time Entry Endpoints
   // -----------------
 
-  listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
-    return apiService.get<TaskTimeEntryDto[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
+  async listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
+    const raw = await apiService.get<any[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
+    return (raw || []).map(normalizeTimeEntry)
   }
 
-  createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
-    return apiService.post<TaskTimeEntryDto>(`${this.endpoint}/tasks/${taskId}/time-entries`, {
-      started_at: payload.startedAt ?? (payload as any).started_at,
-      ended_at: payload.endedAt ?? (payload as any).ended_at,
-      duration_seconds: payload.durationSeconds ?? (payload as any).duration_seconds,
+  async createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    const raw = await apiService.post<any>(`${this.endpoint}/tasks/${taskId}/time-entries`, {
+      started_at: payload.startedAt ?? payload.started_at,
+      ended_at: payload.endedAt ?? payload.ended_at,
+      duration_seconds: payload.durationSeconds ?? payload.duration_seconds,
       note: payload.note ?? '',
     })
+    return normalizeTimeEntry(raw)
   }
 
-  updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
-    return apiService.patch<TaskTimeEntryDto>(`${this.endpoint}/time-entries/${entryId}`, {
-      started_at: payload.startedAt ?? (payload as any).started_at,
-      ended_at: payload.endedAt ?? (payload as any).ended_at,
-      duration_seconds: payload.durationSeconds ?? (payload as any).duration_seconds,
+  async updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    const raw = await apiService.patch<any>(`${this.endpoint}/time-entries/${entryId}`, {
+      started_at: payload.startedAt ?? payload.started_at,
+      ended_at: payload.endedAt ?? payload.ended_at,
+      duration_seconds: payload.durationSeconds ?? payload.duration_seconds,
       note: payload.note,
     })
+    return normalizeTimeEntry(raw)
   }
 
   deleteTimeEntry(entryId: string | number): Promise<SuccessResponse> {

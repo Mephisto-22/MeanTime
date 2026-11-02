@@ -1,8 +1,11 @@
 import { ref, computed, onMounted, onUnmounted, watch, getCurrentInstance } from 'vue'
 import type { TaskTimerDto, TaskTimeEntryDto, TimerMode, TimerState } from '~/api/kanban'
 
-export function formatDigital(totalSeconds: number, forceHours = false): string {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+export function formatDigital(totalSeconds?: number | null, forceHours = false): string {
+  if (totalSeconds == null || isNaN(Number(totalSeconds))) {
+    return forceHours ? '00:00:00' : '00:00'
+  }
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds)))
   const hours = Math.floor(safeSeconds / 3600)
   const minutes = Math.floor((safeSeconds % 3600) / 60)
   const seconds = safeSeconds % 60
@@ -17,8 +20,11 @@ export function formatDigital(totalSeconds: number, forceHours = false): string 
   return `${mm}:${ss}`
 }
 
-export function formatDurationBadge(totalSeconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+export function formatDurationBadge(totalSeconds?: number | null): string {
+  if (totalSeconds == null || isNaN(Number(totalSeconds))) {
+    return '0s'
+  }
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds)))
   const hours = Math.floor(safeSeconds / 3600)
   const minutes = Math.floor((safeSeconds % 3600) / 60)
   const seconds = safeSeconds % 60
@@ -32,12 +38,16 @@ export function formatDurationBadge(totalSeconds: number): string {
   return `${seconds}s`
 }
 
-export function formatTimeRange(startedAt: string, endedAt: string): string {
+export function formatTimeRange(startedAt?: string | null, endedAt?: string | null): string {
   try {
+    if (!startedAt) return 'Session'
     const start = new Date(startedAt)
-    const end = new Date(endedAt)
+    if (isNaN(start.getTime())) return 'Session'
     const timeFormat: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
     const startStr = start.toLocaleTimeString([], timeFormat)
+    if (!endedAt) return startStr
+    const end = new Date(endedAt)
+    if (isNaN(end.getTime())) return startStr
     const endStr = end.toLocaleTimeString([], timeFormat)
     return `${startStr} – ${endStr}`
   } catch {
@@ -45,9 +55,11 @@ export function formatTimeRange(startedAt: string, endedAt: string): string {
   }
 }
 
-export function formatDateLabel(isoString: string): string {
+export function formatDateLabel(isoString?: string | null): string {
   try {
+    if (!isoString) return 'Recent'
     const d = new Date(isoString)
+    if (isNaN(d.getTime())) return 'Recent'
     const now = new Date()
     const isToday = d.toDateString() === now.toDateString()
     if (isToday) return 'Today'
@@ -57,9 +69,11 @@ export function formatDateLabel(isoString: string): string {
   }
 }
 
-export function toLocalTimeString(iso: string): string {
+export function toLocalTimeString(iso?: string | null): string {
   try {
+    if (!iso) return '12:00'
     const d = new Date(iso)
+    if (isNaN(d.getTime())) return '12:00'
     const hh = String(d.getHours()).padStart(2, '0')
     const mm = String(d.getMinutes()).padStart(2, '0')
     return `${hh}:${mm}`
@@ -68,9 +82,11 @@ export function toLocalTimeString(iso: string): string {
   }
 }
 
-export function toLocalDateString(iso: string): string {
+export function toLocalDateString(iso?: string | null): string {
   try {
+    if (!iso) return new Date().toISOString().slice(0, 10)
     const d = new Date(iso)
+    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10)
     const yyyy = d.getFullYear()
     const mm = String(d.getMonth() + 1).padStart(2, '0')
     const dd = String(d.getDate()).padStart(2, '0')
@@ -120,17 +136,18 @@ export function useTaskTimer(
   const elapsedSeconds = computed(() => {
     const t = timer.value
     if (!t) return 0
-    const startedAt = t.startedAt || (t as any).started_at
+    const startedAt = t.startedAt || t.started_at
     if (t.state === 'RUNNING' && startedAt) {
       const anchor = new Date(startedAt).getTime()
       const delta = Math.max(0, Math.floor((now.value - anchor) / 1000))
-      return ((t.elapsedSeconds ?? (t as any).elapsed_seconds) || 0) + delta
+      return (Number(t.elapsedSeconds ?? t.elapsed_seconds ?? 0) || 0) + delta
     }
-    return (t.elapsedSeconds ?? (t as any).elapsed_seconds) || 0
+    return Number(t.elapsedSeconds ?? t.elapsed_seconds ?? 0) || 0
   })
 
   const targetDurationSeconds = computed(() => {
-    return timer.value?.targetDurationSeconds ?? (timer.value as any)?.target_duration_seconds ?? 0
+    const target = timer.value?.targetDurationSeconds ?? timer.value?.target_duration_seconds
+    return target != null && !isNaN(Number(target)) ? Number(target) : 0
   })
 
   const remainingSeconds = computed(() => {
@@ -160,7 +177,7 @@ export function useTaskTimer(
       const entry: TaskTimeEntryDto = {
         id: `entry-${Date.now()}`,
         taskId: t.taskId,
-        startedAt: t.startedAt || (t as any).started_at || new Date(Date.now() - (targetDurationSeconds.value || 0) * 1000).toISOString(),
+        startedAt: t.startedAt || t.started_at || new Date(Date.now() - (targetDurationSeconds.value || 0) * 1000).toISOString(),
         endedAt: new Date().toISOString(),
         durationSeconds: targetDurationSeconds.value || elapsedSeconds.value,
         note: 'Completed countdown session',

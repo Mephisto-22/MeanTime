@@ -1,5 +1,6 @@
 <template>
   <div
+    v-if="hasTimer"
     data-testid="task-timer-dock"
     class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col justify-between border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none transition-colors"
     @click.stop
@@ -147,6 +148,10 @@ const emit = defineEmits<{
   (e: 'stop', taskId: string | number, entry?: TaskTimeEntryDto): void
 }>()
 
+const hasTimer = computed(() => {
+  return props.timer != null && props.timer.mode !== 'NONE'
+})
+
 const {
   isRunning,
   isPaused,
@@ -164,7 +169,8 @@ const {
 )
 
 const targetMinutes = computed(() => {
-  return Math.floor((targetDurationSeconds.value || 1500) / 60)
+  const target = targetDurationSeconds.value || props.timer?.targetDurationSeconds || (props.timer as any)?.target_duration_seconds || 1500
+  return Math.floor(target / 60)
 })
 
 const isCountDownTask = computed(() => {
@@ -184,18 +190,18 @@ const idleDisplayLabel = computed(() => {
     return 'Stopwatch'
   }
   if (props.timer?.mode === 'COUNT_DOWN') {
-    const mins = props.timer?.targetDurationSeconds ? Math.floor(props.timer.targetDurationSeconds / 60) : 25
+    const target = props.timer?.targetDurationSeconds ?? (props.timer as any)?.target_duration_seconds
+    const mins = target ? Math.floor(target / 60) : 25
     return `${TIMER_MODE_CONFIG.COUNT_DOWN.label} (${mins}m)`
   }
-  return 'Ready'
+  return ''
 })
 
 const handleStartOrResume = () => {
-  // If no timer or NONE, inherit Countdown 25m as default
   const defaultTimer: Partial<TaskTimerDto> = {
     taskId: props.taskId,
     mode: props.timer?.mode && props.timer.mode !== 'NONE' ? props.timer.mode : 'COUNT_DOWN',
-    targetDurationSeconds: props.timer?.targetDurationSeconds || 1500,
+    targetDurationSeconds: props.timer?.targetDurationSeconds ?? (props.timer as any)?.target_duration_seconds ?? 1500,
     state: 'RUNNING',
     startedAt: new Date().toISOString(),
     elapsedSeconds: 0,
