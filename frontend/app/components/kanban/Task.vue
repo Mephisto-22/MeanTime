@@ -122,7 +122,7 @@ const handleTimerPause = (taskId: string | number) => {
 
 const handleTimerStop = (taskId: string | number, entry?: TaskTimeEntryDto) => {
   if (props.onTimerStop) props.onTimerStop(taskId, entry)
-  else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId)
+  else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId, entry)
 }
 
 const {

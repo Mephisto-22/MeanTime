@@ -263,3 +263,36 @@ class TaskTimerApiTests(TestCase):
 
         # Must still be exactly 1 entry
         self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+    def test_rapid_reconcile_and_patch_within_safety_window(self):
+        """Even if started_at timestamps slightly differ, duplicate creations within 15 seconds are blocked."""
+        # Pre-existing entry created 2 seconds ago
+        TaskTimeEntry.objects.create(
+            task_id=self.task_id,
+            user=self.user,
+            started_at=timezone.now() - timedelta(seconds=12),
+            ended_at=timezone.now() - timedelta(seconds=2),
+            duration_seconds=10,
+            note="Completed countdown session",
+        )
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=10,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=10),
+            elapsed_seconds=0,
+        )
+
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 10}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Still exactly 1 entry, duplicate prevented by 15-second safety window
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)

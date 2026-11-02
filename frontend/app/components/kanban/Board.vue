@@ -567,7 +567,17 @@ const handlePauseTimer = async (taskId: string | number): Promise<void> => {
   }
 }
 
+const recentAlerts = new Map<string | number, number>()
+const recentlyStoppedTasks = new Map<string | number, number>()
+
 const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
+  const lastStopped = recentlyStoppedTasks.get(taskId) ?? 0
+  const now = Date.now()
+  if (now - lastStopped < 2000) {
+    return
+  }
+  recentlyStoppedTasks.set(taskId, now)
+
   const task = findTaskById(taskId)
   if (!task || !task.timer) return
   if (task.timer.state === 'IDLE') return
@@ -610,6 +620,12 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
 }
 
 const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
+  const lastAlertTime = recentAlerts.get(task.id) ?? 0
+  const now = Date.now()
+  if (now - lastAlertTime < 3000) {
+    return
+  }
+  recentAlerts.set(task.id, now)
   notify.timerComplete(task.title)
 }
 

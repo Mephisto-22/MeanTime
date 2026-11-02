@@ -346,5 +346,88 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       expect(col.tasks[0].timer.state).toBe('IDLE')
       expect(col.tasks[0].timer.elapsedSeconds).toBe(0)
     })
+
+    it('forwards expired entry from Task.vue through kanbanContext.stopTimer', async () => {
+      const stopMock = vi.fn()
+      const task: KanbanTaskDto = {
+        id: 'task-dock-stop-1',
+        title: 'Task Dock Stop',
+        position: 0,
+        timer: {
+          taskId: 'task-dock-stop-1',
+          mode: 'COUNT_DOWN',
+          targetDurationSeconds: 1500,
+          state: 'RUNNING',
+          startedAt: new Date().toISOString(),
+          elapsedSeconds: 0,
+        },
+      }
+
+      const wrapper = mount(Task, {
+        props: { task },
+        global: {
+          plugins: [PrimeVue],
+          provide: {
+            [kanbanContextKey as symbol]: {
+              stopTimer: stopMock,
+            },
+          },
+        },
+      })
+
+      const dock = wrapper.findComponent(TaskTimerDock)
+      expect(dock.exists()).toBe(true)
+
+      const mockEntry: any = { id: 'entry-dock-1', durationSeconds: 1500 }
+      dock.vm.$emit('stop', 'task-dock-stop-1', mockEntry)
+
+      expect(stopMock).toHaveBeenCalledWith('task-dock-stop-1', mockEntry)
+    })
+
+    it('debounces duplicate timer expiration alerts within 3 seconds', async () => {
+      const boardData: KanbanBoardDto = {
+        id: 4,
+        title: 'Debounce Board',
+        description: '',
+        columns: [
+          {
+            id: 301,
+            title: 'Column',
+            position: 0,
+            boardId: 4,
+            tasks: [
+              {
+                id: 'debounce-task-1',
+                title: 'Debounce Task',
+                position: 0,
+                timer: {
+                  taskId: 'debounce-task-1',
+                  mode: 'COUNT_DOWN',
+                  targetDurationSeconds: 1500,
+                  state: 'RUNNING',
+                  startedAt: new Date().toISOString(),
+                  elapsedSeconds: 0,
+                },
+              },
+            ],
+          },
+        ],
+      }
+
+      const wrapper = mountBoard(boardData)
+      const task = wrapper.vm.localColumns[0].tasks[0]
+      const entry: any = { id: 'e1', durationSeconds: 1500 }
+
+      // First alert works
+      wrapper.vm.handleTimerExpired(task, entry)
+
+      // Second immediate call within 3 seconds is debounced
+      wrapper.vm.handleTimerExpired(task, entry)
+
+      // Fast forward past 3 seconds
+      vi.advanceTimersByTime(3500)
+      // Third call after 3.5s succeeds
+      wrapper.vm.handleTimerExpired(task, entry)
+    })
   })
 })

@@ -348,9 +348,6 @@ const handleTimeEntriesUpdate = (updated: TaskTimeEntryDto[]) => {
 
 const handleTimerExpired = (entry: TaskTimeEntryDto) => {
   emit('timerExpired', entry)
-  if (kanbanContext?.onTimerExpired && props.task) {
-    kanbanContext.onTimerExpired(props.task, entry)
-  }
 }
 
 const priorityOptions: Array<{ label: string; value: TaskPriorityType }> = [

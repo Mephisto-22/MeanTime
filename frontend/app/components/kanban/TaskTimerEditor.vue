@@ -618,7 +618,16 @@ const loadPersistedEntries = async () => {
   try {
     const data = await kanbanApi.listTimeEntries(props.taskId)
     if (data && Array.isArray(data)) {
-      entries.value = data.map(normalizeTimeEntry)
+      const seenIds = new Set<string | number>()
+      const deduped: TaskTimeEntryDto[] = []
+      for (const item of data) {
+        const normalized = normalizeTimeEntry(item)
+        if (!seenIds.has(normalized.id)) {
+          seenIds.add(normalized.id)
+          deduped.push(normalized)
+        }
+      }
+      entries.value = deduped
       syncEntriesOut()
     }
   } catch {
@@ -629,7 +638,7 @@ const loadPersistedEntries = async () => {
 onMounted(() => {
   if (props.timeEntries && props.timeEntries.length > 0) {
     entries.value = props.timeEntries.map(normalizeTimeEntry)
-  } else if (!props.timeEntries) {
+  } else {
     loadPersistedEntries()
   }
 })
@@ -642,6 +651,7 @@ watch(
       loadPersistedEntries()
     }
   },
+  { immediate: true },
 )
 
 watch(

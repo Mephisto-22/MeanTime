@@ -54,6 +54,9 @@ def reconcile_expired_countdowns(user):
                 start_time = timer.started_at - timedelta(seconds=elapsed_prior)
                 duplicate = TaskTimeEntry.objects.filter(
                     task=timer.task,
+                    created_at__gte=timezone.now() - timedelta(seconds=15),
+                ).exists() or TaskTimeEntry.objects.filter(
+                    task=timer.task,
                     started_at__gte=start_time - timedelta(seconds=5),
                     started_at__lte=start_time + timedelta(seconds=5),
                 ).exists()
@@ -329,6 +332,9 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
                     start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
                     default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
                     duplicate = TaskTimeEntry.objects.filter(
+                        task=task,
+                        created_at__gte=timezone.now() - timedelta(seconds=15),
+                    ).exists() or TaskTimeEntry.objects.filter(
                         task=task,
                         started_at__gte=start_time - timedelta(seconds=5),
                         started_at__lte=start_time + timedelta(seconds=5),
