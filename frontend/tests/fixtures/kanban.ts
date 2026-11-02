@@ -10,7 +10,7 @@ export function createTagFixture(overrides: Partial<TagDto> = {}): TagDto {
   return {
     id,
     name: overrides.name ?? `Tag ${id}`,
-    created_at: overrides.created_at,
+    createdAt: overrides.createdAt,
   }
 }
 

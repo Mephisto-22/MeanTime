@@ -77,8 +77,8 @@ describe('KanbanApi Contract Suite', () => {
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505')
 
     // 12. moveTask
-    await kanbanApi.moveTask(505, { to_column_id: 102, target_position: 1 })
-    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { to_column_id: 102, target_position: 1 })
+    await kanbanApi.moveTask(505, { toColumnId: 102, targetPosition: 1 })
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { toColumnId: 102, targetPosition: 1 })
   })
 
   it('routes Tag methods to correct paths, verbs, and payloads', async () => {
@@ -138,7 +138,7 @@ describe('KanbanApi Contract Suite', () => {
     expect(deleteCall.options.headers['Content-Type']).toBe('application/json')
 
     // MOVE (POST)
-    await kanbanApi.moveTask(1, { to_column_id: 2, target_position: 0 })
+    await kanbanApi.moveTask(1, { toColumnId: 2, targetPosition: 0 })
     const moveCall = fetchCalls[fetchCalls.length - 1]
     expect(moveCall.options.method).toBe('POST')
     expect(moveCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')

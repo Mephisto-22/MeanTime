@@ -169,7 +169,7 @@ const {
 )
 
 const targetMinutes = computed(() => {
-  const target = targetDurationSeconds.value || props.timer?.targetDurationSeconds || (props.timer as any)?.target_duration_seconds || 1500
+  const target = targetDurationSeconds.value || props.timer?.targetDurationSeconds || 1500
   return Math.floor(target / 60)
 })
 
@@ -190,7 +190,7 @@ const idleDisplayLabel = computed(() => {
     return 'Stopwatch'
   }
   if (props.timer?.mode === 'COUNT_DOWN') {
-    const target = props.timer?.targetDurationSeconds ?? (props.timer as any)?.target_duration_seconds
+    const target = props.timer?.targetDurationSeconds
     const mins = target ? Math.floor(target / 60) : 25
     return `${TIMER_MODE_CONFIG.COUNT_DOWN.label} (${mins}m)`
   }
@@ -201,7 +201,7 @@ const handleStartOrResume = () => {
   const defaultTimer: Partial<TaskTimerDto> = {
     taskId: props.taskId,
     mode: props.timer?.mode && props.timer.mode !== 'NONE' ? props.timer.mode : 'COUNT_DOWN',
-    targetDurationSeconds: props.timer?.targetDurationSeconds ?? (props.timer as any)?.target_duration_seconds ?? 1500,
+    targetDurationSeconds: props.timer?.targetDurationSeconds ?? 1500,
     state: 'RUNNING',
     startedAt: new Date().toISOString(),
     elapsedSeconds: 0,

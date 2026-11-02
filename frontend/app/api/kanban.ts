@@ -8,32 +8,22 @@ export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
 export interface TaskTimerDto {
   id?: number
   taskId: number | string
-  task_id?: number | string
   mode: TimerMode
   targetDurationSeconds: number | null
-  target_duration_seconds?: number | null
   state: TimerState
   startedAt: string | null
-  started_at?: string | null
   elapsedSeconds: number
-  elapsed_seconds?: number
 }
 
 export interface TaskTimeEntryDto {
   id: number | string
   taskId: number | string
-  task_id?: number | string
   userId?: number | string
-  user_id?: number | string
   startedAt: string
-  started_at?: string
   endedAt?: string | null
-  ended_at?: string | null
   durationSeconds: number
-  duration_seconds?: number
   note: string
   createdAt?: string
-  created_at?: string
 }
 
 export function normalizeTimeEntry(raw: any): TaskTimeEntryDto {
@@ -87,7 +77,7 @@ export const TIMER_STATE_CONFIG = {
 export interface TagDto {
   id: string | number
   name: string
-  created_at?: string
+  createdAt?: string
 }
 
 export interface KanbanTaskDto {
@@ -95,14 +85,12 @@ export interface KanbanTaskDto {
   title: string
   description?: string
   position: number
-  columnId?: string | number
-  column_id?: string | number
+  columnId: string | number
   timer?: TaskTimerDto | null
-  time_entries?: TaskTimeEntryDto[]
   timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
-  tag_ids?: Array<string | number>
+  tagIds?: Array<string | number>
 }
 
 export interface KanbanColumnDto {
@@ -125,8 +113,8 @@ export interface SuccessResponse {
 }
 
 export interface TaskMoveRequest {
-  to_column_id: number | string
-  target_position: number
+  toColumnId: number | string
+  targetPosition: number
 }
 
 export interface KanbanColumnSummary {
@@ -151,7 +139,7 @@ export interface TaskDialogSavePayload {
   timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
-  tag_ids?: Array<string | number>
+  tagIds?: Array<string | number>
 }
 
 export interface KanbanContext {
@@ -239,44 +227,24 @@ export class KanbanApi {
   // Timer Endpoints
   // -----------------
 
-  async updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
-    const raw = await apiService.patch<any>(`${this.endpoint}/tasks/${taskId}/timer`, {
-      mode: payload.mode,
-      target_duration_seconds: payload.targetDurationSeconds ?? payload.target_duration_seconds,
-      state: payload.state,
-      started_at: payload.startedAt ?? payload.started_at,
-      elapsed_seconds: payload.elapsedSeconds ?? payload.elapsed_seconds,
-    })
-    return normalizeTaskTimer(raw)
+  updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
+    return apiService.patch<TaskTimerDto>(`${this.endpoint}/tasks/${taskId}/timer`, payload)
   }
 
   // -----------------
   // Time Entry Endpoints
   // -----------------
 
-  async listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
-    const raw = await apiService.get<any[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
-    return (raw || []).map(normalizeTimeEntry)
+  listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
+    return apiService.get<TaskTimeEntryDto[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
   }
 
-  async createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
-    const raw = await apiService.post<any>(`${this.endpoint}/tasks/${taskId}/time-entries`, {
-      started_at: payload.startedAt ?? payload.started_at,
-      ended_at: payload.endedAt ?? payload.ended_at,
-      duration_seconds: payload.durationSeconds ?? payload.duration_seconds,
-      note: payload.note ?? '',
-    })
-    return normalizeTimeEntry(raw)
+  createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.post<TaskTimeEntryDto>(`${this.endpoint}/tasks/${taskId}/time-entries`, payload)
   }
 
-  async updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
-    const raw = await apiService.patch<any>(`${this.endpoint}/time-entries/${entryId}`, {
-      started_at: payload.startedAt ?? payload.started_at,
-      ended_at: payload.endedAt ?? payload.ended_at,
-      duration_seconds: payload.durationSeconds ?? payload.duration_seconds,
-      note: payload.note,
-    })
-    return normalizeTimeEntry(raw)
+  updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.patch<TaskTimeEntryDto>(`${this.endpoint}/time-entries/${entryId}`, payload)
   }
 
   deleteTimeEntry(entryId: string | number): Promise<SuccessResponse> {

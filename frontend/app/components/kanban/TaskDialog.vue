@@ -411,7 +411,7 @@ const syncFormWithProps = () => {
           startedAt: null,
           elapsedSeconds: 0,
         }
-    timeEntriesState.value = props.task.time_entries ? [...props.task.time_entries] : (props.task.timeEntries ? [...props.task.timeEntries] : [])
+    timeEntriesState.value = props.task.timeEntries ? [...props.task.timeEntries] : []
   } else {
     title.value = ''
     description.value = ''
@@ -549,11 +549,11 @@ const save = () => {
     title: trimmedTitle.value,
     description: description.value.trim(),
     mode: props.mode,
-    columnId: selectedColumnId.value ?? props.columnId ?? (props.task?.columnId ?? (props.task as any)?.column_id ?? null),
+    columnId: selectedColumnId.value ?? props.columnId ?? props.task?.columnId ?? (props.task as any)?.column_id ?? null,
     taskId: props.task?.id ?? null,
     priority: priority.value,
     tags: [...attachedTags.value],
-    tag_ids: attachedTags.value.map(t => t.id),
+    tagIds: attachedTags.value.map(t => t.id),
   }
   if (timerState.value && (props.mode === 'edit' || timerState.value.mode !== 'NONE')) {
     payload.timer = timerState.value

@@ -367,11 +367,11 @@
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <Tag
-                        :value="formatDurationBadge(entry.durationSeconds ?? entry.duration_seconds)"
+                        :value="formatDurationBadge(entry.durationSeconds)"
                         class="font-mono text-[11px] font-bold !bg-primary-100/70 !text-primary-700 dark:!bg-primary-950 dark:!text-primary-300 !border-0"
                       />
                       <span class="text-[11px] text-surface-500 font-medium">
-                        {{ formatDateLabel(entry.startedAt ?? entry.started_at) }} &bull; {{ formatTimeRange(entry.startedAt ?? entry.started_at, entry.endedAt ?? entry.ended_at) }}
+                        {{ formatDateLabel(entry.startedAt) }} &bull; {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
                       </span>
                     </div>
 
@@ -659,7 +659,7 @@ const syncEntriesOut = () => emit('update:timeEntries', [...entries.value])
 
 // Target duration & inline editing
 const targetMinutes = computed(() => {
-  const target = localTimer.value.targetDurationSeconds ?? localTimer.value.target_duration_seconds ?? 1500
+  const target = localTimer.value.targetDurationSeconds ?? 1500
   return Math.floor(target / 60)
 })
 const customMinutes = ref(targetMinutes.value)
@@ -756,7 +756,7 @@ const setMode = (m: TimerMode) => {
 
 const totalDurationSeconds = computed(() => {
   return entries.value.reduce((acc, cur) => {
-    const dur = Number(cur.durationSeconds ?? cur.duration_seconds ?? 0)
+    const dur = Number(cur.durationSeconds ?? 0)
     return acc + (isNaN(dur) ? 0 : dur)
   }, 0)
 })

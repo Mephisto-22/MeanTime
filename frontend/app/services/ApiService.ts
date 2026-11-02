@@ -1,4 +1,5 @@
 import { getErrorMessage } from '~/utils/errors'
+import { toCamelCase, toSnakeCase } from '~/utils/case'
 
 /**
  * ApiService provides a centralized HTTP client wrapper around Nuxt's $fetch.
@@ -10,6 +11,12 @@ export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'm
   headers?: Record<string, string>
   /** Disable automatic bearer authentication for public/authentication endpoints. */
   auth?: boolean
+  /**
+   * Automatically convert outgoing payload keys to snake_case and
+   * incoming response keys to camelCase.
+   * If omitted, defaults to true for endpoints starting with /api/kanban.
+   */
+  transformCase?: boolean
 }
 
 export interface ApiAuthHandler {
@@ -47,11 +54,14 @@ export class ApiService {
     options: ApiRequestOptions = {},
   ): Promise<T> {
     const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH' || (method === 'DELETE' && data !== undefined)
-    const { auth = true, headers, ...fetchOptions } = options
+    const { auth = true, transformCase, headers, ...fetchOptions } = options
+    const shouldTransformCase = transformCase ?? endpoint.startsWith('/api/kanban')
+    const requestPayload = shouldTransformCase && data !== undefined ? toSnakeCase(data) : data
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
     const sentToken = handler?.getAccessToken()
-    const execute = (token?: string | null) => $fetch<T>(endpoint, {
+    const execute = async (token?: string | null): Promise<T> => {
+      const response = await $fetch<any>(endpoint, {
       ...fetchOptions,
       method,
       retry: 0,
@@ -60,9 +70,11 @@ export class ApiService {
         ...headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: isBodyMethod ? data : undefined,
-      query: !isBodyMethod ? data : undefined,
+      body: isBodyMethod ? requestPayload : undefined,
+      query: !isBodyMethod ? requestPayload : undefined,
     })
+    return shouldTransformCase ? toCamelCase<T>(response) : (response as T)
+    }
 
     try {
       try {

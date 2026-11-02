@@ -136,17 +136,17 @@ export function useTaskTimer(
   const elapsedSeconds = computed(() => {
     const t = timer.value
     if (!t) return 0
-    const startedAt = t.startedAt || t.started_at
+    const startedAt = t.startedAt
     if (t.state === 'RUNNING' && startedAt) {
       const anchor = new Date(startedAt).getTime()
       const delta = Math.max(0, Math.floor((now.value - anchor) / 1000))
-      return (Number(t.elapsedSeconds ?? t.elapsed_seconds ?? 0) || 0) + delta
+      return (Number(t.elapsedSeconds ?? 0) || 0) + delta
     }
-    return Number(t.elapsedSeconds ?? t.elapsed_seconds ?? 0) || 0
+    return Number(t.elapsedSeconds ?? 0) || 0
   })
 
   const targetDurationSeconds = computed(() => {
-    const target = timer.value?.targetDurationSeconds ?? timer.value?.target_duration_seconds
+    const target = timer.value?.targetDurationSeconds
     return target != null && !isNaN(Number(target)) ? Number(target) : 0
   })
 
@@ -181,7 +181,7 @@ export function useTaskTimer(
       const entry: TaskTimeEntryDto = {
         id: `entry-${Date.now()}`,
         taskId: t.taskId,
-        startedAt: t.startedAt || t.started_at || new Date(Date.now() - (targetDurationSeconds.value || 0) * 1000).toISOString(),
+        startedAt: t.startedAt || new Date(Date.now() - (targetDurationSeconds.value || 0) * 1000).toISOString(),
         endedAt: new Date().toISOString(),
         durationSeconds: targetDurationSeconds.value || elapsedSeconds.value,
         note: 'Completed countdown session',

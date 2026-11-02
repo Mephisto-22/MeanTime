@@ -87,7 +87,7 @@ watch(
     raw.forEach((col: KanbanColumnDto) => {
       col.tasks?.forEach((t: KanbanTaskDto) => {
         if (t.columnId == null) {
-          t.columnId = (t as any).column_id ?? col.id
+          t.columnId = col.id
         }
         if (t.timer) {
           t.timer = normalizeTaskTimer(t.timer)
@@ -183,8 +183,8 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
 
   try {
     await kanbanApi.moveTask(req.taskId, {
-      to_column_id: req.toColumnId,
-      target_position: req.targetPosition,
+      toColumnId: req.toColumnId,
+      targetPosition: req.targetPosition,
     })
   } catch (err) {
     notify.error(err, 'Unable to move task')
@@ -206,7 +206,7 @@ const openCreateTaskDialog = (columnId: string | number): void => {
 const openEditTaskDialog = (task: KanbanTaskDto): void => {
   dialogMode.value = 'edit'
   activeTask.value = task
-  let colId = task.columnId ?? (task as any).column_id
+  let colId = task.columnId
   if (colId == null) {
     const containingCol = localColumns.value.find(c => c.tasks.some(t => sameId(t.id, task.id)))
     if (containingCol) colId = containingCol.id
@@ -246,8 +246,8 @@ const handleCreateTask = async (
       title: payload.title,
       description: payload.description,
       priority: payload.priority,
-      tag_ids: payload.tag_ids,
-    } as any)
+      tagIds: payload.tagIds,
+    })
     notify.success('Task created.')
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
@@ -259,8 +259,8 @@ const handleCreateTask = async (
     }
     if (taskInCol && createdTask) {
       taskInCol.id = createdTask.id
-      if (createdTask.columnId != null || (createdTask as any).column_id != null) {
-        taskInCol.columnId = createdTask.columnId ?? (createdTask as any).column_id
+      if (createdTask.columnId != null) {
+        taskInCol.columnId = createdTask.columnId
       }
       if (createdTask.position !== undefined) {
         taskInCol.position = createdTask.position
@@ -311,7 +311,6 @@ const handleUpdateTask = async (
   taskId: string | number,
   payload: Omit<Partial<KanbanTaskDto>, 'columnId'> & {
     columnId?: string | number | null
-    tag_ids?: Array<string | number>
   },
 ): Promise<void> => {
   let sourceCol: KanbanColumnDto | undefined
@@ -335,7 +334,7 @@ const handleUpdateTask = async (
   const destinationColumnId =
     payload.columnId != null
       ? payload.columnId
-      : (targetTask.columnId ?? (targetTask as any)?.column_id ?? sourceCol.id)
+      : (targetTask.columnId ?? sourceCol.id)
   const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
   const destCol = isColumnChanged
     ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
@@ -369,8 +368,8 @@ const handleUpdateTask = async (
     if (payload.priority !== undefined) {
       updatePayload.priority = payload.priority
     }
-    if (payload.tag_ids !== undefined) {
-      updatePayload.tag_ids = payload.tag_ids
+    if (payload.tagIds !== undefined) {
+      updatePayload.tagIds = payload.tagIds
     }
 
     const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
@@ -378,8 +377,8 @@ const handleUpdateTask = async (
 
     if (isColumnChanged) {
       const movePromise = kanbanApi.moveTask(taskId, {
-        to_column_id: destCol.id,
-        target_position: targetPosition,
+        toColumnId: destCol.id,
+        targetPosition: targetPosition,
       })
       const [updateResult] = await Promise.all([updatePromise, movePromise])
       updated = updateResult
@@ -393,8 +392,8 @@ const handleUpdateTask = async (
       if (updated.position !== undefined) {
         targetTask.position = updated.position
       }
-      if (updated.columnId != null || (updated as any)?.column_id != null) {
-        targetTask.columnId = updated.columnId ?? (updated as any)?.column_id
+      if (updated.columnId != null) {
+        targetTask.columnId = updated.columnId
       }
     }
   } catch (err) {
@@ -449,7 +448,7 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       description: savePayload.description,
       priority: savePayload.priority,
       tags: savePayload.tags,
-      tag_ids: savePayload.tag_ids,
+      tagIds: savePayload.tagIds,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
     await handleUpdateTask(savePayload.taskId, {
@@ -457,7 +456,7 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       description: savePayload.description,
       priority: savePayload.priority,
       tags: savePayload.tags,
-      tag_ids: savePayload.tag_ids,
+      tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
     })
     if (savePayload.timer) {
