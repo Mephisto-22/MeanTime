@@ -84,7 +84,7 @@
       </template>
       <template v-else>
         <Button
-          v-if="isEditing"
+          v-if="isEditing && board?.is_owner"
           type="button"
           class="mr-auto"
           data-testid="board-delete-button"
