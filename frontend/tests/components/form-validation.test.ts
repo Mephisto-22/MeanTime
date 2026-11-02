@@ -60,7 +60,7 @@ describe('Consistent required fields', () => {
     const save = vi.spyOn(kanbanApi, 'createBoard').mockRejectedValue(new Error('Save failed'))
     const wrapper = mount(BoardFormDialog, {
       props: { board: null, visible: true },
-      global: { ...global, stubs: { Dialog: { template: '<div><slot /></div>' } } },
+      global: { ...global, stubs: { Dialog: { template: '<div><slot /><slot name="footer" /></div>' } } },
     })
     expect(wrapper.get('[data-testid="board-save-button"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('input').attributes('aria-invalid')).toBe('true')

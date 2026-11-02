@@ -92,6 +92,7 @@
       v-model:visible="isDialogOpen"
       :board="boardBeingEdited"
       @saved="() => refresh()"
+      @deleted="() => refresh()"
     />
   </div>
 </template>
@@ -101,7 +102,7 @@ import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 
 const notify = useNotifications();
 
-// The backend is the source of truth: after every create or edit the list is
+// The backend is the source of truth: after every create, edit or delete the list is
 // fetched again rather than patched locally.
 const {
   data: boards,

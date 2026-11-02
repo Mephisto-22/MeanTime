@@ -8,6 +8,7 @@
     class="w-[min(28rem,calc(100vw-2rem))]"
   >
     <form
+      id="board-form"
       class="flex flex-col gap-4"
       novalidate
       @submit.prevent="save"
@@ -48,25 +49,39 @@
           fluid
         />
       </div>
-
-      <div class="flex justify-end gap-2">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          text
-          :disabled="isSaving"
-          @click="visible = false"
-        />
-        <Button
-          type="submit"
-          data-testid="board-save-button"
-          :label="isEditing ? 'Save' : 'Create'"
-          :loading="isSaving"
-          :disabled="isSaving || showTitleError"
-        />
-      </div>
     </form>
+
+    <template #footer>
+      <Button
+        v-if="isEditing"
+        type="button"
+        class="mr-auto"
+        data-testid="board-delete-button"
+        label="Delete board"
+        severity="danger"
+        text
+        :loading="isDeleting"
+        :disabled="isBusy"
+        @click="deleteBoard"
+      />
+      <Button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        text
+        :disabled="isBusy"
+        @click="visible = false"
+      />
+      <!-- The footer is outside the form, so the form attribute links Save to it. -->
+      <Button
+        type="submit"
+        form="board-form"
+        data-testid="board-save-button"
+        :label="isEditing ? 'Save' : 'Create'"
+        :loading="isSaving"
+        :disabled="isBusy || showTitleError"
+      />
+    </template>
   </Dialog>
 </template>
 
@@ -81,6 +96,8 @@ interface Props {
 interface Emits {
   /** Fired after the backend has saved the board, so the page can re-fetch. */
   saved: [board: KanbanBoardDto];
+  /** Fired after the backend has deleted the board, so the page can re-fetch. */
+  deleted: [board: KanbanBoardDto];
 }
 
 // Matches the max_length of Board.title in backend/kanban/models.py.
@@ -95,9 +112,11 @@ const visible = defineModel<boolean>('visible', {required: true});
 const title = ref('');
 const description = ref('');
 const isSaving = ref(false);
+const isDeleting = ref(false);
 const notify = useNotifications();
 
 const isEditing = computed(() => props.board !== null);
+const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
 const showTitleError = computed(
   () => trimmedTitle.value === '',
@@ -114,7 +133,7 @@ watch(visible, isOpen => {
 }, {immediate: true});
 
 async function save(): Promise<void> {
-  if (trimmedTitle.value === '' || isSaving.value) {
+  if (trimmedTitle.value === '' || isBusy.value) {
     return;
   }
 
@@ -137,6 +156,25 @@ async function save(): Promise<void> {
     notify.error(error, 'Unable to save board');
   } finally {
     isSaving.value = false;
+  }
+}
+
+async function deleteBoard(): Promise<void> {
+  if (props.board === null || isBusy.value) {
+    return;
+  }
+
+  const board = props.board;
+  isDeleting.value = true;
+  try {
+    await kanbanApi.deleteBoard(board.id);
+    notify.success('Board deleted.');
+    emit('deleted', board);
+    visible.value = false;
+  } catch (error) {
+    notify.error(error, 'Unable to delete board');
+  } finally {
+    isDeleting.value = false;
   }
 }
 </script>
