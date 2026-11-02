@@ -7,16 +7,35 @@
           <span class="text-xl font-bold tracking-tight">MeanTime</span>
         </div>
         <div class="flex items-center gap-4">
-          <Button
-            v-if="authStore.isAuthenticated && authStore.user"
-            data-testid="user-profile-button"
-            :label="authStore.user.display_name"
-            icon="pi pi-user"
-            text
-            severity="secondary"
-            @click="goToProfile"
-          />
           <Tag value="v0.1.0-dev" severity="info" />
+
+          <template v-if="authStore.isAuthenticated">
+            <NuxtLink
+              to="/friends"
+              data-testid="friends-nav-link"
+              class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-surface-700 transition-colors hover:bg-surface-100 hover:text-primary dark:text-surface-200 dark:hover:bg-surface-800"
+            >
+              <i class="pi pi-users" />
+              <span>Friends</span>
+              <Badge
+                v-if="pendingIncomingCount > 0"
+                :value="pendingIncomingCount"
+                severity="warn"
+                data-testid="friends-pending-badge"
+              />
+            </NuxtLink>
+
+            <Button
+              v-if="authStore.user"
+              data-testid="user-profile-button"
+              :label="authStore.user.display_name || 'Profile'"
+              icon="pi pi-user"
+              text
+              severity="secondary"
+              size="small"
+              @click="goToProfile"
+            />
+          </template>
         </div>
       </div>
     </header>
@@ -30,9 +49,28 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref, watch } from 'vue'
+import Badge from 'primevue/badge'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import { friendsApi } from '~/api/friends'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
+const pendingIncomingCount = ref(0)
+
+const fetchPendingRequests = async () => {
+  if (!authStore.isAuthenticated) {
+    pendingIncomingCount.value = 0
+    return
+  }
+  try {
+    const res = await friendsApi.getRequests()
+    pendingIncomingCount.value = res?.incoming?.length || 0
+  } catch (err) {
+    console.error('Failed to fetch friend requests in header:', err)
+  }
+}
 
 function goToProfile() {
   const userId = authStore.user?.id
@@ -40,4 +78,21 @@ function goToProfile() {
     navigateTo(`/users/${userId}`)
   }
 }
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    fetchPendingRequests()
+  }
+})
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      fetchPendingRequests()
+    } else {
+      pendingIncomingCount.value = 0
+    }
+  }
+)
 </script>
