@@ -145,11 +145,11 @@ export class KanbanApi {
     return apiService.get<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`)
   }
 
-  createBoard(payload: { title: string; description?: string }): Promise<KanbanBoardDto> {
+  createBoard(payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
     return apiService.post<KanbanBoardDto>(`${this.endpoint}/boards`, payload)
   }
 
-  updateBoard(boardId: string | number, payload: { title?: string; description?: string }): Promise<KanbanBoardDto> {
+  updateBoard(boardId: string | number, payload: Partial<KanbanBoardDto>): Promise<KanbanBoardDto> {
     return apiService.patch<KanbanBoardDto>(`${this.endpoint}/boards/${boardId}`, payload)
   }
 
@@ -161,11 +161,11 @@ export class KanbanApi {
   // Column Endpoints
   // -----------------
 
-  createColumn(boardId: string | number, payload: { title: string; position?: number }): Promise<KanbanColumnDto> {
+  createColumn(boardId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
     return apiService.post<KanbanColumnDto>(`${this.endpoint}/boards/${boardId}/columns`, payload)
   }
 
-  updateColumn(columnId: string | number, payload: { title?: string; position?: number }): Promise<KanbanColumnDto> {
+  updateColumn(columnId: string | number, payload: Partial<KanbanColumnDto>): Promise<KanbanColumnDto> {
     return apiService.patch<KanbanColumnDto>(`${this.endpoint}/columns/${columnId}`, payload)
   }
 
