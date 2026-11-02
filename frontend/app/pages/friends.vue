@@ -138,10 +138,6 @@ import {
   type UserOut,
 } from '~/api/friends'
 
-definePageMeta({
-  middleware: 'auth',
-})
-
 const toast = useToast()
 
 const loading = ref(true)

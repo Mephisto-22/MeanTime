@@ -44,6 +44,19 @@ users_router = Router(tags=["Users"])
 INVALID_RESET_LINK = "This password reset link is invalid or expired. Request a new link."
 
 
+def issue_tokens(user):
+    """JWTs for a user who just signed in, by password or through Google."""
+    refresh = RefreshToken.for_user(user)
+    # Changing the password bumps password_version, which revokes these tokens.
+    refresh["password_version"] = user.password_version
+    return {
+        "access_token": str(refresh.access_token),
+        "refresh_token": str(refresh),
+        "token_type": "bearer",
+        "expires_in": 900,
+    }
+
+
 def deliver_reset_link(user):
     # The fragment keeps the secret out of frontend HTTP access logs.
     fragment = urlencode({
@@ -160,15 +173,7 @@ def login(request, payload: LoginIn):
     if user.password_reset_active():
         return 403, {"detail": "Password reset is in progress. Complete the reset before logging in."}
 
-    refresh = RefreshToken.for_user(user)
-    refresh["password_version"] = user.password_version
-    return 200, {
-        "access_token": str(refresh.access_token),
-        "refresh_token": str(refresh),
-        "token_type": "bearer",
-        "expires_in": 900,
-        "user": user,
-    }
+    return 200, {**issue_tokens(user), "user": user}
 
 
 @auth_router.post(
@@ -290,14 +295,20 @@ def update_me(request, payload: UserUpdateIn):
 def delete_me(request, payload: DeleteAccountIn):
     """
     Soft-delete the user account by setting is_active to False.
-    Requires password verification to prevent accidental deactivation.
+    Requires the password to prevent accidental deactivation, or the account's
+    email address for accounts created through Google, which have no password.
     """
     user = request.auth if isinstance(request.auth, User) else getattr(request, "user", None)
     if not user or not user.is_authenticated:
         return 401, {"detail": "Authentication required."}
 
-    if not user.check_password(payload.password):
-        return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+    if user.has_usable_password():
+        if not user.check_password(payload.password):
+            return 400, {"detail": "Incorrect password. Account deactivation cancelled."}
+    elif payload.email.strip().lower() != user.email:
+        return 400, {
+            "detail": "Enter your account's email to confirm. Account deactivation cancelled."
+        }
 
     user.is_active = False
     user.save(update_fields=["is_active"])

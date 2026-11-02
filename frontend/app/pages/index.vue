@@ -33,11 +33,10 @@
     </div>
 
     <!-- Error -->
-    <Message
+    <div
       v-else-if="error"
       data-testid="boards-error"
-      severity="error"
-      :closable="false"
+      class="rounded-lg border border-surface-300 p-4"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load your boards.</span>
@@ -50,7 +49,7 @@
           @click="() => refresh()"
         />
       </div>
-    </Message>
+    </div>
 
     <!-- Empty -->
     <div
@@ -100,6 +99,8 @@
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 
+const notify = useNotifications();
+
 // The backend is the source of truth: after every create or edit the list is
 // fetched again rather than patched locally.
 const {
@@ -125,4 +126,8 @@ function openEditDialog(board: KanbanBoardDto): void {
   boardBeingEdited.value = board;
   isDialogOpen.value = true;
 }
+
+watch(error, value => {
+  if (value) notify.error(value, 'Unable to load boards');
+}, {immediate: true});
 </script>

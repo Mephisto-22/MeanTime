@@ -7,17 +7,6 @@
       <span data-testid="board-description">{{ board.description }}</span>
     </template>
     <template #content>
-      <!-- Error Notification Banner -->
-      <Message
-        v-if="errorMessage"
-        data-testid="board-error-banner"
-        severity="error"
-        class="mb-3"
-        @close="errorMessage = null"
-      >
-        {{ errorMessage }}
-      </Message>
-
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
@@ -61,6 +50,8 @@ import type {
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
+const notify = useNotifications()
+
 const props = defineProps<{
   board: KanbanBoardDto
 }>()
@@ -78,7 +69,7 @@ const loadTags = async (): Promise<void> => {
     const tags = await kanbanApi.listTags()
     availableTags.value = tags || []
   } catch (err) {
-    console.warn('Failed to fetch tags:', err)
+    notify.error(err, 'Unable to fetch tags')
   }
 }
 
@@ -190,7 +181,7 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
       target_position: req.targetPosition,
     })
   } catch (err) {
-    console.warn('Failed to persist task movement:', err)
+    notify.error(err, 'Unable to move task')
   }
 }
 
@@ -198,7 +189,6 @@ const isTaskDialogOpen = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const activeTask = ref<KanbanTaskDto | null>(null)
 const activeColumnId = ref<string | number | null>(null)
-const errorMessage = ref<string | null>(null)
 
 const openCreateTaskDialog = (columnId: string | number): void => {
   dialogMode.value = 'create'
@@ -233,7 +223,6 @@ const handleCreateTask = async (
   const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
   if (!targetCol) return
 
-  errorMessage.value = null
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const optimisticTask: KanbanTaskDto = {
     id: tempId,
@@ -253,6 +242,7 @@ const handleCreateTask = async (
       priority: payload.priority,
       tag_ids: payload.tag_ids,
     } as any)
+    notify.success('Task created.')
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
     if (!taskInCol) {
@@ -292,11 +282,7 @@ const handleCreateTask = async (
       containingCol.tasks.splice(taskPosition, 1)
       reindexTasks(containingCol.tasks)
     }
-    const message = (err as any)?.message
-      ? `Failed to create task: ${(err as any).message}`
-      : 'Failed to create task'
-    errorMessage.value = message
-    console.warn('Failed to create task:', err)
+    notify.error(err, 'Unable to create task')
   }
 }
 
@@ -338,7 +324,6 @@ const handleUpdateTask = async (
 
   if (!sourceCol || !targetTask || sourceIndex === -1) return
 
-  errorMessage.value = null
   const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
 
   const destinationColumnId =
@@ -351,7 +336,7 @@ const handleUpdateTask = async (
     : sourceCol
 
   if (!destCol) {
-    errorMessage.value = 'Destination column not found'
+    notify.error(new Error('Destination column not found'), 'Unable to update task')
     return
   }
 
@@ -396,6 +381,7 @@ const handleUpdateTask = async (
       updated = await updatePromise
     }
 
+    notify.success('Task updated.')
     if (updated) {
       applyTaskUpdates(targetTask, updated)
       if (updated.position !== undefined) {
@@ -407,11 +393,7 @@ const handleUpdateTask = async (
     }
   } catch (err) {
     localColumns.value = columnsSnapshot
-    const message = (err as any)?.message
-      ? `Failed to update task: ${(err as any).message}`
-      : 'Failed to update task'
-    errorMessage.value = message
-    console.warn('Failed to update task:', err)
+    notify.error(err, 'Unable to update task')
   }
 }
 
@@ -432,7 +414,6 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
 
   if (!targetCol || !deletedTask || targetIndex === -1) return
 
-  errorMessage.value = null
   const originalColId = targetCol.id
   const originalPosition = targetIndex
   const snapshotTask: KanbanTaskDto = { ...deletedTask }
@@ -443,6 +424,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
 
   try {
     await kanbanApi.deleteTask(taskId)
+    notify.success('Task deleted.')
   } catch (err) {
     // Restore task to original column and position
     let restoreCol = localColumns.value.find(col => sameId(col.id, originalColId)) || targetCol
@@ -450,11 +432,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
     restoreCol.tasks.splice(restorePos, 0, snapshotTask)
     reindexTasks(restoreCol.tasks)
 
-    const message = (err as any)?.message
-      ? `Failed to delete task: ${(err as any).message}`
-      : 'Failed to delete task'
-    errorMessage.value = message
-    console.warn('Failed to delete task:', err)
+    notify.error(err, 'Unable to delete task')
   }
 }
 
@@ -491,10 +469,7 @@ const handleCreateTag = async (payload: { name: string } | string): Promise<TagD
     }
     return created
   } catch (err) {
-    const message = (err as any)?.message
-      ? `Failed to create tag: ${(err as any).message}`
-      : 'Failed to create tag'
-    errorMessage.value = message
+    notify.error(err, 'Unable to create tag')
     throw err
   }
 }
@@ -519,7 +494,6 @@ defineExpose({
   dialogMode,
   activeTask,
   activeColumnId,
-  errorMessage,
   openCreateTaskDialog,
   openEditTaskDialog,
   closeTaskDialog,

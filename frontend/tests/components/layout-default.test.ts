@@ -22,9 +22,10 @@ vi.mock('~/stores/auth', () => ({
 }))
 
 function mountLayout(options: { slots?: Record<string, string> } = {}) {
+  const router = useRouter()
   return mount(DefaultLayout, {
     global: {
-      plugins: [PrimeVue],
+      plugins: [PrimeVue, router],
       stubs: {
         NuxtLink: {
           props: ['to'],
@@ -62,6 +63,15 @@ describe('Default Layout Header Suite', () => {
           default: '<div>Content</div>',
         },
       })
+      await flushPromises()
+
+      const button = wrapper.find('[data-testid="user-profile-button"]')
+      expect(button.exists()).toBe(true)
+      expect(button.text()).toContain('Alex Engineer')
+    })
+
+    it('renders profile button with user display name', async () => {
+      const wrapper = mountLayout()
       await flushPromises()
 
       const button = wrapper.find('[data-testid="user-profile-button"]')

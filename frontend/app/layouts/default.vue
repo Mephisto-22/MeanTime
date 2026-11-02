@@ -26,12 +26,14 @@
             </NuxtLink>
 
             <Button
+              v-if="authStore.user"
               data-testid="user-profile-button"
-              :label="authStore.user?.display_name || 'Profile'"
+              :label="authStore.user.display_name || 'Profile'"
               icon="pi pi-user"
               text
               severity="secondary"
               size="small"
+              @click="goToProfile"
             />
           </template>
         </div>
@@ -70,6 +72,12 @@ const fetchPendingRequests = async () => {
   }
 }
 
+function goToProfile() {
+  const userId = authStore.user?.id
+  if (userId) {
+    navigateTo(`/users/${userId}`)
+  }
+}
 
 onMounted(() => {
   if (authStore.isAuthenticated) {

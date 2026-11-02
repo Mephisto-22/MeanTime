@@ -1,3 +1,5 @@
+import { getErrorMessage } from '~/utils/errors'
+
 /**
  * ApiService provides a centralized HTTP client wrapper around Nuxt's $fetch.
  * It encapsulates standard HTTP methods (GET, POST, PUT, DELETE), manages headers,
@@ -44,7 +46,7 @@ export class ApiService {
     data?: any,
     options: ApiRequestOptions = {},
   ): Promise<T> {
-    const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH'
+    const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH' || (method === 'DELETE' && data !== undefined)
     const { auth = true, headers, ...fetchOptions } = options
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
@@ -83,12 +85,9 @@ export class ApiService {
         }
       }
     } catch (err: any) {
-      const statusCode = err.statusCode || err.response?.status || 500
+      const statusCode = err.statusCode || err.response?.status
       const errorData = err.data || err.response?._data
-      const message =
-        (typeof errorData === 'object' && (errorData?.detail || errorData?.message)) ||
-        err.message ||
-        'An unexpected API error occurred.'
+      const message = getErrorMessage({ statusCode, data: errorData, message: err.message }, 'Unable to reach the server. Please try again.')
 
       throw new ApiError(message, statusCode, errorData)
     }
@@ -125,8 +124,8 @@ export class ApiService {
   /**
    * Send a DELETE request.
    */
-  delete<T>(url: string, options?: ApiRequestOptions): Promise<T> {
-    return this.request<T>(url, 'DELETE', undefined, options)
+  delete<T>(url: string, body?: any, options?: ApiRequestOptions): Promise<T> {
+    return this.request<T>(url, 'DELETE', body, options)
   }
 }
 

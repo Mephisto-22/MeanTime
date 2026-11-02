@@ -32,6 +32,17 @@ data "aws_ssm_parameter" "db_password" {
   with_decryption = false
 }
 
+# Google sign-in (#92). Their real values are entered by hand in Parameter Store.
+data "aws_ssm_parameter" "google_oauth_client_id" {
+  name            = "/meantime/${var.environment}/google-oauth-client-id"
+  with_decryption = false
+}
+
+data "aws_ssm_parameter" "google_oauth_client_secret" {
+  name            = "/meantime/${var.environment}/google-oauth-client-secret"
+  with_decryption = false
+}
+
 # ---------------------------------------------------------------------------
 # Database storage: the base layer's EFS file system, connected to this VPC
 # ---------------------------------------------------------------------------
@@ -111,6 +122,8 @@ data "aws_iam_policy_document" "read_secrets" {
     resources = [
       data.aws_ssm_parameter.django_secret_key.arn,
       data.aws_ssm_parameter.db_password.arn,
+      data.aws_ssm_parameter.google_oauth_client_id.arn,
+      data.aws_ssm_parameter.google_oauth_client_secret.arn,
     ]
   }
 }
@@ -222,10 +235,15 @@ resource "aws_ecs_task_definition" "this" {
         { name = "POSTGRES_PORT", value = "5432" },
         # Requests reach Django only through the frontend's proxy on localhost.
         { name = "DJANGO_ALLOWED_HOSTS", value = "localhost,127.0.0.1" },
+        # The address people open the app at, for links and the Google
+        # sign-in callback. Dev is opened through the tunnel on localhost.
+        { name = "FRONTEND_URL", value = coalesce(local.app_url, "http://localhost:3000") },
       ]
       secrets = [
         { name = "POSTGRES_PASSWORD", valueFrom = data.aws_ssm_parameter.db_password.arn },
         { name = "DJANGO_SECRET_KEY", valueFrom = data.aws_ssm_parameter.django_secret_key.arn },
+        { name = "GOOGLE_OAUTH_CLIENT_ID", valueFrom = data.aws_ssm_parameter.google_oauth_client_id.arn },
+        { name = "GOOGLE_OAUTH_CLIENT_SECRET", valueFrom = data.aws_ssm_parameter.google_oauth_client_secret.arn },
       ]
       dependsOn = [
         { containerName = "db", condition = "HEALTHY" },
@@ -312,6 +330,7 @@ resource "aws_ecs_service" "this" {
 
   depends_on = [
     aws_lb_listener.http,
+    aws_lb_listener.https,
     aws_efs_mount_target.db,
     aws_vpc_security_group_ingress_rule.db_storage_from_task,
   ]

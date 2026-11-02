@@ -59,7 +59,10 @@ The default values in `.env.example` are pre-configured to work out of the box f
 | **`DJANGO_ALLOWED_HOSTS`** | `*` | Comma-separated allowed hosts | `*` permits requests from local browser and Docker network. |
 | **`BACKEND_PORT`** | `8000` | Exposed host port for Django | Change if port 8000 is occupied on your host. |
 | **`FRONTEND_PORT`** | `3000` | Exposed host port for Nuxt | Change if port 3000 is occupied on your host. |
+| **`FRONTEND_URL`** | `http://localhost:3000` | Address people open the app at | Django uses it for password reset links and Google sign-in redirects. |
 | **`BACKEND_INTERNAL_URL`** | `http://backend:8000` | Internal backend URL for Nuxt proxy | Used by Nuxt Nitro proxy to forward `/api/**` traffic internally. |
+| **`GOOGLE_OAUTH_CLIENT_ID`** | _(empty)_ | Google OAuth client ID | Leave empty to turn Google sign-in off. See the [Google sign-in guide](google-sign-in.md#try-it-locally). |
+| **`GOOGLE_OAUTH_CLIENT_SECRET`** | _(empty)_ | Google OAuth client secret | Never commit it; `.env` is ignored by git. |
 | **`PRIMEVUE_LICENSE_KEY`** | _(empty)_ | PrimeVue license key | Optional; only needed for commercial PrimeVue offerings. |
 | **`WATCHFILES_FORCE_POLLING`** | `true` | Watchfiles file watcher polling | Ensures hot reloading triggers reliably across Windows mounts. |
 

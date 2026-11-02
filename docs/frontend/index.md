@@ -1,5 +1,8 @@
 # Frontend Developer Guide
 
+See [Notifications and required fields](notifications.md) for toast usage,
+error formatting, form-validation conventions, and verification.
+
 See [Live registration password requirements](password-requirements.md) for the
 password checklist, confirmation behavior, API contract, and verification.
 

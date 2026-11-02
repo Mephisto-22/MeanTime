@@ -297,10 +297,14 @@ function getInitials(name?: string, email?: string): string {
   const trimmed = name?.trim()
   if (trimmed) {
     const parts = trimmed.split(/\s+/)
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    const first = parts[0]
+    const last = parts[parts.length - 1]
+    if (parts.length >= 2 && first && last && first[0] && last[0]) {
+      return (first[0] + last[0]).toUpperCase()
     }
-    return parts[0].slice(0, 1).toUpperCase()
+    if (first) {
+      return first.slice(0, 1).toUpperCase()
+    }
   }
   const emailTrimmed = email?.trim()
   if (emailTrimmed) {
