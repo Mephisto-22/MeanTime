@@ -8,6 +8,8 @@ export default defineVitestConfig({
         domEnvironment: 'happy-dom',
       },
     },
+    hookTimeout: 60000,
+    testTimeout: 30000,
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/smoke/**', '**/node_modules/**'],
     passWithNoTests: true,

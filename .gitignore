@@ -75,6 +75,8 @@ Thumbs.db
 *.swp
 *.swo
 .superpowers/
+run-tests.sh
+frontend/run-tests.sh
 
 # Terraform (infra/)
 .terraform/
