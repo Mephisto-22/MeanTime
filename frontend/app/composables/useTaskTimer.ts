@@ -170,8 +170,12 @@ export function useTaskTimer(
     return formatDigital(elapsedSeconds.value)
   })
 
+  let hasExpired = false
+
   const checkCountdownExpiry = () => {
-    if (isCountDown.value && isRunning.value && remainingSeconds.value <= 0) {
+    if (isCountDown.value && isRunning.value && remainingSeconds.value <= 0 && !hasExpired) {
+      hasExpired = true
+      stopTick()
       const t = timer.value
       if (!t) return
       const entry: TaskTimeEntryDto = {
@@ -215,6 +219,7 @@ export function useTaskTimer(
     isRunning,
     (running) => {
       if (running) {
+        hasExpired = false
         now.value = Date.now()
         startTick()
       } else {

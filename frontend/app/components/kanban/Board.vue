@@ -31,6 +31,7 @@
         :column-id="activeColumnId"
         @save="handleSaveTask"
         @delete="handleDeleteTask"
+        @timer-expired="handleDialogTimerExpired"
       />
     </template>
   </Card>
@@ -569,6 +570,7 @@ const handlePauseTimer = async (taskId: string | number): Promise<void> => {
 const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
   const task = findTaskById(taskId)
   if (!task || !task.timer) return
+  if (task.timer.state === 'IDLE') return
 
   const currentTimer = task.timer
   let totalElapsed = currentTimer.elapsedSeconds || 0
@@ -589,6 +591,10 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
     elapsedSeconds: 0,
   }
 
+  if (entry) {
+    handleTimerExpired(task, entry)
+  }
+
   try {
     const persisted = await kanbanApi.updateTaskTimer(taskId, idleTimer)
     if (persisted) {
@@ -598,16 +604,20 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
         taskId,
       }
     }
-    if (entry) {
-      handleTimerExpired(task, entry)
-    }
   } catch (err) {
     notify.error(err, 'Unable to stop timer')
   }
 }
 
-const handleTimerExpired = (task: KanbanTaskDto, entry: TaskTimeEntryDto): void => {
-  notify.success(`Focus session completed for "${task.title}"!`)
+const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
+  notify.timerComplete(task.title)
+}
+
+const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
+  const task = activeTask.value
+  if (task) {
+    handleTimerExpired(task, entry)
+  }
 }
 
 provide(kanbanContextKey, {

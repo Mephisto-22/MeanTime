@@ -226,7 +226,7 @@
                 title="Stop & Save Session"
                 aria-label="Stop & Save Session"
                 data-testid="timer-btn-stop"
-                @click="handleStop"
+                @click="() => handleStop()"
               >
                 <i class="pi pi-stop text-base" />
               </Button>
@@ -784,7 +784,7 @@ const {
   () => localTimer.value,
   {
     onExpired: (entry) => {
-      handleStop()
+      handleStop(entry)
       emit('timerExpired', entry)
     },
   },
@@ -809,7 +809,7 @@ const handlePause = () => {
   }
 }
 
-const handleStop = async () => {
+const handleStop = async (entry?: TaskTimeEntryDto) => {
   const duration = elapsedSeconds.value
   const startedAt = localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString()
   const endedAt = new Date().toISOString()
@@ -821,7 +821,7 @@ const handleStop = async () => {
   syncTimerOut()
 
   if (kanbanContext?.stopTimer && isPersistedTaskId.value) {
-    kanbanContext.stopTimer(props.taskId)
+    await kanbanContext.stopTimer(props.taskId, entry)
   } else if (isPersistedTaskId.value) {
     try {
       await kanbanApi.updateTaskTimer(props.taskId, {

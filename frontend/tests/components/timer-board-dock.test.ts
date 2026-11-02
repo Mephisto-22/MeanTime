@@ -299,5 +299,52 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       expect(movedTask.timer.mode).toBe('COUNT_DOWN')
       expect(movedTask.timer.startedAt).toBe(startedAtStr)
     })
+
+    it('handles countdown expiration and resets timer to IDLE with toast notification', async () => {
+      const activeTimer: TaskTimerDto = {
+        taskId: 'expiring-task-1',
+        mode: 'COUNT_DOWN',
+        targetDurationSeconds: 1500,
+        state: 'RUNNING',
+        startedAt: new Date(Date.now() - 1500000).toISOString(),
+        elapsedSeconds: 0,
+      }
+
+      const boardData: KanbanBoardDto = {
+        id: 3,
+        title: 'Notification Board',
+        description: '',
+        columns: [
+          {
+            id: 201,
+            title: 'Doing',
+            position: 0,
+            boardId: 3,
+            tasks: [
+              {
+                id: 'expiring-task-1',
+                title: 'Deep Work Sprint',
+                position: 0,
+                timer: activeTimer,
+              },
+            ],
+          },
+        ],
+      }
+
+      const wrapper = mountBoard(boardData)
+
+      const expiredEntry: any = {
+        id: 'exp-entry-1',
+        taskId: 'expiring-task-1',
+        durationSeconds: 1500,
+      }
+
+      await wrapper.vm.handleStopTimer('expiring-task-1', expiredEntry)
+
+      const col = wrapper.vm.localColumns[0]
+      expect(col.tasks[0].timer.state).toBe('IDLE')
+      expect(col.tasks[0].timer.elapsedSeconds).toBe(0)
+    })
   })
 })

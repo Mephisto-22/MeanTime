@@ -36,10 +36,11 @@ describe('Countdown Timer Mode, Inline Typing & Persistent Track (#107)', () => 
       expect(progressPercent.value).toBe(20) // 300/1500 = 20%
     })
 
-    it('automatically triggers onExpired callback when reaching 00:00:00', () => {
+    it('automatically triggers onExpired callback when reaching 00:00:00 without duplicate calls', () => {
       const now = Date.now()
       vi.setSystemTime(now)
 
+      let expiredCallCount = 0
       let expiredEntry: TaskTimeEntryDto | null = null
       const timer: TaskTimerDto = {
         taskId: 'cd-task-2',
@@ -54,6 +55,7 @@ describe('Countdown Timer Mode, Inline Typing & Persistent Track (#107)', () => 
         () => timer,
         {
           onExpired: (entry) => {
+            expiredCallCount++
             expiredEntry = entry
           },
         },
@@ -61,9 +63,10 @@ describe('Countdown Timer Mode, Inline Typing & Persistent Track (#107)', () => 
 
       expect(expiredEntry).toBeNull()
 
-      // Advance by 2 seconds to cross 00:00:00
-      vi.advanceTimersByTime(2000)
+      // Advance by 10 seconds past 00:00:00
+      vi.advanceTimersByTime(10000)
 
+      expect(expiredCallCount).toBe(1)
       expect(expiredEntry).not.toBeNull()
       expect(expiredEntry!.durationSeconds).toBe(60)
       expect(expiredEntry!.taskId).toBe('cd-task-2')

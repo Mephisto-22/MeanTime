@@ -51,14 +51,21 @@ def reconcile_expired_countdowns(user):
         if remaining > 0 and now >= timer.started_at + timedelta(seconds=remaining):
             with transaction.atomic():
                 ended_at = timer.started_at + timedelta(seconds=remaining)
-                TaskTimeEntry.objects.create(
+                start_time = timer.started_at - timedelta(seconds=elapsed_prior)
+                duplicate = TaskTimeEntry.objects.filter(
                     task=timer.task,
-                    user=user,
-                    started_at=timer.started_at - timedelta(seconds=elapsed_prior),
-                    ended_at=ended_at,
-                    duration_seconds=target,
-                    note="Completed countdown session",
-                )
+                    started_at__gte=start_time - timedelta(seconds=5),
+                    started_at__lte=start_time + timedelta(seconds=5),
+                ).exists()
+                if not duplicate:
+                    TaskTimeEntry.objects.create(
+                        task=timer.task,
+                        user=user,
+                        started_at=start_time,
+                        ended_at=ended_at,
+                        duration_seconds=target,
+                        note="Completed countdown session",
+                    )
                 timer.state = TimerState.IDLE
                 timer.started_at = None
                 timer.elapsed_seconds = 0
@@ -308,26 +315,33 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
         if elapsed is None:
             elapsed = timer.elapsed_seconds
 
-        # If transitioning to IDLE after an active run (or elapsed_seconds > 0)
-        if new_state == TimerState.IDLE and (prev_state in (TimerState.RUNNING, TimerState.PAUSED) or elapsed > 0):
-            total_duration = elapsed
-            if prev_state == TimerState.RUNNING and timer.started_at:
-                anchor_delta = int((timezone.now() - timer.started_at).total_seconds())
-                if anchor_delta > 0 and data.get("elapsed_seconds") is None:
-                    total_duration += anchor_delta
+        # If transitioning to IDLE
+        if new_state == TimerState.IDLE:
+            if prev_state in (TimerState.RUNNING, TimerState.PAUSED):
+                total_duration = elapsed
+                if prev_state == TimerState.RUNNING and timer.started_at:
+                    anchor_delta = int((timezone.now() - timer.started_at).total_seconds())
+                    if anchor_delta > 0 and data.get("elapsed_seconds") is None:
+                        total_duration += anchor_delta
 
-            if total_duration > 0:
-                end_time = timezone.now()
-                start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
-                default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
-                TaskTimeEntry.objects.create(
-                    task=task,
-                    user=request.auth,
-                    started_at=start_time,
-                    ended_at=end_time,
-                    duration_seconds=total_duration,
-                    note=default_note,
-                )
+                if total_duration > 0:
+                    end_time = timezone.now()
+                    start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
+                    default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
+                    duplicate = TaskTimeEntry.objects.filter(
+                        task=task,
+                        started_at__gte=start_time - timedelta(seconds=5),
+                        started_at__lte=start_time + timedelta(seconds=5),
+                    ).exists()
+                    if not duplicate:
+                        TaskTimeEntry.objects.create(
+                            task=task,
+                            user=request.auth,
+                            started_at=start_time,
+                            ended_at=end_time,
+                            duration_seconds=total_duration,
+                            note=default_note,
+                        )
 
             # Reset ephemeral runtime fields
             timer.state = TimerState.IDLE

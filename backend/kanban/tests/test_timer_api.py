@@ -201,3 +201,65 @@ class TaskTimerApiTests(TestCase):
         task_data = board_res.json()["columns"][0]["tasks"][0]
         self.assertEqual(task_data["timer"]["state"], "RUNNING")
         self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 0)
+
+
+    def test_reconcile_and_client_stop_creates_exactly_one_entry(self):
+        """When an expired countdown is reconciled on board load and then client sends stop, only 1 entry is created."""
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1500,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=1600),
+            elapsed_seconds=0,
+        )
+
+        # 1. Board fetch reconciles the expired countdown
+        board_res = self.client.get(f"/api/kanban/boards/{self.board_id}", **self.auth)
+        self.assertEqual(board_res.status_code, 200)
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+        # 2. Client also sends stop/IDLE PATCH request
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 1500}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Still exactly 1 entry, NOT 2
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+    def test_duplicate_stop_calls_create_only_one_entry(self):
+        """Consecutive stop calls on a running timer create only one time entry."""
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1500,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=1500),
+            elapsed_seconds=0,
+        )
+
+        # First stop
+        res1 = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 1500}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res1.status_code, 200)
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+        # Rapid second stop (e.g. from multiple components or ticking intervals)
+        res2 = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 1500}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res2.status_code, 200)
+
+        # Must still be exactly 1 entry
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
