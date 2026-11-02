@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
-from ninja_jwt.authentication import JWTAuth
 from django.db.models import Prefetch, Max, Q
 from django.db import IntegrityError, transaction
+from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 from ninja import Router
 from .models import Board, BoardColumn, Task, TaskTimeEntry, Tag
@@ -12,13 +12,17 @@ from .schemas import (
     BoardColumnIn, 
     BoardColumnOut, 
     BoardIn, 
-    BoardOut, 
+    BoardOut,
+    BoardShareIn, 
     TaskMoveIn,
     TagIn,
     TagOut,
 )
 
 router = Router(tags=["Kanban"])
+
+# get the custom user model
+User = get_user_model()
 
 # Every new board starts with these columns, left to right.
 DEFAULT_COLUMN_TITLES = ("To Do", "In Progress", "Done")
@@ -86,11 +90,9 @@ def _reindex(items):
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by or shared with the authenticated user."""
-    return (
-        Board.objects.filter(
-            Q(owner=request.auth) | Q(collaborators=request.auth)
-        ).distinct().prefetch_related("columns__tasks__tags"),
-    )
+    return Board.objects.filter(
+        Q(owner=request.auth) | Q(collaborators=request.auth)
+    ).distinct().prefetch_related("columns__tasks__tags")
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
@@ -123,6 +125,43 @@ def delete_board(request, board_id: int):
     get_owned_board(request.auth, board_id).delete()
     return {"success": True}
 
+@router.post("/boards/{board_id}/collaborators")
+def share_board(request, board_id: int, payload: BoardShareIn):
+    """Share a board with an accepted friend."""
+
+    # only the board owner can manage collaborators
+    board = get_owned_board(request.auth, board_id)
+
+    # retrieve the user who will receive access
+    friend = get_object_or_404(User, id=payload.friend_id)
+
+    # verify the user is an accepted friend
+    if not request.auth.is_friends_with(friend):
+        raise HttpError(403, "You can only share boards with accepted friends.")
+
+    # grant the friend access
+    board.collaborators.add(friend)
+
+    return {"success": True, "message": "Board shared successfully."}
+
+@router.delete("/boards/{board_id}/collaborators/{collaborator_id}")
+def remove_collaborators(request, board_id: int, collaborator_id: int):
+    """Revoke a collaborator's access to a board."""
+
+    # only the board owner can remove collaborators
+    board = get_owned_board(request.auth, board_id)
+
+    # retrieve the collaborator
+    friend = get_object_or_404(User, id=collaborator_id)
+
+    # Verify that the user currently has access.
+    if not board.collaborators.filter(id=friend.id).exists():
+        raise HttpError(404, "User is not a collaborator on this board.")
+
+    # remove the relationship from the many-to-many table
+    board.collaborators.remove(friend)
+
+    return {"success": True, "message": "Collaborator access successfully revoked."}
 
 # -----------------
 # Column Endpoints
