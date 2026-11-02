@@ -195,6 +195,18 @@
         />
       </div>
 
+      <!-- Task Timer Section (Full-Width Focus & Work Journal) -->
+      <div data-testid="task-dialog-timer-section" class="w-full">
+        <TaskTimerEditor
+          :task-id="activeTaskId"
+          :timer="timerState"
+          :time-entries="timeEntriesState"
+          @update:timer="handleTimerUpdate"
+          @update:time-entries="handleTimeEntriesUpdate"
+          @timer-expired="handleTimerExpired"
+        />
+      </div>
+
       <!-- Delete Confirmation Step -->
       <div
         v-if="isConfirmingDelete"
@@ -269,6 +281,8 @@ import type {
   KanbanColumnSummary,
 } from '~/api/kanban'
 import { kanbanContextKey, TASK_PRIORITY_CONFIG } from '~/api/kanban'
+import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
+import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 
 interface Props {
   visible?: boolean
@@ -293,6 +307,7 @@ const emit = defineEmits<{
   (e: 'delete', taskId: string | number): void
   (e: 'cancel'): void
   (e: 'createTag', name: string): void
+  (e: 'timerExpired', entry: TaskTimeEntryDto): void
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
@@ -309,6 +324,34 @@ const selectedColumnId = ref<string | number | null>(null)
 const attachedTags = ref<TagDto[]>([])
 const tagInputText = ref('')
 const isConfirmingDelete = ref(false)
+
+const activeTaskId = computed(() => props.task?.id ?? 'draft-task')
+
+const timerState = ref<TaskTimerDto>({
+  taskId: props.task?.id ?? 'draft-task',
+  mode: 'NONE',
+  targetDurationSeconds: 1500,
+  state: 'IDLE',
+  startedAt: null,
+  elapsedSeconds: 0,
+})
+
+const timeEntriesState = ref<TaskTimeEntryDto[]>([])
+
+const handleTimerUpdate = (updated: TaskTimerDto) => {
+  timerState.value = { ...updated }
+}
+
+const handleTimeEntriesUpdate = (updated: TaskTimeEntryDto[]) => {
+  timeEntriesState.value = [...updated]
+}
+
+const handleTimerExpired = (entry: TaskTimeEntryDto) => {
+  emit('timerExpired', entry)
+  if (kanbanContext?.onTimerExpired && props.task) {
+    kanbanContext.onTimerExpired(props.task, entry)
+  }
+}
 
 const priorityOptions: Array<{ label: string; value: TaskPriorityType }> = [
   { label: 'None (Clear)', value: null },
@@ -361,12 +404,32 @@ const syncFormWithProps = () => {
     priority.value = props.task.priority ?? null
     selectedColumnId.value = props.task.columnId ?? (props.task as any)?.column_id ?? props.columnId ?? null
     attachedTags.value = props.task.tags ? [...props.task.tags] : []
+    timerState.value = props.task.timer
+      ? { ...props.task.timer }
+      : {
+          taskId: props.task.id,
+          mode: 'NONE',
+          targetDurationSeconds: 1500,
+          state: 'IDLE',
+          startedAt: null,
+          elapsedSeconds: 0,
+        }
+    timeEntriesState.value = props.task.time_entries ? [...props.task.time_entries] : (props.task.timeEntries ? [...props.task.timeEntries] : [])
   } else {
     title.value = ''
     description.value = ''
     priority.value = null
     selectedColumnId.value = props.columnId ?? null
     attachedTags.value = []
+    timerState.value = {
+      taskId: 'new-task',
+      mode: 'NONE',
+      targetDurationSeconds: 1500,
+      state: 'IDLE',
+      startedAt: null,
+      elapsedSeconds: 0,
+    }
+    timeEntriesState.value = []
   }
 }
 
@@ -485,7 +548,7 @@ const save = () => {
   if (isSaveDisabled.value || isConfirmingDelete.value) {
     return
   }
-  emit('save', {
+  const payload: TaskDialogSavePayload = {
     title: trimmedTitle.value,
     description: description.value.trim(),
     mode: props.mode,
@@ -494,7 +557,14 @@ const save = () => {
     priority: priority.value,
     tags: [...attachedTags.value],
     tag_ids: attachedTags.value.map(t => t.id),
-  })
+  }
+  if (timerState.value && timerState.value.mode !== 'NONE') {
+    payload.timer = timerState.value
+  }
+  if (timeEntriesState.value && timeEntriesState.value.length > 0) {
+    payload.timeEntries = timeEntriesState.value
+  }
+  emit('save', payload)
   isVisible.value = false
 }
 
@@ -516,5 +586,7 @@ defineExpose({
   addTagFromInput,
   attachExistingTag,
   removeTag,
+  timerState,
+  timeEntriesState,
 })
 </script>

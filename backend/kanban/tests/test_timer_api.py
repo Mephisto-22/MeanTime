@@ -1,0 +1,156 @@
+import json
+from datetime import timedelta
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.utils import timezone
+
+from kanban.models import Board, BoardColumn, Task, TaskTimer, TaskTimeEntry, TimerMode, TimerState
+
+User = get_user_model()
+PASSWORD = "TestPassword123!"
+
+
+class TaskTimerApiTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="timer_tester@example.com",
+            password=PASSWORD,
+            display_name="Timer Tester",
+        )
+        login = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({"email": "timer_tester@example.com", "password": PASSWORD}),
+            content_type="application/json",
+        )
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {login.json()['access_token']}"}
+
+        # Board & Column
+        board_res = self.client.post(
+            "/api/kanban/boards",
+            data=json.dumps({"title": "Timer Test Board", "description": ""}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.board_id = board_res.json()["id"]
+        self.column_id = board_res.json()["columns"][0]["id"]
+
+        # Task
+        task_res = self.client.post(
+            f"/api/kanban/columns/{self.column_id}/tasks",
+            data=json.dumps({"title": "Timed Task"}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.task_id = task_res.json()["id"]
+
+    def test_get_board_serializes_timer_field(self):
+        """Board retrieval endpoint returns tasks with nested timer (None or dict)."""
+        board_res = self.client.get(f"/api/kanban/boards/{self.board_id}", **self.auth)
+        self.assertEqual(board_res.status_code, 200)
+        task_data = board_res.json()["columns"][0]["tasks"][0]
+        self.assertIn("timer", task_data)
+        self.assertIsNone(task_data["timer"])
+
+    def test_patch_timer_creates_task_timer_and_sets_mode(self):
+        """PATCH /tasks/{id}/timer creates TaskTimer and updates mode."""
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"mode": "COUNT_UP"}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["mode"], "COUNT_UP")
+        self.assertEqual(data["state"], "IDLE")
+        self.assertEqual(data["elapsed_seconds"], 0)
+
+        # Confirm persisted in DB
+        timer = TaskTimer.objects.get(task_id=self.task_id)
+        self.assertEqual(timer.mode, TimerMode.COUNT_UP)
+        self.assertEqual(timer.state, TimerState.IDLE)
+
+    def test_patch_timer_start_and_pause_transitions(self):
+        """PATCH /tasks/{id}/timer transitions through RUNNING and PAUSED states."""
+        now_str = timezone.now().isoformat()
+
+        # Start timer
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"mode": "COUNT_UP", "state": "RUNNING", "started_at": now_str}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["state"], "RUNNING")
+
+        # Pause timer with accumulated 45 seconds
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "PAUSED", "elapsed_seconds": 45, "started_at": None}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["state"], "PAUSED")
+        self.assertEqual(res.json()["elapsed_seconds"], 45)
+
+        timer = TaskTimer.objects.get(task_id=self.task_id)
+        self.assertEqual(timer.state, TimerState.PAUSED)
+        self.assertEqual(timer.elapsed_seconds, 45)
+
+    def test_patch_timer_stop_creates_time_entry_and_resets_runtime(self):
+        """Stopping an active timer resets TaskTimer to IDLE and creates a TaskTimeEntry."""
+        # Initial active timer
+        timer = TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_UP,
+            state=TimerState.RUNNING,
+            started_at=timezone.now() - timedelta(seconds=120),
+            elapsed_seconds=0,
+        )
+
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 120}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["state"], "IDLE")
+        self.assertEqual(data["elapsed_seconds"], 0)
+        self.assertIsNone(data["started_at"])
+        self.assertEqual(data["mode"], "COUNT_UP")  # Preserves mode
+
+        # Verify TaskTimeEntry creation
+        entries = TaskTimeEntry.objects.filter(task_id=self.task_id)
+        self.assertEqual(entries.count(), 1)
+        entry = entries.first()
+        self.assertEqual(entry.duration_seconds, 120)
+        self.assertEqual(entry.user, self.user)
+        self.assertIsNotNone(entry.started_at)
+        self.assertIsNotNone(entry.ended_at)
+
+    def test_patch_timer_other_user_forbidden(self):
+        """Another user cannot mutate timer of a task they do not own."""
+        other_user = User.objects.create_user(
+            email="other@example.com",
+            password=PASSWORD,
+            display_name="Other User",
+        )
+        login = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({"email": "other@example.com", "password": PASSWORD}),
+            content_type="application/json",
+        )
+        other_auth = {"HTTP_AUTHORIZATION": f"Bearer {login.json()['access_token']}"}
+
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"mode": "COUNT_UP"}),
+            content_type="application/json",
+            **other_auth,
+        )
+        self.assertEqual(res.status_code, 404)

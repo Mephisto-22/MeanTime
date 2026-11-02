@@ -1,0 +1,864 @@
+<template>
+  <div
+    data-testid="task-timer-editor"
+    class="flex flex-col gap-4 rounded-xl border border-surface-200 bg-surface-0 p-4 dark:border-surface-800 dark:bg-surface-900 shadow-xs transition-all"
+  >
+    <!-- Section Header with Mode Dropdown & Status -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-surface-200/80 pb-3 dark:border-surface-800">
+      <div class="flex items-center gap-2">
+        <i class="pi pi-hourglass text-amber-500 text-sm" />
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-600 dark:text-surface-300">
+          Focus & Work Journal
+        </h3>
+        <span
+          v-if="isRunning"
+          class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live session
+        </span>
+        <span
+          v-else-if="isPaused"
+          class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          <i class="pi pi-pause text-[8px]" />
+          Paused
+        </span>
+      </div>
+
+      <!-- Mode Selector: Clean Select Dropdown -->
+      <div class="flex items-center gap-2">
+        <label for="timer-mode-select" class="text-xs text-surface-500">Mode:</label>
+        <Select
+          id="timer-mode-select"
+          v-model="localTimer.mode"
+          :options="modeOptions"
+          option-label="label"
+          option-value="value"
+          size="small"
+          :disabled="isRunning || isPaused"
+          class="!text-xs !w-44"
+          data-testid="timer-mode-select"
+          @change="onModeChange"
+        />
+      </div>
+    </div>
+
+    <!-- Asymmetric 2-Column Split: Left Focus Desk (42%) & Right Activity Chronicle (58%) -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+      <!-- Left Column: Active Focus Instrument (5 cols / ~42%) -->
+      <div class="flex flex-col gap-3 md:col-span-5 md:pr-4 md:border-r md:border-surface-200 dark:md:border-surface-800">
+        <div class="flex items-center justify-between text-xs font-medium text-surface-500">
+          <span>Active Instrument</span>
+          <span v-if="localTimer.mode !== 'NONE'" class="text-[11px] text-surface-400">
+            {{ localTimer.mode === 'COUNT_DOWN' ? 'Countdown Block' : 'Stopwatch' }}
+          </span>
+        </div>
+
+        <!-- If Mode is NONE: Clean Callout to Enable -->
+        <div
+          v-if="localTimer.mode === 'NONE'"
+          class="flex flex-col items-center justify-center p-6 text-center rounded-lg border border-dashed border-surface-200 dark:border-surface-800 text-surface-400 text-xs gap-2"
+        >
+          <i class="pi pi-clock text-lg opacity-40" />
+          <span>Timer disabled for this task.</span>
+          <Button
+            label="Enable Countdown (25m)"
+            size="small"
+            text
+            class="!text-xs"
+            @click="setMode('COUNT_DOWN')"
+          />
+        </div>
+
+        <!-- Active Focus Stage -->
+        <template v-else>
+          <!-- Countdown Duration Config: Presets + Custom Target Input -->
+          <div v-if="localTimer.mode === 'COUNT_DOWN'" class="flex flex-col gap-2">
+            <div class="flex items-center justify-between text-[11px] text-surface-600 dark:text-surface-400">
+              <span class="font-medium">Target duration:</span>
+              <span class="font-bold text-surface-900 dark:text-surface-100 font-mono">{{ targetMinutes }} min</span>
+            </div>
+
+            <!-- Quick-Pick Presets -->
+            <div class="flex items-center gap-1.5">
+              <Button
+                v-for="p in [15, 25, 45, 60]"
+                :key="p"
+                type="button"
+                :label="`${p}m`"
+                size="small"
+                :severity="targetMinutes === p ? 'primary' : 'secondary'"
+                :outlined="targetMinutes !== p"
+                :disabled="isRunning || isPaused"
+                class="!text-xs !py-1 !px-2 flex-1 cursor-pointer"
+                :data-testid="`timer-preset-${p}`"
+                @click="setPresetMinutes(p)"
+              />
+            </div>
+
+          </div>
+
+          <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
+          <div
+            class="group relative flex flex-col items-center justify-center p-4 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200/80 dark:border-surface-700/60 text-center gap-1 transition-all"
+            :class="{ 'ring-2 ring-primary-500/50 bg-primary-50/20 dark:bg-primary-950/20': isEditingTarget }"
+          >
+            <!-- Header Label / Inline Edit Prompt -->
+            <div class="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-surface-400">
+              <span v-if="isEditingTarget" class="text-primary-600 dark:text-primary-400 flex items-center gap-1">
+                <i class="pi pi-pencil text-[9px]" />
+                Type Target (e.g. 30, 45:00) & Enter
+              </span>
+              <span v-else>
+                {{ isRunning ? 'Remaining Time' : (isPaused ? 'Paused At' : 'Target Interval') }}
+              </span>
+            </div>
+
+            <!-- Readout when NOT editing -->
+            <div
+              v-if="!isEditingTarget"
+              data-testid="timer-digital-readout"
+              class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none transition-transform"
+              :class="{
+                'cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 hover:scale-[1.02]': !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'
+              }"
+              :title="(!isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN') ? 'Double-click to set custom target' : undefined"
+              @dblclick="startEditingTarget"
+            >
+              {{ displayTime }}
+            </div>
+
+            <!-- Inline Input when double-clicked -->
+            <div v-else class="flex items-center justify-center py-0.5">
+              <input
+                ref="targetInputRef"
+                v-model="targetInputText"
+                type="text"
+                maxlength="8"
+                class="font-mono text-3xl font-bold tracking-normal tabular-nums text-center bg-transparent border-b-2 border-primary-500 text-surface-900 dark:text-surface-100 focus:outline-none w-36 py-0"
+                data-testid="timer-inline-target-input"
+                placeholder="25:00"
+                @keydown.enter="commitTargetInput"
+                @keydown.esc="cancelTargetEditing"
+                @blur="commitTargetInput"
+              />
+            </div>
+
+            <!-- Double-Click Hint (Shown when IDLE in COUNT_DOWN mode) -->
+            <div
+              v-if="!isEditingTarget && !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'"
+              class="text-[10px] text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer select-none"
+              title="Double-click to edit custom target"
+              @click="startEditingTarget"
+            >
+              <i class="pi pi-pencil text-[8px]" />
+              <span>Double-click timer to set time</span>
+            </div>
+
+            <!-- Hairline Progress Line -->
+            <div v-if="localTimer.mode === 'COUNT_DOWN'" class="w-full mt-2">
+              <ProgressBar
+                :value="progressPercent"
+                :show-value="false"
+                class="!h-1.5 rounded-full overflow-hidden"
+              />
+              <div class="flex justify-between text-[10px] text-surface-400 mt-1">
+                <span>{{ progressPercent }}% elapsed</span>
+                <span>{{ formatDigital(elapsedSeconds) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Persistent Rounded-Square Buttons Across the Bottom (Evenly Stretched Full Width) -->
+          <div class="grid grid-cols-3 gap-2 w-full pt-1">
+            <!-- 1. Start / Resume Button (Disabled when RUNNING) -->
+            <Button
+              type="button"
+              severity="primary"
+              :disabled="isRunning"
+              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+              style="width: 100% !important;"
+              :title="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
+              :aria-label="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
+              data-testid="timer-btn-start"
+              @click="handleStart"
+            >
+              <i class="pi pi-play text-base" />
+            </Button>
+
+            <!-- 2. Pause Button (Disabled when NOT RUNNING) -->
+            <Button
+              type="button"
+              severity="warn"
+              :disabled="!isRunning"
+              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+              style="width: 100% !important;"
+              title="Pause Focus Session"
+              aria-label="Pause Focus Session"
+              data-testid="timer-btn-pause"
+              @click="handlePause"
+            >
+              <i class="pi pi-pause text-base" />
+            </Button>
+
+            <!-- 3. Stop Button (Disabled when IDLE) -->
+            <Button
+              type="button"
+              severity="danger"
+              outlined
+              :disabled="isIdle"
+              class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+              style="width: 100% !important;"
+              title="Stop & Save Session"
+              aria-label="Stop & Save Session"
+              data-testid="timer-btn-stop"
+              @click="handleStop"
+            >
+              <i class="pi pi-stop text-base" />
+            </Button>
+          </div>
+        </template>
+      </div>
+
+      <!-- Right Column: Activity Chronicle & Past Work (7 cols / ~58%) -->
+      <div class="flex flex-col gap-3 md:col-span-7">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-xs font-medium text-surface-500">
+            <span>Session Chronicle</span>
+            <span class="font-bold text-surface-700 dark:text-surface-300">
+              ({{ entries.length }})
+            </span>
+            <span v-if="totalDurationSeconds > 0" class="text-xs text-primary-600 dark:text-primary-400 font-semibold">
+              &bull; {{ formatDurationBadge(totalDurationSeconds) }} total
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            icon="pi pi-plus"
+            :label="isManualLogOpen ? 'Cancel' : 'Log past work'"
+            size="small"
+            text
+            class="!text-xs !py-0.5"
+            data-testid="btn-toggle-log-past-work"
+            @click="toggleManualLog"
+          />
+        </div>
+
+        <!-- "Log Past Work" Form with Start/End Times and Symmetrical Grid Spacing -->
+        <div
+          v-if="isManualLogOpen"
+          data-testid="manual-work-form"
+          class="flex flex-col gap-3 p-3.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/80 text-xs shadow-xs"
+        >
+          <div class="flex items-center justify-between border-b border-surface-200 dark:border-surface-700 pb-2">
+            <span class="font-bold text-surface-800 dark:text-surface-100">Log Past Work Session</span>
+            <span class="text-[10px] text-surface-400 font-mono">Calculated duration: {{ formatDurationBadge(manualDurationMinutes * 60) }}</span>
+          </div>
+
+          <!-- Row 1: Date (Flex-1) and Duration (Fixed Width Stepper) -->
+          <div class="flex items-center gap-3">
+            <!-- Date (takes natural expanded space) -->
+            <div class="flex-1 min-w-0 flex flex-col gap-1">
+              <label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</label>
+              <input
+                id="manual-date"
+                v-model="manualDate"
+                type="date"
+                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                data-testid="manual-input-date"
+              />
+            </div>
+
+            <!-- Duration (compact dedicated stepper) -->
+            <div class="w-28 shrink-0 flex flex-col gap-1">
+              <label for="manual-duration-mins" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Duration</label>
+              <InputNumber
+                id="manual-duration-mins"
+                v-model="manualDurationMinutes"
+                suffix=" min"
+                :min="1"
+                :max="1440"
+                fluid
+                input-class="!text-xs !py-1.5 !px-2 !text-center"
+                data-testid="manual-input-duration"
+                @update:model-value="onManualDurationInputChanged"
+              />
+            </div>
+          </div>
+
+          <!-- Row 2: Start Time and End Time (Spacious 2-Column Split) -->
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Start Time -->
+            <div class="flex flex-col gap-1">
+              <label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</label>
+              <input
+                id="manual-start-time"
+                v-model="manualStartTime"
+                type="time"
+                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                data-testid="manual-input-start-time"
+                @change="onManualTimeInputChanged"
+              />
+            </div>
+
+            <!-- End Time -->
+            <div class="flex flex-col gap-1">
+              <label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</label>
+              <input
+                id="manual-end-time"
+                v-model="manualEndTime"
+                type="time"
+                class="w-full text-xs py-1.5 px-2.5 rounded-md border border-surface-300 bg-surface-0 dark:border-surface-600 dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                data-testid="manual-input-end-time"
+                @change="onManualTimeInputChanged"
+              />
+            </div>
+          </div>
+
+          <!-- Row 2: Note Field (Dedicated Full-Width Space) -->
+          <div class="flex flex-col gap-1">
+            <label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</label>
+            <InputText
+              id="manual-session-note"
+              v-model="manualNote"
+              placeholder="What did you accomplish in this session?"
+              fluid
+              class="!text-xs !py-1.5"
+              data-testid="manual-input-note"
+            />
+          </div>
+
+          <!-- Row 3: Action Buttons -->
+          <div class="flex justify-end gap-2 pt-1 border-t border-surface-200/80 dark:border-surface-700">
+            <Button
+              label="Cancel"
+              size="small"
+              text
+              severity="secondary"
+              class="!text-xs"
+              @click="isManualLogOpen = false"
+            />
+            <Button
+              label="Record Session"
+              icon="pi pi-check"
+              size="small"
+              severity="primary"
+              class="!text-xs"
+              data-testid="manual-save-btn"
+              @click="submitManualEntry"
+            />
+          </div>
+        </div>
+
+        <!-- Sessions List (With Full Time & Duration Editing) -->
+        <div v-if="entries.length > 0" class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div
+            v-for="entry in entries"
+            :key="entry.id"
+            :data-testid="`session-entry-${entry.id}`"
+            class="group relative flex flex-col gap-2 rounded-xl border border-surface-200/90 bg-surface-50/50 p-3 text-xs transition-all hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80"
+          >
+            <!-- Normal View (When Not Editing this Entry) -->
+            <template v-if="editingEntryId !== entry.id">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center rounded-md bg-primary-100/70 px-2 py-0.5 font-mono text-[11px] font-bold text-primary-700 dark:bg-primary-950 dark:text-primary-300">
+                    {{ formatDurationBadge(entry.durationSeconds) }}
+                  </span>
+                  <span class="text-[11px] text-surface-500 font-medium">
+                    {{ formatDateLabel(entry.startedAt) }} &bull; {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
+                  </span>
+                </div>
+
+                <!-- Actions: Edit & Delete -->
+                <div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    type="button"
+                    icon="pi pi-pencil"
+                    size="small"
+                    text
+                    severity="secondary"
+                    class="!h-6 !w-6 !p-0 text-surface-500 hover:text-surface-900 dark:hover:text-surface-100"
+                    title="Edit session time & duration"
+                    aria-label="Edit session"
+                    :data-testid="`btn-edit-session-${entry.id}`"
+                    @click="startEditingSession(entry)"
+                  />
+                  <Button
+                    type="button"
+                    icon="pi pi-trash"
+                    size="small"
+                    text
+                    severity="danger"
+                    class="!h-6 !w-6 !p-0 text-surface-400 hover:text-red-500"
+                    title="Delete session"
+                    aria-label="Delete session"
+                    :data-testid="`btn-delete-session-${entry.id}`"
+                    @click="deleteEntry(entry.id)"
+                  />
+                </div>
+              </div>
+
+              <!-- Note Display -->
+              <p
+                class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
+                title="Click to edit session"
+                @click="startEditingSession(entry)"
+              >
+                {{ entry.note || '(No session note recorded)' }}
+              </p>
+            </template>
+
+            <!-- Inline Session Editor (When Editing this Entry) -->
+            <div
+              v-else
+              data-testid="inline-session-editor"
+              class="flex flex-col gap-2.5 p-2 rounded-lg bg-surface-0 dark:bg-surface-900 border border-primary-200 dark:border-primary-800"
+            >
+              <div class="text-[11px] font-bold text-primary-600 dark:text-primary-400">
+                Edit Work Session
+              </div>
+
+              <!-- Editable Timestamps & Duration (Spacious Multi-Row Layout) -->
+              <!-- Row 1: Date + Duration Stepper -->
+              <div class="flex items-center gap-2.5">
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <label class="text-[10px] uppercase font-semibold text-surface-400">Date</label>
+                  <input
+                    v-model="editDate"
+                    type="date"
+                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                  />
+                </div>
+                <div class="w-28 shrink-0 flex flex-col gap-0.5">
+                  <label class="text-[10px] uppercase font-semibold text-surface-400">Duration</label>
+                  <InputNumber
+                    v-model="editDurationMinutes"
+                    suffix=" min"
+                    :min="1"
+                    :max="1440"
+                    fluid
+                    input-class="!text-xs !py-1 !px-2 !text-center"
+                    data-testid="edit-session-duration"
+                    @update:model-value="onEditDurationChanged"
+                  />
+                </div>
+              </div>
+
+              <!-- Row 2: Start Time & End Time -->
+              <div class="grid grid-cols-2 gap-2.5">
+                <div class="flex flex-col gap-0.5">
+                  <label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</label>
+                  <input
+                    v-model="editStartTime"
+                    type="time"
+                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                    @change="onEditTimeChanged"
+                  />
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <label class="text-[10px] uppercase font-semibold text-surface-400">End Time</label>
+                  <input
+                    v-model="editEndTime"
+                    type="time"
+                    class="w-full text-xs py-1 px-2 rounded border border-surface-300 dark:border-surface-600 dark:bg-surface-950 text-surface-900 dark:text-surface-100"
+                    @change="onEditTimeChanged"
+                  />
+                </div>
+              </div>
+
+              <!-- Editable Note -->
+              <div class="flex flex-col gap-0.5">
+                <label class="text-[10px] uppercase font-semibold text-surface-400">Note</label>
+                <InputText
+                  v-model="editNoteText"
+                  placeholder="Session notes..."
+                  fluid
+                  class="!text-xs !py-1"
+                  data-testid="edit-session-note"
+                  @keydown.enter="saveSessionEdits(entry)"
+                />
+              </div>
+
+              <!-- Edit Action Buttons -->
+              <div class="flex justify-end gap-1.5 pt-1">
+                <Button
+                  label="Cancel"
+                  size="small"
+                  text
+                  severity="secondary"
+                  class="!text-xs"
+                  @click="editingEntryId = null"
+                />
+                <Button
+                  label="Save Changes"
+                  icon="pi pi-check"
+                  size="small"
+                  severity="primary"
+                  class="!text-xs"
+                  data-testid="btn-save-session-edits"
+                  @click="saveSessionEdits(entry)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="text-xs text-surface-400 italic py-4 text-center">
+          No work sessions recorded yet. Start tracking or click "+ Log past work" above.
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch, nextTick } from 'vue'
+import type { TaskTimerDto, TaskTimeEntryDto, TimerMode } from '~/api/kanban'
+import {
+  useTaskTimer,
+  formatDigital,
+  formatDurationBadge,
+  formatTimeRange,
+  formatDateLabel,
+  toLocalTimeString,
+  toLocalDateString,
+  combineDateAndTime,
+} from '~/composables/useTaskTimer'
+
+const props = defineProps<{
+  timer?: TaskTimerDto | null
+  timeEntries?: TaskTimeEntryDto[]
+  taskId: string | number
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:timer', timer: TaskTimerDto): void
+  (e: 'update:timeEntries', entries: TaskTimeEntryDto[]): void
+  (e: 'timerExpired', entry: TaskTimeEntryDto): void
+}>()
+
+const modeOptions = [
+  { label: 'None (Disabled)', value: 'NONE' },
+  { label: 'Stopwatch (Count up)', value: 'COUNT_UP' },
+  { label: 'Countdown (Target)', value: 'COUNT_DOWN' },
+]
+
+const localTimer = ref<TaskTimerDto>({
+  taskId: props.taskId,
+  mode: props.timer?.mode ?? 'NONE',
+  targetDurationSeconds: props.timer?.targetDurationSeconds ?? 1500,
+  state: props.timer?.state ?? 'IDLE',
+  startedAt: props.timer?.startedAt ?? null,
+  elapsedSeconds: props.timer?.elapsedSeconds ?? 0,
+})
+
+const entries = ref<TaskTimeEntryDto[]>(props.timeEntries ? [...props.timeEntries] : [])
+
+watch(
+  () => props.timer,
+  (t) => {
+    if (t) localTimer.value = { ...t }
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.timeEntries,
+  (list) => {
+    if (list) entries.value = [...list]
+  },
+  { deep: true },
+)
+
+const syncTimerOut = () => emit('update:timer', { ...localTimer.value })
+const syncEntriesOut = () => emit('update:timeEntries', [...entries.value])
+
+// Target duration & inline editing
+const targetMinutes = computed(() => Math.floor((localTimer.value.targetDurationSeconds ?? 1500) / 60))
+const customMinutes = ref(targetMinutes.value)
+
+watch(targetMinutes, (m) => {
+  customMinutes.value = m
+})
+
+// Inline double-click editing on the digital readout
+const isEditingTarget = ref(false)
+const targetInputText = ref('')
+const targetInputRef = ref<HTMLInputElement | null>(null)
+
+const startEditingTarget = () => {
+  if (isRunning.value || isPaused.value || localTimer.value.mode !== 'COUNT_DOWN') return
+  isEditingTarget.value = true
+  targetInputText.value = formatDigital(localTimer.value.targetDurationSeconds || 1500)
+  nextTick(() => {
+    if (targetInputRef.value) {
+      targetInputRef.value.focus()
+      targetInputRef.value.select()
+    }
+  })
+}
+
+const parseTargetDurationString = (input: string): number | null => {
+  const trimmed = input.trim().toLowerCase()
+  if (!trimmed) return null
+
+  // If format "MM:SS" e.g. "25:00" or "10:30"
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':').map(Number)
+    const mins = parts[0] ?? 0
+    const secs = parts[1] ?? 0
+    const total = mins * 60 + secs
+    return total > 0 ? total : null
+  }
+
+  // If format "45m" or "45min"
+  if (trimmed.endsWith('m') || trimmed.endsWith('min')) {
+    const num = parseFloat(trimmed)
+    if (!isNaN(num) && num > 0) return Math.round(num * 60)
+  }
+
+  // If format "30s" or "30sec"
+  if (trimmed.endsWith('s') || trimmed.endsWith('sec')) {
+    const num = parseFloat(trimmed)
+    if (!isNaN(num) && num > 0) return Math.round(num)
+  }
+
+  // If plain number e.g. "35" or "10", treat as minutes
+  const val = parseFloat(trimmed)
+  if (!isNaN(val) && val > 0) {
+    return Math.round(val * 60)
+  }
+
+  return null
+}
+
+const commitTargetInput = () => {
+  if (!isEditingTarget.value) return
+  const parsedSeconds = parseTargetDurationString(targetInputText.value)
+  if (parsedSeconds && parsedSeconds >= 10 && parsedSeconds <= 720 * 60) {
+    localTimer.value.targetDurationSeconds = parsedSeconds
+    customMinutes.value = Math.round(parsedSeconds / 60)
+    syncTimerOut()
+  }
+  isEditingTarget.value = false
+}
+
+const cancelTargetEditing = () => {
+  isEditingTarget.value = false
+}
+
+const setPresetMinutes = (m: number) => {
+  if (isRunning.value || isPaused.value) return
+  localTimer.value.targetDurationSeconds = m * 60
+  customMinutes.value = m
+  syncTimerOut()
+}
+
+const onCustomMinutesChange = (val: number | null) => {
+  if (isRunning.value || isPaused.value) return
+  if (val && val > 0) {
+    localTimer.value.targetDurationSeconds = val * 60
+    syncTimerOut()
+  }
+}
+
+const onModeChange = () => {
+  if (localTimer.value.mode === 'COUNT_DOWN' && !localTimer.value.targetDurationSeconds) {
+    localTimer.value.targetDurationSeconds = 1500
+  }
+  syncTimerOut()
+}
+
+const setMode = (m: TimerMode) => {
+  localTimer.value.mode = m
+  onModeChange()
+}
+
+const totalDurationSeconds = computed(() => {
+  return entries.value.reduce((acc, cur) => acc + (cur.durationSeconds || 0), 0)
+})
+
+const {
+  isRunning,
+  isPaused,
+  isIdle,
+  elapsedSeconds,
+  progressPercent,
+  displayTime,
+} = useTaskTimer(
+  () => localTimer.value,
+  {
+    onExpired: (entry) => {
+      handleStop()
+      emit('timerExpired', entry)
+    },
+  },
+)
+
+const handleStart = () => {
+  localTimer.value.state = 'RUNNING'
+  localTimer.value.startedAt = new Date().toISOString()
+  syncTimerOut()
+}
+
+const handlePause = () => {
+  localTimer.value.state = 'PAUSED'
+  localTimer.value.elapsedSeconds = elapsedSeconds.value
+  localTimer.value.startedAt = null
+  syncTimerOut()
+}
+
+const handleStop = () => {
+  const duration = elapsedSeconds.value
+  if (duration > 0) {
+    const newEntry: TaskTimeEntryDto = {
+      id: `entry-${Date.now()}`,
+      taskId: props.taskId,
+      startedAt: localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString(),
+      endedAt: new Date().toISOString(),
+      durationSeconds: duration,
+      note: localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session',
+      createdAt: new Date().toISOString(),
+    }
+    entries.value.unshift(newEntry)
+    syncEntriesOut()
+  }
+
+  localTimer.value.state = 'IDLE'
+  localTimer.value.elapsedSeconds = 0
+  localTimer.value.startedAt = null
+  syncTimerOut()
+}
+
+// -------------------------------------------------------------
+// Manual Work Logging State & Handlers
+// -------------------------------------------------------------
+const isManualLogOpen = ref(false)
+const manualDate = ref(toLocalDateString(new Date().toISOString()))
+const manualStartTime = ref('09:00')
+const manualEndTime = ref('09:25')
+const manualDurationMinutes = ref(25)
+const manualNote = ref('')
+
+const toggleManualLog = () => {
+  isManualLogOpen.value = !isManualLogOpen.value
+  if (isManualLogOpen.value) {
+    // initialize to recent times
+    const now = new Date()
+    const thirtyMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
+    manualDate.value = toLocalDateString(now.toISOString())
+    manualStartTime.value = toLocalTimeString(thirtyMinsAgo.toISOString())
+    manualEndTime.value = toLocalTimeString(now.toISOString())
+    manualDurationMinutes.value = 25
+    manualNote.value = ''
+  }
+}
+
+// Helpers for time string parsing and conversion
+const parseMinutesFromTime = (timeStr: string): number => {
+  const parts = timeStr.split(':').map(Number)
+  const h = parts[0] ?? 0
+  const m = parts[1] ?? 0
+  return h * 60 + m
+}
+
+const formatMinutesToTime = (totalMinutes: number): string => {
+  const normalized = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+  const eh = String(Math.floor(normalized / 60)).padStart(2, '0')
+  const em = String(normalized % 60).padStart(2, '0')
+  return `${eh}:${em}`
+}
+
+// When start or end time changes, recalculate duration
+const onManualTimeInputChanged = () => {
+  const startTotalMins = parseMinutesFromTime(manualStartTime.value)
+  let endTotalMins = parseMinutesFromTime(manualEndTime.value)
+  if (endTotalMins < startTotalMins) {
+    endTotalMins += 24 * 60 // wrap next day
+  }
+  const diff = Math.max(1, endTotalMins - startTotalMins)
+  manualDurationMinutes.value = diff
+}
+
+// When duration minutes changes, push end time forward from start time
+const onManualDurationInputChanged = (val: number | null) => {
+  if (!val || val <= 0) return
+  const startMins = parseMinutesFromTime(manualStartTime.value)
+  manualEndTime.value = formatMinutesToTime(startMins + val)
+}
+
+const submitManualEntry = () => {
+  if (manualDurationMinutes.value <= 0) return
+  const started = combineDateAndTime(manualDate.value, manualStartTime.value)
+  const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  const durationSec = manualDurationMinutes.value * 60
+
+  const newEntry: TaskTimeEntryDto = {
+    id: `manual-${Date.now()}`,
+    taskId: props.taskId,
+    startedAt: started,
+    endedAt: ended,
+    durationSeconds: durationSec,
+    note: manualNote.value.trim() || 'Manual session',
+    createdAt: new Date().toISOString(),
+  }
+
+  entries.value.unshift(newEntry)
+  syncEntriesOut()
+  isManualLogOpen.value = false
+  manualNote.value = ''
+}
+
+// -------------------------------------------------------------
+// Existing Session Editing State & Handlers
+// -------------------------------------------------------------
+const editingEntryId = ref<string | number | null>(null)
+const editDate = ref('')
+const editStartTime = ref('')
+const editEndTime = ref('')
+const editDurationMinutes = ref(0)
+const editNoteText = ref('')
+
+const startEditingSession = (entry: TaskTimeEntryDto) => {
+  editingEntryId.value = entry.id
+  editDate.value = toLocalDateString(entry.startedAt)
+  editStartTime.value = toLocalTimeString(entry.startedAt)
+  editEndTime.value = toLocalTimeString(entry.endedAt)
+  editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
+  editNoteText.value = entry.note
+}
+
+const onEditTimeChanged = () => {
+  const startMins = parseMinutesFromTime(editStartTime.value)
+  let endMins = parseMinutesFromTime(editEndTime.value)
+  if (endMins < startMins) endMins += 24 * 60
+  editDurationMinutes.value = Math.max(1, endMins - startMins)
+}
+
+const onEditDurationChanged = (val: number | null) => {
+  if (!val || val <= 0) return
+  const startMins = parseMinutesFromTime(editStartTime.value)
+  editEndTime.value = formatMinutesToTime(startMins + val)
+}
+
+const saveSessionEdits = (entry: TaskTimeEntryDto) => {
+  const started = combineDateAndTime(editDate.value, editStartTime.value)
+  const ended = combineDateAndTime(editDate.value, editEndTime.value)
+  const durationSec = editDurationMinutes.value * 60
+
+  entry.startedAt = started
+  entry.endedAt = ended
+  entry.durationSeconds = durationSec
+  entry.note = editNoteText.value
+  editingEntryId.value = null
+  syncEntriesOut()
+}
+
+const deleteEntry = (id: string | number) => {
+  entries.value = entries.value.filter(e => e.id !== id)
+  syncEntriesOut()
+}
+</script>

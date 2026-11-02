@@ -1,10 +1,12 @@
+from datetime import timedelta
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from ninja_jwt.authentication import JWTAuth
 from django.db.models import Prefetch, Max
 from django.db import IntegrityError, transaction
 from ninja.errors import HttpError
 from ninja import Router
-from .models import Board, BoardColumn, Task, TaskTimeEntry, Tag
+from .models import Board, BoardColumn, Task, TaskTimer, TaskTimeEntry, Tag, TimerMode, TimerState
 from .schemas import (
     TaskIn, 
     TaskOut, 
@@ -16,6 +18,8 @@ from .schemas import (
     TaskMoveIn,
     TagIn,
     TagOut,
+    TaskTimerOut,
+    TaskTimerPatchIn,
 )
 
 router = Router(tags=["Kanban"])
@@ -24,6 +28,11 @@ router = Router(tags=["Kanban"])
 DEFAULT_COLUMN_TITLES = ("To Do", "In Progress", "Done")
 
 # Helpers
+
+def get_board_queryset(user):
+    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
+    col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
+    return Board.objects.filter(owner=user).prefetch_related(Prefetch("columns", queryset=col_qs))
 
 def get_owned_board(user, board_id: int) -> Board:
     """Retrieve a board owned by the authenticated user."""
@@ -42,7 +51,7 @@ def get_owned_column(user, column_id: int) -> BoardColumn:
 def get_owned_task(user, task_id: int) -> Task:
     """Retrieve a task belonging to the authenticated user."""
     return get_object_or_404(
-        Task.objects.select_related("column__board").filter(
+        Task.objects.select_related("column__board", "timer").filter(
             column__board__owner=user
         ),
         id=task_id
@@ -74,8 +83,8 @@ def _reindex(items):
 
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
-    """List boards owned by the authenticated user/"""
-    return Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags")
+    """List boards owned by the authenticated user."""
+    return get_board_queryset(request.auth)
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
@@ -92,7 +101,7 @@ def create_board(request, payload: BoardIn):
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
     board = get_object_or_404(
-        Board.objects.filter(owner=request.auth).prefetch_related("columns__tasks__tags"),
+        get_board_queryset(request.auth),
         id=board_id,
     )
     return board
@@ -233,6 +242,72 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
             _reindex(src_tasks)
         _reindex(dest_tasks)
     return task
+
+# ------------------
+# Timer Endpoints
+# ------------------
+
+@router.patch("/tasks/{task_id}/timer", response=TaskTimerOut)
+def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
+    """Configure or transition the execution state of a task's timer."""
+    task = get_owned_task(request.auth, task_id)
+    with transaction.atomic():
+        timer, _ = TaskTimer.objects.select_for_update().get_or_create(task=task)
+        data = payload.dict(exclude_unset=True)
+
+        new_state = data.get("state")
+        prev_state = timer.state
+        elapsed = data.get("elapsed_seconds")
+        if elapsed is None:
+            elapsed = timer.elapsed_seconds
+
+        # If transitioning to IDLE after an active run (or elapsed_seconds > 0)
+        if new_state == TimerState.IDLE and (prev_state in (TimerState.RUNNING, TimerState.PAUSED) or elapsed > 0):
+            total_duration = elapsed
+            if prev_state == TimerState.RUNNING and timer.started_at:
+                anchor_delta = int((timezone.now() - timer.started_at).total_seconds())
+                if anchor_delta > 0 and data.get("elapsed_seconds") is None:
+                    total_duration += anchor_delta
+
+            if total_duration > 0:
+                end_time = timezone.now()
+                start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
+                TaskTimeEntry.objects.create(
+                    task=task,
+                    user=request.auth,
+                    started_at=start_time,
+                    ended_at=end_time,
+                    duration_seconds=total_duration,
+                    note="",
+                )
+
+            # Reset ephemeral runtime fields
+            timer.state = TimerState.IDLE
+            timer.started_at = None
+            timer.elapsed_seconds = 0
+            if "mode" in data and data["mode"] is not None:
+                timer.mode = data["mode"]
+            if "target_duration_seconds" in data:
+                timer.target_duration_seconds = data["target_duration_seconds"]
+            timer.save()
+            return timer
+
+        for field, value in data.items():
+            if field == "state":
+                timer.state = value
+            elif field == "mode":
+                if value is not None:
+                    timer.mode = value
+            elif field == "target_duration_seconds":
+                timer.target_duration_seconds = value
+            elif field == "started_at":
+                timer.started_at = value
+            elif field == "elapsed_seconds":
+                if value is not None:
+                    timer.elapsed_seconds = value
+
+        timer.save()
+        return timer
 
 # ------------------
 # Tag Endpoints
