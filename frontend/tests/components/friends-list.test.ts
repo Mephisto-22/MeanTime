@@ -95,8 +95,10 @@ describe('FriendsList Component Suite', () => {
 
       expect(wrapper.find('[data-testid="unfriend-button-1"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="block-button-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="share-board-button-1"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="unfriend-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="block-button-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="share-board-button-2"]').exists()).toBe(true)
     })
   })
 
