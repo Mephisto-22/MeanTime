@@ -84,7 +84,7 @@
       </template>
       <template v-else>
         <Button
-          v-if="isEditing"
+          v-if="isEditing && props.board?.isOwner"
           type="button"
           class="mr-auto"
           data-testid="board-delete-button"
