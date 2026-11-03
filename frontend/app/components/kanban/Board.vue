@@ -504,12 +504,17 @@ const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<
   if (!task) return
 
   const nowIso = new Date().toISOString()
+  const isResuming = task.timer?.state === 'PAUSED' && Boolean(task.timer?.startedAt)
+  const sessionStartedAt = isResuming ? task.timer!.startedAt : (defaultTimer?.startedAt || nowIso)
+
   const updatedTimer: TaskTimerDto = {
     taskId,
     mode: defaultTimer?.mode || task.timer?.mode || 'COUNT_DOWN',
     targetDurationSeconds: defaultTimer?.targetDurationSeconds ?? task.timer?.targetDurationSeconds ?? 1500,
     state: 'RUNNING',
-    startedAt: nowIso,
+    startedAt: sessionStartedAt,
+    lastResumedAt: nowIso,
+    lastPausedAt: null,
     elapsedSeconds: task.timer?.elapsedSeconds || 0,
   }
 
@@ -534,16 +539,20 @@ const handlePauseTimer = async (taskId: string | number): Promise<void> => {
   if (!task || !task.timer) return
 
   const currentTimer = task.timer
+  const nowIso = new Date().toISOString()
   let accumulated = currentTimer.elapsedSeconds || 0
-  if (currentTimer.state === 'RUNNING' && currentTimer.startedAt) {
-    const delta = Math.max(0, Math.floor((Date.now() - new Date(currentTimer.startedAt).getTime()) / 1000))
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
     accumulated += delta
   }
 
   const pausedTimer: TaskTimerDto = {
     ...currentTimer,
     state: 'PAUSED',
-    startedAt: null,
+    startedAt: currentTimer.startedAt,
+    lastResumedAt: null,
+    lastPausedAt: nowIso,
     elapsedSeconds: accumulated,
   }
 
@@ -580,8 +589,9 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
 
   const currentTimer = task.timer
   let totalElapsed = currentTimer.elapsedSeconds || 0
-  if (currentTimer.state === 'RUNNING' && currentTimer.startedAt) {
-    const delta = Math.max(0, Math.floor((Date.now() - new Date(currentTimer.startedAt).getTime()) / 1000))
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
     totalElapsed += delta
   }
 
@@ -589,6 +599,8 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
     ...currentTimer,
     state: 'IDLE',
     startedAt: null,
+    lastResumedAt: null,
+    lastPausedAt: null,
     elapsedSeconds: totalElapsed,
   }
 

@@ -12,6 +12,8 @@ export interface TaskTimerDto {
   targetDurationSeconds: number | null
   state: TimerState
   startedAt: string | null
+  lastResumedAt?: string | null
+  lastPausedAt?: string | null
   elapsedSeconds: number
 }
 

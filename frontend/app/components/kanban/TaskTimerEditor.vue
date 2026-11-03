@@ -365,13 +365,20 @@
                 <!-- Normal View (When Not Editing this Entry) -->
                 <template v-if="editingEntryId !== entry.id">
                   <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                       <Tag
                         :value="formatDurationBadge(entry.durationSeconds)"
                         class="font-mono text-[11px] font-bold !bg-primary-100/70 !text-primary-700 dark:!bg-primary-950 dark:!text-primary-300 !border-0"
                       />
                       <span class="text-[11px] text-surface-500 font-medium">
                         {{ formatDateLabel(entry.startedAt) }} &bull; {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
+                      </span>
+                      <span
+                        v-if="getPauseSeconds(entry) >= 60"
+                        class="text-[10px] text-surface-400 font-normal"
+                        data-testid="session-pause-indicator"
+                      >
+                        ({{ formatDurationBadge(getPauseSeconds(entry)) }} paused)
                       </span>
                     </div>
 
@@ -462,6 +469,7 @@
                           type="time"
                           fluid
                           class="!text-xs !py-1 !px-2"
+                          data-testid="edit-session-start-time"
                           @change="onEditTimeChanged"
                         />
                       </div>
@@ -472,6 +480,7 @@
                           type="time"
                           fluid
                           class="!text-xs !py-1 !px-2"
+                          data-testid="edit-session-end-time"
                           @change="onEditTimeChanged"
                         />
                       </div>
@@ -535,12 +544,14 @@ import {
   kanbanContextKey,
 } from '~/api/kanban'
 import { toCamelCase } from '~/utils/case'
+import { useNotifications } from '~/composables/useNotifications'
 import {
   useTaskTimer,
   formatDigital,
   formatDurationBadge,
   formatTimeRange,
   formatDateLabel,
+  getPauseSeconds,
   toLocalTimeString,
   toLocalDateString,
   combineDateAndTime,
@@ -559,6 +570,7 @@ const emit = defineEmits<{
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
+const notify = useNotifications()
 
 const modeOptions = [
   { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },
@@ -777,8 +789,14 @@ const {
 )
 
 const handleStart = () => {
+  const nowIso = new Date().toISOString()
+  const isResuming = localTimer.value.state === 'PAUSED' && Boolean(localTimer.value.startedAt)
+  if (!isResuming) {
+    localTimer.value.startedAt = nowIso
+  }
+  localTimer.value.lastResumedAt = nowIso
+  localTimer.value.lastPausedAt = null
   localTimer.value.state = 'RUNNING'
-  localTimer.value.startedAt = new Date().toISOString()
   syncTimerOut()
   if (kanbanContext?.startTimer && isPersistedTaskId.value) {
     kanbanContext.startTimer(props.taskId, localTimer.value)
@@ -788,7 +806,8 @@ const handleStart = () => {
 const handlePause = () => {
   localTimer.value.state = 'PAUSED'
   localTimer.value.elapsedSeconds = elapsedSeconds.value
-  localTimer.value.startedAt = null
+  localTimer.value.lastResumedAt = null
+  localTimer.value.lastPausedAt = new Date().toISOString()
   syncTimerOut()
   if (kanbanContext?.pauseTimer && isPersistedTaskId.value) {
     kanbanContext.pauseTimer(props.taskId)
@@ -798,12 +817,16 @@ const handlePause = () => {
 const handleStop = async (entry?: TaskTimeEntryDto) => {
   const duration = elapsedSeconds.value
   const startedAt = localTimer.value.startedAt || new Date(Date.now() - duration * 1000).toISOString()
-  const endedAt = new Date().toISOString()
+  const endedAt = (localTimer.value.state === 'PAUSED' && localTimer.value.lastPausedAt)
+    ? localTimer.value.lastPausedAt
+    : new Date().toISOString()
   const note = localTimer.value.mode === 'COUNT_DOWN' ? 'Completed focus session' : 'Continuous stopwatch session'
 
   localTimer.value.state = 'IDLE'
   localTimer.value.elapsedSeconds = 0
   localTimer.value.startedAt = null
+  localTimer.value.lastResumedAt = null
+  localTimer.value.lastPausedAt = null
   syncTimerOut()
 
   if (kanbanContext?.stopTimer && isPersistedTaskId.value) {
@@ -813,6 +836,8 @@ const handleStop = async (entry?: TaskTimeEntryDto) => {
       await kanbanApi.updateTaskTimer(props.taskId, {
         state: 'IDLE',
         startedAt: null,
+        lastResumedAt: null,
+        lastPausedAt: null,
         elapsedSeconds: 0,
       })
     } catch {
@@ -879,26 +904,44 @@ const formatMinutesToTime = (totalMinutes: number): string => {
 }
 
 const onManualTimeInputChanged = () => {
+  if (!manualDurationMinutes.value) {
+    const startTotalMins = parseMinutesFromTime(manualStartTime.value)
+    let endTotalMins = parseMinutesFromTime(manualEndTime.value)
+    if (endTotalMins < startTotalMins) {
+      endTotalMins += 24 * 60
+    }
+    manualDurationMinutes.value = Math.max(1, endTotalMins - startTotalMins)
+  }
+}
+
+const onManualDurationInputChanged = () => {
+  // Independent input - no auto-clamping or automatic mutation
+}
+
+const submitManualEntry = async () => {
+  const durationMins = Number(manualDurationMinutes.value) || 0
+  if (durationMins <= 0) {
+    notify.error(null, 'Please enter a valid duration')
+    return
+  }
   const startTotalMins = parseMinutesFromTime(manualStartTime.value)
   let endTotalMins = parseMinutesFromTime(manualEndTime.value)
   if (endTotalMins < startTotalMins) {
     endTotalMins += 24 * 60
   }
-  const diff = Math.max(1, endTotalMins - startTotalMins)
-  manualDurationMinutes.value = diff
-}
+  const spanMins = endTotalMins - startTotalMins
+  if (durationMins > spanMins) {
+    notify.error(null, 'Duration cannot exceed the selected time range')
+    return
+  }
 
-const onManualDurationInputChanged = (val: number | null) => {
-  if (val == null || isNaN(val) || val <= 0) return
-  const startMins = parseMinutesFromTime(manualStartTime.value)
-  manualEndTime.value = formatMinutesToTime(startMins + val)
-}
-
-const submitManualEntry = async () => {
-  const durationMins = Number(manualDurationMinutes.value) || 0
-  if (durationMins <= 0) return
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
   const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  if (new Date(ended) < new Date(started)) {
+    notify.error(null, 'End time cannot precede start time')
+    return
+  }
+
   const durationSec = durationMins * 60
   const note = manualNote.value.trim() || 'Manual session'
 
@@ -933,8 +976,8 @@ const submitManualEntry = async () => {
           syncEntriesOut()
         }
       }
-    } catch {
-      // Continue with optimistic entry
+    } catch (err) {
+      notify.error(err, 'Unable to create time entry')
     }
   }
 }
@@ -959,22 +1002,37 @@ const startEditingSession = (entry: TaskTimeEntryDto) => {
 }
 
 const onEditTimeChanged = () => {
-  const startMins = parseMinutesFromTime(editStartTime.value)
-  let endMins = parseMinutesFromTime(editEndTime.value)
-  if (endMins < startMins) endMins += 24 * 60
-  editDurationMinutes.value = Math.max(1, endMins - startMins)
+  // Independent input - no auto-clamping or automatic mutation
 }
 
-const onEditDurationChanged = (val: number | null) => {
-  if (val == null || isNaN(val) || val <= 0) return
-  const startMins = parseMinutesFromTime(editStartTime.value)
-  editEndTime.value = formatMinutesToTime(startMins + val)
+const onEditDurationChanged = () => {
+  // Independent input - no auto-clamping or automatic mutation
 }
 
 const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   const durationMins = Number(editDurationMinutes.value) || 0
+  if (durationMins <= 0) {
+    notify.error(null, 'Please enter a valid duration')
+    return
+  }
+  const startMins = parseMinutesFromTime(editStartTime.value)
+  let endMins = parseMinutesFromTime(editEndTime.value)
+  if (endMins < startMins) {
+    endMins += 24 * 60
+  }
+  const spanMins = endMins - startMins
+  if (durationMins > spanMins) {
+    notify.error(null, 'Duration cannot exceed the session time range')
+    return
+  }
+
   const started = combineDateAndTime(editDate.value, editStartTime.value)
   const ended = combineDateAndTime(editDate.value, editEndTime.value)
+  if (new Date(ended) < new Date(started)) {
+    notify.error(null, 'End time cannot precede start time')
+    return
+  }
+
   const durationSec = durationMins * 60
   const note = editNoteText.value
 
@@ -997,8 +1055,8 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
         Object.assign(entry, updated)
         syncEntriesOut()
       }
-    } catch {
-      // Continue with optimistic edit
+    } catch (err) {
+      notify.error(err, 'Unable to update time entry')
     }
   }
 }

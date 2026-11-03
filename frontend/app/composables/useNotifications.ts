@@ -24,18 +24,24 @@ export function playTimerCompletionTone(): void {
 }
 
 export function useNotifications() {
-  const toast = useToast()
+  let toast: ReturnType<typeof useToast> | null = null
+  try {
+    toast = useToast()
+  } catch {
+    // In headless test environments without ToastService
+  }
+
   return {
     error(error: unknown, summary = 'Something went wrong') {
       // Errors remain available until dismissed, including after navigation.
-      toast.add({ severity: 'error', summary, detail: getErrorMessage(error), closable: true })
+      toast?.add({ severity: 'error', summary, detail: getErrorMessage(error), closable: true })
     },
     success(detail: string) {
-      toast.add({ severity: 'success', summary: 'Success', detail, life: 4000 })
+      toast?.add({ severity: 'success', summary: 'Success', detail, life: 4000 })
     },
     timerComplete(taskTitle: string) {
       playTimerCompletionTone()
-      toast.add({
+      toast?.add({
         severity: 'success',
         summary: 'Time is up!',
         detail: `Focus session completed for "${taskTitle}"!`,

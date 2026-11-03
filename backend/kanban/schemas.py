@@ -11,6 +11,8 @@ class TaskTimerOut(Schema):
     target_duration_seconds: int | None = None
     state: TimerState
     started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
     elapsed_seconds: int
 
 class TaskTimerPatchIn(Schema):
@@ -18,6 +20,8 @@ class TaskTimerPatchIn(Schema):
     target_duration_seconds: int | None = None
     state: TimerState | None = None
     started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
     elapsed_seconds: int | None = None
 
 # Time entry schemas

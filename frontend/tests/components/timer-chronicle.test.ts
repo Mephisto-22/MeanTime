@@ -222,4 +222,68 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     expect(durationInput.text()).not.toContain('NaN')
     expect(wrapper.html()).not.toContain('NaN')
   })
+
+  it('renders pause indicator when session span exceeds active duration', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-paused',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T18:30:00.000Z',
+        endedAt: '2026-11-01T19:00:00.000Z',
+        durationSeconds: 1200, // 20m active work during 30m span -> 10m paused
+        note: 'Sprint retrospective with pauses',
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    expect(wrapper.text()).toContain('20m')
+    expect(wrapper.text()).toContain('(10m paused)')
+  })
+
+  it('preserves existing duration when editing timestamps of a paused session', async () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-paused-edit',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T18:30:00.000Z',
+        endedAt: '2026-11-01T19:00:00.000Z',
+        durationSeconds: 1200, // 20m active
+        note: 'Coding session',
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const editBtn = wrapper.find('[data-testid="btn-edit-session-entry-paused-edit"]')
+    await editBtn.trigger('click')
+
+    // Modify end time to 19:15 (span expands to 45m, duration should remain 20m)
+    const endTimeInput = wrapper.find('[data-testid="edit-session-end-time"]')
+    await endTimeInput.setValue('19:15')
+
+    const saveBtn = wrapper.find('[data-testid="btn-save-session-edits"]')
+    await saveBtn.trigger('click')
+
+    const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
+    expect(updated[0].durationSeconds).toBe(1200) // Preserved!
+  })
 })

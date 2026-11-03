@@ -55,6 +55,15 @@ export function formatTimeRange(startedAt?: string | null, endedAt?: string | nu
   }
 }
 
+export function getPauseSeconds(entry?: { startedAt?: string | null; endedAt?: string | null; durationSeconds?: number | null } | null): number {
+  if (!entry?.startedAt || !entry?.endedAt) return 0
+  const start = new Date(entry.startedAt).getTime()
+  const end = new Date(entry.endedAt).getTime()
+  if (isNaN(start) || isNaN(end) || end <= start) return 0
+  const span = Math.floor((end - start) / 1000)
+  return Math.max(0, span - (Number(entry.durationSeconds) || 0))
+}
+
 export function formatDateLabel(isoString?: string | null): string {
   try {
     if (!isoString) return 'Recent'
@@ -136,9 +145,9 @@ export function useTaskTimer(
   const elapsedSeconds = computed(() => {
     const t = timer.value
     if (!t) return 0
-    const startedAt = t.startedAt
-    if (t.state === 'RUNNING' && startedAt) {
-      const anchor = new Date(startedAt).getTime()
+    const anchorTime = t.lastResumedAt || t.startedAt
+    if (t.state === 'RUNNING' && anchorTime) {
+      const anchor = new Date(anchorTime).getTime()
       const delta = Math.max(0, Math.floor((now.value - anchor) / 1000))
       return (Number(t.elapsedSeconds ?? 0) || 0) + delta
     }

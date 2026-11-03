@@ -48,10 +48,11 @@ def reconcile_expired_countdowns(user):
         target = timer.target_duration_seconds or 0
         elapsed_prior = timer.elapsed_seconds or 0
         remaining = max(0, target - elapsed_prior)
-        if remaining > 0 and now >= timer.started_at + timedelta(seconds=remaining):
+        anchor = timer.last_resumed_at or timer.started_at
+        if remaining > 0 and anchor and now >= anchor + timedelta(seconds=remaining):
             with transaction.atomic():
-                ended_at = timer.started_at + timedelta(seconds=remaining)
-                start_time = timer.started_at - timedelta(seconds=elapsed_prior)
+                ended_at = anchor + timedelta(seconds=remaining)
+                start_time = timer.started_at or (ended_at - timedelta(seconds=target))
                 duplicate = TaskTimeEntry.objects.filter(
                     task=timer.task,
                     created_at__gte=timezone.now() - timedelta(seconds=15),
@@ -71,6 +72,8 @@ def reconcile_expired_countdowns(user):
                     )
                 timer.state = TimerState.IDLE
                 timer.started_at = None
+                timer.last_resumed_at = None
+                timer.last_paused_at = None
                 timer.elapsed_seconds = 0
                 timer.save()
 
@@ -322,13 +325,17 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
         if new_state == TimerState.IDLE:
             if prev_state in (TimerState.RUNNING, TimerState.PAUSED):
                 total_duration = elapsed
-                if prev_state == TimerState.RUNNING and timer.started_at:
-                    anchor_delta = int((timezone.now() - timer.started_at).total_seconds())
-                    if anchor_delta > 0 and data.get("elapsed_seconds") is None:
-                        total_duration += anchor_delta
+                if prev_state == TimerState.RUNNING:
+                    anchor = timer.last_resumed_at or timer.started_at
+                    if anchor:
+                        anchor_delta = int((timezone.now() - anchor).total_seconds())
+                        if anchor_delta > 0 and data.get("elapsed_seconds") is None:
+                            total_duration += anchor_delta
+                    end_time = timezone.now()
+                else:
+                    end_time = timer.last_paused_at or timezone.now()
 
                 if total_duration > 0:
-                    end_time = timezone.now()
                     start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
                     default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
                     duplicate = TaskTimeEntry.objects.filter(
@@ -352,6 +359,8 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
             # Reset ephemeral runtime fields
             timer.state = TimerState.IDLE
             timer.started_at = None
+            timer.last_resumed_at = None
+            timer.last_paused_at = None
             timer.elapsed_seconds = 0
             if "mode" in data and data["mode"] is not None:
                 timer.mode = data["mode"]
@@ -369,10 +378,31 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
             elif field == "target_duration_seconds":
                 timer.target_duration_seconds = value
             elif field == "started_at":
-                timer.started_at = value
+                if value is not None or prev_state == TimerState.IDLE:
+                    timer.started_at = value
+            elif field == "last_resumed_at":
+                timer.last_resumed_at = value
+            elif field == "last_paused_at":
+                timer.last_paused_at = value
             elif field == "elapsed_seconds":
                 if value is not None:
                     timer.elapsed_seconds = value
+
+        if new_state == TimerState.RUNNING:
+            if not timer.started_at:
+                timer.started_at = timezone.now()
+            if not timer.last_resumed_at:
+                timer.last_resumed_at = timezone.now()
+            timer.last_paused_at = None
+        elif new_state == TimerState.PAUSED:
+            if prev_state == TimerState.RUNNING and data.get("elapsed_seconds") is None:
+                anchor = timer.last_resumed_at or timer.started_at
+                if anchor:
+                    delta = max(0, int((timezone.now() - anchor).total_seconds()))
+                    timer.elapsed_seconds += delta
+            timer.last_resumed_at = None
+            if not timer.last_paused_at:
+                timer.last_paused_at = timezone.now()
 
         timer.save()
         return timer
@@ -396,10 +426,15 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
     end = data.get("ended_at")
     duration = data.get("duration_seconds", 0)
 
+    if end is not None and end < start:
+        raise HttpError(400, "End time cannot precede start time")
+
     if end is None and duration > 0:
         end = start + timedelta(seconds=duration)
     elif end is not None and duration <= 0:
         duration = max(0, int((end - start).total_seconds()))
+    elif end is not None and duration > int((end - start).total_seconds()):
+        raise HttpError(400, "Duration cannot exceed elapsed time range")
 
     with transaction.atomic():
         entry = TaskTimeEntry.objects.create(
@@ -414,30 +449,23 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
 
 @router.patch("/time-entries/{entry_id}", response=TaskTimeEntryOut)
 def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
-    """Partially update a recorded time entry with duration/timestamp synchronization."""
+    """Partially update a recorded time entry, enforcing duration_seconds <= ended_at - started_at."""
     entry = get_owned_time_entry(request.auth, entry_id)
     updates = payload.dict(exclude_unset=True)
 
     with transaction.atomic():
-        if "duration_seconds" in updates and "ended_at" not in updates:
-            new_duration = updates["duration_seconds"]
-            entry.duration_seconds = new_duration
-            start = updates.get("started_at", entry.started_at)
-            entry.started_at = start
-            entry.ended_at = start + timedelta(seconds=new_duration)
-        elif ("started_at" in updates or "ended_at" in updates) and "duration_seconds" not in updates:
-            start = updates.get("started_at", entry.started_at)
-            end = updates.get("ended_at", entry.ended_at)
-            entry.started_at = start
-            entry.ended_at = end
-            if start and end:
-                entry.duration_seconds = max(0, int((end - start).total_seconds()))
-        else:
-            for field, val in updates.items():
-                setattr(entry, field, val)
+        start = updates.get("started_at", entry.started_at)
+        end = updates.get("ended_at", entry.ended_at)
+        duration = updates.get("duration_seconds", entry.duration_seconds)
 
-        if "note" in updates:
-            entry.note = updates["note"]
+        if start and end:
+            if end < start:
+                raise HttpError(400, "End time cannot precede start time")
+            if duration is not None and duration > int((end - start).total_seconds()):
+                raise HttpError(400, "Duration cannot exceed elapsed time range")
+
+        for field, val in updates.items():
+            setattr(entry, field, val)
 
         entry.save()
     return entry

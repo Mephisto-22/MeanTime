@@ -73,10 +73,10 @@ class TaskTimeEntryApiTests(TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["id"], data["id"])
 
-    def test_patch_time_entry_duration_recalculates_end(self):
-        """PATCHing duration_seconds recalculates ended_at = started_at + duration."""
+    def test_patch_time_entry_duration_preserves_end_and_enforces_lte_span(self):
+        """PATCHing duration_seconds preserves ended_at and enforces duration <= ended_at - started_at."""
         now = timezone.now()
-        start = now - timedelta(minutes=30)
+        start = now - timedelta(minutes=60)
         entry = TaskTimeEntry.objects.create(
             task_id=self.task_id,
             user=self.user,
@@ -86,6 +86,7 @@ class TaskTimeEntryApiTests(TestCase):
             note="Original note",
         )
 
+        # Update duration to 2700 (<= 3600), ended_at should NOT be shifted
         patch_res = self.client.patch(
             f"/api/kanban/time-entries/{entry.id}",
             data=json.dumps({"duration_seconds": 2700, "note": "Updated note"}),
@@ -99,12 +100,19 @@ class TaskTimeEntryApiTests(TestCase):
 
         entry.refresh_from_db()
         self.assertEqual(entry.duration_seconds, 2700)
-        self.assertEqual(entry.note, "Updated note")
-        # ended_at was shifted by 45 minutes from start
-        self.assertEqual(int((entry.ended_at - entry.started_at).total_seconds()), 2700)
+        self.assertEqual(entry.ended_at, now)
 
-    def test_patch_time_entry_timestamps_recalculates_duration(self):
-        """PATCHing timestamps recalculates duration_seconds = ended_at - started_at."""
+        # Attempt to set duration > span (e.g. 4000s > 3600s) should fail with 400
+        invalid_res = self.client.patch(
+            f"/api/kanban/time-entries/{entry.id}",
+            data=json.dumps({"duration_seconds": 4000}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(invalid_res.status_code, 400)
+
+    def test_patch_time_entry_timestamps_preserves_existing_duration(self):
+        """PATCHing timestamps preserves duration_seconds as long as duration <= span."""
         now = timezone.now()
         entry = TaskTimeEntry.objects.create(
             task_id=self.task_id,
@@ -117,6 +125,7 @@ class TaskTimeEntryApiTests(TestCase):
         new_start = (now - timedelta(minutes=45)).isoformat()
         new_end = now.isoformat()
 
+        # Expanding span to 45 mins should preserve 15 min duration
         patch_res = self.client.patch(
             f"/api/kanban/time-entries/{entry.id}",
             data=json.dumps({"started_at": new_start, "ended_at": new_end}),
@@ -125,10 +134,10 @@ class TaskTimeEntryApiTests(TestCase):
         )
         self.assertEqual(patch_res.status_code, 200)
         data = patch_res.json()
-        self.assertEqual(data["duration_seconds"], 2700)
+        self.assertEqual(data["duration_seconds"], 900)
 
         entry.refresh_from_db()
-        self.assertEqual(entry.duration_seconds, 2700)
+        self.assertEqual(entry.duration_seconds, 900)
 
     def test_delete_time_entry(self):
         """DELETE /time-entries/{id} removes entry from database."""

@@ -296,3 +296,84 @@ class TaskTimerApiTests(TestCase):
 
         # Still exactly 1 entry, duplicate prevented by 15-second safety window
         self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+    def test_pause_and_resume_preserves_started_at_and_records_correct_entry(self):
+        """Timer paused and resumed preserves started_at, records true stop as ended_at and active duration."""
+        now = timezone.now()
+        session_start = now - timedelta(minutes=30)
+        resume_time = now - timedelta(minutes=15)
+
+        # Timer started at 6:30, paused at 6:35 (elapsed: 300s), resumed at 6:45
+        timer = TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_UP,
+            state=TimerState.RUNNING,
+            started_at=session_start,
+            last_resumed_at=resume_time,
+            elapsed_seconds=300,
+        )
+
+        # Ended at 7:00 (active work: 300s + 900s = 1200s = 20 min)
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": 1200}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        entry = TaskTimeEntry.objects.filter(task_id=self.task_id).latest("created_at")
+        self.assertEqual(entry.duration_seconds, 1200)
+        self.assertAlmostEqual(entry.started_at.timestamp(), session_start.timestamp(), delta=2)
+        self.assertAlmostEqual(entry.ended_at.timestamp(), now.timestamp(), delta=2)
+
+    def test_stopping_paused_timer_records_last_paused_at_as_ended_at(self):
+        """Stopping while PAUSED sets ended_at to last_paused_at, avoiding ghost idle spans."""
+        now = timezone.now()
+        session_start = now - timedelta(hours=1)
+        pause_time = now - timedelta(minutes=40)
+
+        timer = TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_UP,
+            state=TimerState.PAUSED,
+            started_at=session_start,
+            last_paused_at=pause_time,
+            elapsed_seconds=1200,
+        )
+
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE"}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        entry = TaskTimeEntry.objects.filter(task_id=self.task_id).latest("created_at")
+        self.assertEqual(entry.duration_seconds, 1200)
+        self.assertAlmostEqual(entry.started_at.timestamp(), session_start.timestamp(), delta=2)
+        self.assertAlmostEqual(entry.ended_at.timestamp(), pause_time.timestamp(), delta=2)
+
+    def test_countdown_reconciliation_preserves_initial_start_time_with_pauses(self):
+        """Expired countdown with prior pauses preserves initial started_at on background reconciliation."""
+        now = timezone.now()
+        initial_start = now - timedelta(seconds=2000)
+        resume_time = now - timedelta(seconds=1205)
+
+        TaskTimer.objects.create(
+            task_id=self.task_id,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1500,
+            state=TimerState.RUNNING,
+            started_at=initial_start,
+            last_resumed_at=resume_time,
+            elapsed_seconds=300,
+        )
+
+        res = self.client.get("/api/kanban/boards", **self.auth)
+        self.assertEqual(res.status_code, 200)
+
+        entry = TaskTimeEntry.objects.filter(task_id=self.task_id).latest("created_at")
+        self.assertEqual(entry.duration_seconds, 1500)
+        self.assertAlmostEqual(entry.started_at.timestamp(), initial_start.timestamp(), delta=2)

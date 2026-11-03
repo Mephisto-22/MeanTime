@@ -136,6 +136,8 @@ class TaskTimer(models.Model):
         default=TimerState.IDLE,
     )
     started_at = models.DateTimeField(null=True, blank=True)
+    last_resumed_at = models.DateTimeField(null=True, blank=True)
+    last_paused_at = models.DateTimeField(null=True, blank=True)
     elapsed_seconds = models.PositiveIntegerField(default=0)
 
     def __str__(self):
