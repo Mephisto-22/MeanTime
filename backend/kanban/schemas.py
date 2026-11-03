@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from ninja import Schema
+from users.schemas import UserOut
 from .models import TaskPriority, TimerMode, TimerState
 
 # Timer schemas
@@ -119,6 +120,8 @@ class BoardOut(Schema):
     id: int
     title: str
     description: str
+    owner: UserOut
+    collaborators: list[UserOut] = []
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime
