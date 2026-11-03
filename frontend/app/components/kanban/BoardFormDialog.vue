@@ -8,6 +8,7 @@
     class="w-[min(28rem,calc(100vw-2rem))]"
   >
     <form
+      id="board-form"
       class="flex flex-col gap-4"
       novalidate
       @submit.prevent="save"
@@ -48,25 +49,70 @@
           fluid
         />
       </div>
+    </form>
 
-      <div class="flex justify-end gap-2">
+    <Message
+      v-if="isConfirmingDelete"
+      class="mt-4"
+      data-testid="board-delete-confirmation"
+      severity="error"
+      :closable="false"
+    >
+      Delete "{{ board?.title }}"? Its columns and tasks are deleted too.
+      This can't be undone.
+    </Message>
+
+    <template #footer>
+      <template v-if="isConfirmingDelete">
         <Button
           type="button"
           label="Cancel"
           severity="secondary"
           text
-          :disabled="isSaving"
-          @click="visible = false"
+          data-testid="board-cancel-delete-button"
+          :disabled="isDeleting"
+          @click="isConfirmingDelete = false"
         />
         <Button
+          type="button"
+          label="Delete board"
+          severity="danger"
+          data-testid="board-confirm-delete-button"
+          :loading="isDeleting"
+          @click="deleteBoard"
+        />
+      </template>
+      <template v-else>
+        <Button
+          v-if="isEditing"
+          type="button"
+          class="mr-auto"
+          data-testid="board-delete-button"
+          label="Delete board"
+          severity="danger"
+          text
+          :disabled="isBusy"
+          @click="isConfirmingDelete = true"
+        />
+        <Button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          text
+          :disabled="isBusy"
+          @click="visible = false"
+        />
+        <!-- The footer is outside the form, so the form attribute links Save to it. -->
+        <Button
           type="submit"
+          form="board-form"
           data-testid="board-save-button"
           :label="isEditing ? 'Save' : 'Create'"
           :loading="isSaving"
-          :disabled="isSaving || showTitleError"
+          :disabled="isBusy || showTitleError"
         />
-      </div>
-    </form>
+      </template>
+    </template>
   </Dialog>
 </template>
 
@@ -81,6 +127,8 @@ interface Props {
 interface Emits {
   /** Fired after the backend has saved the board, so the page can re-fetch. */
   saved: [board: KanbanBoardDto];
+  /** Fired after the backend has deleted the board, so the page can re-fetch. */
+  deleted: [board: KanbanBoardDto];
 }
 
 // Matches the max_length of Board.title in backend/kanban/models.py.
@@ -95,9 +143,13 @@ const visible = defineModel<boolean>('visible', {required: true});
 const title = ref('');
 const description = ref('');
 const isSaving = ref(false);
+const isDeleting = ref(false);
+// Deleting asks for confirmation first, in place of the editor's buttons.
+const isConfirmingDelete = ref(false);
 const notify = useNotifications();
 
 const isEditing = computed(() => props.board !== null);
+const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
 const showTitleError = computed(
   () => trimmedTitle.value === '',
@@ -111,10 +163,12 @@ watch(visible, isOpen => {
   }
   title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
+  isConfirmingDelete.value = false;
 }, {immediate: true});
 
 async function save(): Promise<void> {
-  if (trimmedTitle.value === '' || isSaving.value) {
+  // Enter in a field still submits the form while the confirmation shows.
+  if (trimmedTitle.value === '' || isBusy.value || isConfirmingDelete.value) {
     return;
   }
 
@@ -137,6 +191,25 @@ async function save(): Promise<void> {
     notify.error(error, 'Unable to save board');
   } finally {
     isSaving.value = false;
+  }
+}
+
+async function deleteBoard(): Promise<void> {
+  if (props.board === null || isBusy.value) {
+    return;
+  }
+
+  const board = props.board;
+  isDeleting.value = true;
+  try {
+    await kanbanApi.deleteBoard(board.id);
+    notify.success('Board deleted.');
+    emit('deleted', board);
+    visible.value = false;
+  } catch (error) {
+    notify.error(error, 'Unable to delete board');
+  } finally {
+    isDeleting.value = false;
   }
 }
 </script>

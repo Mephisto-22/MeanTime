@@ -9,6 +9,8 @@ import { toCamelCase, toSnakeCase } from '~/utils/case'
 
 export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'method' | 'body' | 'query'> {
   headers?: Record<string, string>
+  /** Maximum request duration in milliseconds (passed through to ofetch). */
+  timeout?: number
   /** Disable automatic bearer authentication for public/authentication endpoints. */
   auth?: boolean
   /**
@@ -21,6 +23,7 @@ export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'm
 
 export interface ApiAuthHandler {
   getAccessToken(): string | null
+  getSessionRevision?(): number
   refresh(): Promise<void>
   expireSession(): Promise<void>
 }
@@ -60,20 +63,22 @@ export class ApiService {
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
     const sentToken = handler?.getAccessToken()
+    const sentRevision = handler?.getSessionRevision?.()
+    const sameSession = () => !handler?.getSessionRevision || handler.getSessionRevision() === sentRevision
     const execute = async (token?: string | null): Promise<T> => {
       const response = await $fetch<any>(endpoint, {
-      ...fetchOptions,
-      method,
-      retry: 0,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: isBodyMethod ? requestPayload : undefined,
-      query: !isBodyMethod ? requestPayload : undefined,
-    })
-    return shouldTransformCase ? toCamelCase<T>(response) : (response as T)
+        ...fetchOptions,
+        method,
+        retry: 0,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: isBodyMethod ? requestPayload : undefined,
+        query: !isBodyMethod ? requestPayload : undefined,
+      })
+      return shouldTransformCase ? toCamelCase<T>(response) : (response as T)
     }
 
     try {
@@ -81,18 +86,20 @@ export class ApiService {
         return await execute(sentToken)
       } catch (error: any) {
         if (!handler || (error.statusCode || error.response?.status) !== 401) throw error
+        if (!sameSession()) throw error
         if (!sentToken || !handler.getAccessToken()) {
           await handler.expireSession()
           throw error
         }
         // Another concurrent request may have already refreshed this token.
         if (handler.getAccessToken() === sentToken) await handler.refresh()
+        if (!sameSession()) throw error
         const updatedToken = handler.getAccessToken()
         if (!updatedToken) throw error
         try {
           return await execute(updatedToken)
         } catch (retryError: any) {
-          if ((retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
+          if (sameSession() && (retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
           throw retryError
         }
       }

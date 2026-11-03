@@ -1,5 +1,6 @@
 import zoneinfo
 from datetime import datetime
+from typing import Literal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
@@ -53,6 +54,11 @@ class RefreshIn(Schema):
     """Payload for refreshing an access token."""
 
     refresh_token: str
+
+
+class LogoutIn(Schema):
+    refresh_token: str = Field(..., min_length=1, max_length=8192)
+    access_token: str | None = Field(default=None, min_length=1, max_length=8192)
 
 
 class UserOut(Schema):
@@ -154,3 +160,28 @@ class DeleteAccountIn(Schema):
 
     password: str = ""
     email: str = ""
+
+
+class UserSearchResultOut(Schema):
+    """User profile returned by exact search with relationship state."""
+
+    id: int
+    email: str | None = None
+    display_name: str
+    timezone: str
+    relationship_status: Literal["none", "friend", "pending_incoming", "pending_outgoing"]
+
+
+class FriendRequestOut(Schema):
+    """Outgoing or incoming pending friend request."""
+
+    id: int
+    user: UserOut
+    created_at: datetime
+
+
+class FriendRequestsListOut(Schema):
+    """Grouped pending requests for the authenticated user."""
+
+    incoming: list[FriendRequestOut]
+    outgoing: list[FriendRequestOut]

@@ -5,6 +5,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const auth = useAuthStore()
   apiService.setAuthHandler({
     getAccessToken: () => auth.accessToken,
+    getSessionRevision: () => auth.sessionRevision,
     refresh: () => auth.refresh(),
     expireSession: () => auth.expireSession(),
   })
