@@ -147,10 +147,10 @@ def share_board(request, board_id: int, payload: BoardShareIn):
 
 @router.delete("/boards/{board_id}/collaborators/{collaborator_id}")
 def remove_collaborators(request, board_id: int, collaborator_id: int):
-    """Revoke a collaborator's access to a board."""
+    """Revoke a collaborator's access to a board or leave a shared board."""
 
-    # only the board owner can remove collaborators
-    board = get_owned_board(request.auth, board_id)
+    # retrieve the board if the user owns it or has access to it
+    board = get_accessible_board(request.auth, board_id)
 
     # retrieve the collaborator
     friend = get_object_or_404(User, id=collaborator_id)
@@ -158,6 +158,11 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     # Verify that the user currently has access.
     if not board.collaborators.filter(id=friend.id).exists():
         raise HttpError(404, "User is not a collaborator on this board.")
+
+    # only the owner can remove other collaborators
+    # collaborators can only remove themselves
+    if request.auth != board.owner and request.auth.id != collaborator_id:
+        raise HttpError(403, "You can only remove yourself from a shared board.")
 
     # remove the relationship from the many-to-many table
     board.collaborators.remove(friend)
