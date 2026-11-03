@@ -90,6 +90,14 @@ describe('Default Layout Header Suite', () => {
       expect(wrapper.find('.p-tag').exists()).toBe(false)
     })
 
+    it('renders navigation within a PrimeVue Menubar component', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      expect(wrapper.find('.p-menubar').exists()).toBe(true)
+      expect(wrapper.find('nav').exists()).toBe(false)
+    })
+
     it('renders static, non-clickable MeanTime brand in header', async () => {
       const wrapper = mountLayout()
       await flushPromises()
