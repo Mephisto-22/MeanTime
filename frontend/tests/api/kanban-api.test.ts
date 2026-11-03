@@ -39,6 +39,14 @@ describe('KanbanApi Contract Suite', () => {
     // 5. deleteBoard
     await kanbanApi.deleteBoard(42)
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42')
+
+    // 6. shareBoard
+    await kanbanApi.shareBoard(42, 10)
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators', { friend_id: 10 })
+
+    // 7. removeCollaborator
+    await kanbanApi.removeCollaborator(42, 10)
+    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators/10')
   })
 
   it('routes all 3 Column CRUD methods to correct paths, verbs, and payloads', async () => {
