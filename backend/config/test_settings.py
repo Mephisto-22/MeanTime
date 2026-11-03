@@ -1,6 +1,5 @@
 import os
 
-# Set dummy environment variables for unit test execution if not already provided
 for key, val in [
     ("DJANGO_SECRET_KEY", "test-secret-key-for-unit-tests-only-32bytes+"),
     ("POSTGRES_DB", "test"),

@@ -89,6 +89,14 @@
         <!-- Action Buttons -->
         <div class="flex items-center gap-2 self-end sm:self-auto">
           <Button
+            label="Share board"
+            severity="secondary"
+            variant="outlined"
+            size="small"
+            :data-testid="'share-board-button-' + friend.id"
+            @click="openShareDialog(friend)"
+          />
+          <Button
             label="Unfriend"
             severity="danger"
             variant="outlined"
@@ -181,10 +189,18 @@
         </div>
       </template>
     </Dialog>
+
+    <!-- Share Board Dialog -->
+    <FriendShareBoardDialog
+      v-if="isShareDialogOpen"
+      v-model:visible="isShareDialogOpen"
+      :friend="targetShareFriend"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import FriendShareBoardDialog from '~/components/friends/FriendShareBoardDialog.vue'
 import { ref } from 'vue'
 import type { UserOut } from '~/api/friends'
 
@@ -205,7 +221,14 @@ const emit = defineEmits<{
 
 const isUnfriendDialogOpen = ref(false)
 const isBlockDialogOpen = ref(false)
+const isShareDialogOpen = ref(false)
 const targetFriend = ref<UserOut | null>(null)
+const targetShareFriend = ref<UserOut | null>(null)
+
+function openShareDialog(friend: UserOut) {
+  targetShareFriend.value = friend
+  isShareDialogOpen.value = true
+}
 
 function getInitials(name?: string, email?: string): string {
   const trimmed = name?.trim()

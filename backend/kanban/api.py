@@ -118,7 +118,11 @@ def reconcile_expired_countdowns(user):
 def get_board_queryset(user):
     task_qs = Task.objects.select_related("timer").prefetch_related("tags")
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
-    return get_accessible_boards(user).prefetch_related(Prefetch("columns", queryset=col_qs))
+    return (
+        get_accessible_boards(user)
+        .select_related("owner")
+        .prefetch_related("collaborators", Prefetch("columns", queryset=col_qs))
+    )
 
 def get_owned_board(user, board_id: int) -> Board:
     """Retrieve a board owned by the authenticated user."""
@@ -163,10 +167,10 @@ def get_owned_task(user, task_id: int) -> Task:
     )
 
 def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
-    """Retrieve a time entry belonging to the authenticated user's task."""
+    """Retrieve a time entry belonging to the authenticated user's task or created by the user."""
     return get_object_or_404(
         TaskTimeEntry.objects.select_related("task__column__board").filter(
-            task__column__board__owner=user
+            Q(user=user) | Q(task__column__board__owner=user)
         ),
         id=entry_id
     )
@@ -415,7 +419,7 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
 @router.patch("/tasks/{task_id}/timer", response=TaskTimerOut)
 def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
     """Configure or transition the execution state of a task's timer."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     with transaction.atomic():
         timer, _ = TaskTimer.objects.select_for_update().get_or_create(task=task)
         data = payload.dict(exclude_unset=True)
@@ -519,13 +523,13 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
 @router.get("/tasks/{task_id}/time-entries", response=list[TaskTimeEntryOut])
 def list_time_entries(request, task_id: int):
     """List historical time entries recorded for a task."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     return task.time_entries.all()
 
 @router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
 def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
     """Manually log a past work session for a task."""
-    task = get_owned_task(request.auth, task_id)
+    task = get_accessible_task(request.auth, task_id)
     data = payload.dict()
     start = data["started_at"]
     end = data.get("ended_at")

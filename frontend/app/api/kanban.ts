@@ -1,4 +1,5 @@
 import type { ComputedRef, InjectionKey } from 'vue'
+import type { UserOut } from '~/api/friends'
 import { apiService } from '~/services/ApiService'
 
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
@@ -77,7 +78,9 @@ export interface KanbanBoardDto {
   id: string | number
   title: string
   description: string
-  isOwner: boolean
+  isOwner?: boolean
+  owner?: UserOut
+  collaborators?: UserOut[]
   columns: KanbanColumnDto[]
 }
 
@@ -158,6 +161,14 @@ export class KanbanApi {
 
   deleteBoard(boardId: string | number): Promise<SuccessResponse> {
     return apiService.delete<SuccessResponse>(`${this.endpoint}/boards/${boardId}`)
+  }
+
+  shareBoard(boardId: string | number, friendId: number): Promise<{ success: boolean; message: string }> {
+    return apiService.post<{ success: boolean; message: string }>(`${this.endpoint}/boards/${boardId}/collaborators`, { friend_id: friendId })
+  }
+
+  removeCollaborator(boardId: string | number, collaboratorId: number): Promise<{ success: boolean; message: string }> {
+    return apiService.delete<{ success: boolean; message: string }>(`${this.endpoint}/boards/${boardId}/collaborators/${collaboratorId}`)
   }
 
   // -----------------
