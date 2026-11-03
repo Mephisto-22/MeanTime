@@ -1,8 +1,18 @@
-import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto } from '~/api/kanban'
+import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto, TagDto } from '~/api/kanban'
 
 let nextTaskId = 1
 let nextColumnId = 1
 let nextBoardId = 1
+let nextTagId = 1
+
+export function createTagFixture(overrides: Partial<TagDto> = {}): TagDto {
+  const id = overrides.id ?? `tag-${nextTagId++}`
+  return {
+    id,
+    name: overrides.name ?? `Tag ${id}`,
+    createdAt: overrides.createdAt,
+  }
+}
 
 export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): KanbanTaskDto {
   const id = overrides.id ?? `task-${nextTaskId++}`
@@ -12,6 +22,8 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     position: overrides.position ?? 0,
     columnId: overrides.columnId ?? 'col-1',
     description: overrides.description,
+    priority: overrides.priority,
+    tags: overrides.tags,
   }
 }
 
@@ -38,6 +50,14 @@ export function createBoardFixture(overrides: Partial<KanbanBoardDto> = {}): Kan
     id,
     title: overrides.title ?? `Board ${id}`,
     description: overrides.description,
+    isOwner: overrides.isOwner ?? true,
     columns,
   }
+}
+
+
+export const DialogStub = {
+  name: 'Dialog',
+  props: ['visible', 'header'],
+  template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
 }

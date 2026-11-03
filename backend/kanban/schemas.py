@@ -1,14 +1,62 @@
+from __future__ import annotations
 from datetime import datetime
 from ninja import Schema
-from enum import Enum
-from .models import TaskPriority
+from users.schemas import UserOut
+from .models import TaskPriority, TimerMode, TimerState
+
+# Timer schemas
+class TaskTimerOut(Schema):
+    id: int
+    task_id: int
+    mode: TimerMode
+    target_duration_seconds: int | None = None
+    state: TimerState
+    started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
+    elapsed_seconds: int
+
+class TaskTimerPatchIn(Schema):
+    mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    state: TimerState | None = None
+    started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
+    elapsed_seconds: int | None = None
+
+# Time entry schemas
+class TaskTimeEntryIn(Schema):
+    """Payload expected when manually recording past work."""
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int = 0
+    note: str = ""
+
+class TaskTimeEntryUpdateIn(Schema):
+    """Payload expected when updating a recorded time entry."""
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    duration_seconds: int | None = None
+    note: str | None = None
+
+class TaskTimeEntryOut(Schema):
+    """Shape of recorded time entry returned to clients."""
+    id: int
+    task_id: int
+    user_id: int | None = None
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int
+    note: str
+    created_at: datetime
 
 # Task schemas
 class TaskIn(Schema):
     """Payload expected when creating a task."""
     title: str
     description: str = ""
-    priority: TaskPriority = TaskPriority.MEDIUM
+    priority: TaskPriority | None = None
     tag_ids: list[int] = []
 
 class TaskOut(Schema):
@@ -16,12 +64,20 @@ class TaskOut(Schema):
     id: int
     title: str
     description: str
-    priority: TaskPriority
+    priority: TaskPriority | None = None
     position: int
     column_id: int
     tags: list[TagOut]
+    timer: TaskTimerOut | None = None
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_timer(obj):
+        try:
+            return obj.timer
+        except Exception:
+            return None
 
 # Allows us to update only part of a task without having to send a full TaskIn Schema
 class TaskUpdateIn(Schema):
@@ -47,6 +103,11 @@ class BoardColumnOut(Schema):
     created_at: datetime
     updated_at: datetime
 
+class BoardColumnUpdateIn(Schema):
+    """Payload expected for partially updating a board column."""
+    title: str | None = None
+    position: int | None = None
+
 
 # Board Schemas
 class BoardIn(Schema):
@@ -59,6 +120,9 @@ class BoardOut(Schema):
     id: int
     title: str
     description: str
+    owner: UserOut
+    collaborators: list[UserOut] = []
+    is_owner: bool = True
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime
@@ -67,6 +131,10 @@ class TaskMoveIn(Schema):
     """Payload expected when moving a task to another column."""
     to_column_id: int
     target_position: int
+
+class BoardShareIn(Schema):
+    """Payload expected when sharing a board with a friend."""
+    friend_id: int
 
 
 # Tag Schemas

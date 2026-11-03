@@ -1,11 +1,11 @@
-"""Tests for creating boards through the kanban API."""
+"""Tests for creating and deleting boards through the kanban API."""
 
 import json
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
-from kanban.models import Board, BoardColumn
+from kanban.models import Board, BoardColumn, Task
 
 User = get_user_model()
 
@@ -82,3 +82,59 @@ class CreateBoardTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertFalse(Board.objects.exists())
+
+
+class DeleteBoardTests(TestCase):
+    """DELETE /api/kanban/boards/{id}."""
+
+    def setUp(self):
+        self.client = Client()
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            password=PASSWORD,
+            display_name="Board Owner",
+        )
+        User.objects.create_user(
+            email="other@example.com",
+            password=PASSWORD,
+            display_name="Someone Else",
+        )
+        self.board = Board.objects.create(owner=self.owner, title="School")
+        column = BoardColumn.objects.create(board=self.board, title="To Do")
+        Task.objects.create(column=column, title="Essay")
+
+    def auth_for(self, email):
+        login = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({"email": email, "password": PASSWORD}),
+            content_type="application/json",
+        )
+        return {"HTTP_AUTHORIZATION": f"Bearer {login.json()['access_token']}"}
+
+    def delete_board(self, **auth):
+        return self.client.delete(f"/api/kanban/boards/{self.board.id}", **auth)
+
+    def test_owner_deletes_board_with_its_columns_and_tasks(self):
+        """Deleting a board removes everything on it."""
+        response = self.delete_board(**self.auth_for("owner@example.com"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"success": True})
+        self.assertFalse(Board.objects.exists())
+        self.assertFalse(BoardColumn.objects.exists())
+        self.assertFalse(Task.objects.exists())
+
+    def test_other_users_cannot_delete_the_board(self):
+        """Someone else's board looks like it doesn't exist, and stays."""
+        response = self.delete_board(**self.auth_for("other@example.com"))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Board.objects.filter(id=self.board.id).exists())
+        self.assertEqual(Task.objects.count(), 1)
+
+    def test_deleting_a_board_requires_login(self):
+        """Without a token, nothing is deleted."""
+        response = self.delete_board()
+
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(Board.objects.filter(id=self.board.id).exists())

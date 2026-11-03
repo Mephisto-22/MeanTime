@@ -39,6 +39,14 @@ describe('KanbanApi Contract Suite', () => {
     // 5. deleteBoard
     await kanbanApi.deleteBoard(42)
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42')
+
+    // 6. shareBoard
+    await kanbanApi.shareBoard(42, 10)
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators', { friend_id: 10 })
+
+    // 7. removeCollaborator
+    await kanbanApi.removeCollaborator(42, 10)
+    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators/10')
   })
 
   it('routes all 3 Column CRUD methods to correct paths, verbs, and payloads', async () => {
@@ -77,8 +85,21 @@ describe('KanbanApi Contract Suite', () => {
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505')
 
     // 12. moveTask
-    await kanbanApi.moveTask(505, { to_column_id: 102, target_position: 1 })
-    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { to_column_id: 102, target_position: 1 })
+    await kanbanApi.moveTask(505, { toColumnId: 102, targetPosition: 1 })
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { toColumnId: 102, targetPosition: 1 })
+  })
+
+  it('routes Tag methods to correct paths, verbs, and payloads', async () => {
+    const getSpy = vi.spyOn(apiService, 'get').mockResolvedValue({} as any)
+    const postSpy = vi.spyOn(apiService, 'post').mockResolvedValue({} as any)
+
+    // 13. listTags
+    await kanbanApi.listTags()
+    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/tags')
+
+    // 14. createTag
+    await kanbanApi.createTag({ name: 'Urgent' })
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tags', { name: 'Urgent' })
   })
 
   it('integrates with ApiService to dispatch bearer authorization and JSON headers across all verbs', async () => {
@@ -125,11 +146,26 @@ describe('KanbanApi Contract Suite', () => {
     expect(deleteCall.options.headers['Content-Type']).toBe('application/json')
 
     // MOVE (POST)
-    await kanbanApi.moveTask(1, { to_column_id: 2, target_position: 0 })
+    await kanbanApi.moveTask(1, { toColumnId: 2, targetPosition: 0 })
     const moveCall = fetchCalls[fetchCalls.length - 1]
     expect(moveCall.options.method).toBe('POST')
     expect(moveCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')
     expect(moveCall.options.headers['Content-Type']).toBe('application/json')
     expect(moveCall.options.body).toEqual({ to_column_id: 2, target_position: 0 })
+
+    // TAG LIST (GET)
+    await kanbanApi.listTags()
+    const tagListCall = fetchCalls[fetchCalls.length - 1]
+    expect(tagListCall.options.method).toBe('GET')
+    expect(tagListCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')
+    expect(tagListCall.options.headers['Content-Type']).toBe('application/json')
+
+    // TAG CREATE (POST)
+    await kanbanApi.createTag({ name: 'Important' })
+    const tagCreateCall = fetchCalls[fetchCalls.length - 1]
+    expect(tagCreateCall.options.method).toBe('POST')
+    expect(tagCreateCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')
+    expect(tagCreateCall.options.headers['Content-Type']).toBe('application/json')
+    expect(tagCreateCall.options.body).toEqual({ name: 'Important' })
   })
 })

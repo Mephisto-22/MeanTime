@@ -1,23 +1,29 @@
 <template>
   <Card data-testid="kanban-board">
-    <template v-if="board.title" #title>
-      <span data-testid="board-title">{{ board.title }}</span>
-    </template>
-    <template v-if="board.description" #subtitle>
-      <span data-testid="board-description">{{ board.description }}</span>
+    <template #title>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span v-if="board.title" data-testid="board-title">{{ board.title }}</span>
+          <p
+            v-if="board.description"
+            data-testid="board-description"
+            class="mt-1 text-sm font-normal text-surface-600 dark:text-surface-400"
+          >
+            {{ board.description }}
+          </p>
+        </div>
+        <Button
+          data-testid="add-column-button"
+          label="Add Column"
+          icon="pi pi-plus"
+          severity="secondary"
+          outlined
+          class="h-fit shrink-0"
+          @click="openCreateColumnDialog"
+        />
+      </div>
     </template>
     <template #content>
-      <!-- Error Notification Banner -->
-      <Message
-        v-if="errorMessage"
-        data-testid="board-error-banner"
-        severity="error"
-        class="mb-3"
-        @close="errorMessage = null"
-      >
-        {{ errorMessage }}
-      </Message>
-
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
@@ -25,7 +31,7 @@
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">
-            <KanbanColumn :column="column">
+            <KanbanColumn :column="column" @edit="openEditColumnDialog">
               <template v-if="$slots.task" #task="taskSlotProps">
                 <slot name="task" v-bind="taskSlotProps" />
               </template>
@@ -33,6 +39,16 @@
           </slot>
         </template>
       </div>
+
+      <!-- Column Dialog -->
+      <ColumnFormDialog
+        v-model:visible="columnDialogVisible"
+        :board-id="props.board.id"
+        :column="selectedColumn"
+        @created="handleColumnCreated"
+        @updated="handleColumnUpdated"
+        @deleted="handleColumnDeleted"
+      />
 
       <!-- Centralized Task Dialog -->
       <KanbanTaskDialog
@@ -42,13 +58,14 @@
         :column-id="activeColumnId"
         @save="handleSaveTask"
         @delete="handleDeleteTask"
+        @timer-expired="handleDialogTimerExpired"
       />
     </template>
   </Card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, provide, nextTick } from 'vue'
+import { ref, computed, watch, provide, nextTick, onMounted } from 'vue'
 import type {
   KanbanBoardDto,
   KanbanColumnDto,
@@ -56,8 +73,15 @@ import type {
   KanbanTaskDto,
   TaskMoveContext,
   TaskDialogSavePayload,
+  TagDto,
+  TaskPriorityType,
+  TaskTimerDto,
+  TaskTimeEntryDto,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
+import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
+
+const notify = useNotifications()
 
 const props = defineProps<{
   board: KanbanBoardDto
@@ -69,11 +93,35 @@ defineSlots<{
 }>()
 
 const localColumns = ref<KanbanColumnDto[]>([])
+const availableTags = ref<TagDto[]>([])
+const columnDialogVisible = ref(false)
+const selectedColumn = ref<KanbanColumnDto | null>(null)
+
+const loadTags = async (): Promise<void> => {
+  try {
+    const tags = await kanbanApi.listTags()
+    availableTags.value = tags || []
+  } catch (err) {
+    notify.error(err, 'Unable to fetch tags')
+  }
+}
+
+onMounted(() => {
+  loadTags()
+})
 
 watch(
   () => props.board.columns,
   (newColumns) => {
-    localColumns.value = JSON.parse(JSON.stringify(newColumns || []))
+    const raw = JSON.parse(JSON.stringify(newColumns || []))
+    raw.forEach((col: KanbanColumnDto) => {
+      col.tasks?.forEach((t: KanbanTaskDto) => {
+        if (t.columnId == null) {
+          t.columnId = col.id
+        }
+      })
+    })
+    localColumns.value = raw
   },
   { immediate: true, deep: true },
 )
@@ -162,11 +210,11 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
 
   try {
     await kanbanApi.moveTask(req.taskId, {
-      to_column_id: req.toColumnId,
-      target_position: req.targetPosition,
+      toColumnId: req.toColumnId,
+      targetPosition: req.targetPosition,
     })
   } catch (err) {
-    console.warn('Failed to persist task movement:', err)
+    notify.error(err, 'Unable to move task')
   }
 }
 
@@ -174,7 +222,6 @@ const isTaskDialogOpen = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const activeTask = ref<KanbanTaskDto | null>(null)
 const activeColumnId = ref<string | number | null>(null)
-const errorMessage = ref<string | null>(null)
 
 const openCreateTaskDialog = (columnId: string | number): void => {
   dialogMode.value = 'create'
@@ -186,7 +233,15 @@ const openCreateTaskDialog = (columnId: string | number): void => {
 const openEditTaskDialog = (task: KanbanTaskDto): void => {
   dialogMode.value = 'edit'
   activeTask.value = task
-  activeColumnId.value = task.columnId
+  let colId = task.columnId
+  if (colId == null) {
+    const containingCol = localColumns.value.find(c => c.tasks.some(t => sameId(t.id, task.id)))
+    if (containingCol) colId = containingCol.id
+  }
+  if (task.columnId == null && colId != null) {
+    task.columnId = colId
+  }
+  activeColumnId.value = colId ?? null
   isTaskDialogOpen.value = true
 }
 
@@ -196,12 +251,11 @@ const closeTaskDialog = (): void => {
 
 const handleCreateTask = async (
   columnId: string | number,
-  payload: Partial<KanbanTaskDto>,
+  payload: Partial<KanbanTaskDto> & { tag_ids?: Array<string | number> },
 ): Promise<void> => {
   const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
   if (!targetCol) return
 
-  errorMessage.value = null
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const optimisticTask: KanbanTaskDto = {
     id: tempId,
@@ -209,6 +263,8 @@ const handleCreateTask = async (
     description: payload.description ?? '',
     position: targetCol.tasks.length,
     columnId,
+    priority: payload.priority ?? null,
+    tags: payload.tags ?? [],
   }
   targetCol.tasks.push(optimisticTask)
 
@@ -216,7 +272,10 @@ const handleCreateTask = async (
     const createdTask = await kanbanApi.createTask(columnId, {
       title: payload.title,
       description: payload.description,
+      priority: payload.priority,
+      tagIds: payload.tagIds,
     })
+    notify.success('Task created.')
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
     if (!taskInCol) {
@@ -227,8 +286,17 @@ const handleCreateTask = async (
     }
     if (taskInCol && createdTask) {
       taskInCol.id = createdTask.id
+      if (createdTask.columnId != null) {
+        taskInCol.columnId = createdTask.columnId
+      }
       if (createdTask.position !== undefined) {
         taskInCol.position = createdTask.position
+      }
+      if (createdTask.priority !== undefined) {
+        taskInCol.priority = createdTask.priority
+      }
+      if (createdTask.tags !== undefined) {
+        taskInCol.tags = createdTask.tags
       }
     }
   } catch (err) {
@@ -247,76 +315,117 @@ const handleCreateTask = async (
       containingCol.tasks.splice(taskPosition, 1)
       reindexTasks(containingCol.tasks)
     }
-    const message = (err as any)?.message
-      ? `Failed to create task: ${(err as any).message}`
-      : 'Failed to create task'
-    errorMessage.value = message
-    console.warn('Failed to create task:', err)
+    notify.error(err, 'Unable to create task')
   }
+}
+
+const applyTaskUpdates = (
+  target: KanbanTaskDto,
+  source: {
+    title?: string
+    description?: string
+    priority?: TaskPriorityType
+    tags?: TagDto[]
+  },
+): void => {
+  if (source.title !== undefined) target.title = source.title
+  if (source.description !== undefined) target.description = source.description
+  if (source.priority !== undefined) target.priority = source.priority
+  if (source.tags !== undefined) target.tags = source.tags
 }
 
 const handleUpdateTask = async (
   taskId: string | number,
-  payload: Partial<KanbanTaskDto>,
+  payload: Omit<Partial<KanbanTaskDto>, 'columnId'> & {
+    columnId?: string | number | null
+  },
 ): Promise<void> => {
+  let sourceCol: KanbanColumnDto | undefined
+  let sourceIndex = -1
   let targetTask: KanbanTaskDto | undefined
 
   for (const col of localColumns.value) {
-    const found = col.tasks.find(t => sameId(t.id, taskId))
-    if (found) {
-      targetTask = found
+    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
+    if (idx !== -1) {
+      sourceCol = col
+      sourceIndex = idx
+      targetTask = col.tasks[idx]
       break
     }
   }
 
-  if (!targetTask) return
+  if (!sourceCol || !targetTask || sourceIndex === -1) return
 
-  errorMessage.value = null
-  const previousTitle = targetTask.title
-  const previousDescription = targetTask.description
+  const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
 
-  // Optimistic update
-  if (payload.title !== undefined) {
-    targetTask.title = payload.title
+  const destinationColumnId =
+    payload.columnId != null
+      ? payload.columnId
+      : (targetTask.columnId ?? sourceCol.id)
+  const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
+  const destCol = isColumnChanged
+    ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
+    : sourceCol
+
+  if (!destCol) {
+    notify.error(new Error('Destination column not found'), 'Unable to update task')
+    return
   }
-  if (payload.description !== undefined) {
-    targetTask.description = payload.description
+
+  const targetPosition = destCol.tasks.length
+
+  // Optimistic update of task fields
+  applyTaskUpdates(targetTask, payload)
+
+  // Optimistic column relocation
+  if (isColumnChanged) {
+    sourceCol.tasks.splice(sourceIndex, 1)
+    reindexTasks(sourceCol.tasks)
+
+    targetTask.columnId = destCol.id
+    destCol.tasks.push(targetTask)
+    reindexTasks(destCol.tasks)
   }
 
   try {
-    const updated = await kanbanApi.updateTask(taskId, {
+    const updatePayload: any = {
       title: payload.title,
       description: payload.description,
-    })
+    }
+    if (payload.priority !== undefined) {
+      updatePayload.priority = payload.priority
+    }
+    if (payload.tagIds !== undefined) {
+      updatePayload.tagIds = payload.tagIds
+    }
+
+    const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
+    let updated: KanbanTaskDto | undefined
+
+    if (isColumnChanged) {
+      const movePromise = kanbanApi.moveTask(taskId, {
+        toColumnId: destCol.id,
+        targetPosition: targetPosition,
+      })
+      const [updateResult] = await Promise.all([updatePromise, movePromise])
+      updated = updateResult
+    } else {
+      updated = await updatePromise
+    }
+
+    notify.success('Task updated.')
     if (updated) {
-      let currentTask = targetTask
-      for (const col of localColumns.value) {
-        const found = col.tasks.find(t => sameId(t.id, taskId))
-        if (found) {
-          currentTask = found
-          break
-        }
+      applyTaskUpdates(targetTask, updated)
+      if (updated.position !== undefined) {
+        targetTask.position = updated.position
       }
-      if (updated.title !== undefined) currentTask.title = updated.title
-      if (updated.description !== undefined) currentTask.description = updated.description
+      if (updated.columnId != null) {
+        targetTask.columnId = updated.columnId
+      }
     }
   } catch (err) {
-    let currentTask = targetTask
-    for (const col of localColumns.value) {
-      const found = col.tasks.find(t => sameId(t.id, taskId))
-      if (found) {
-        currentTask = found
-        break
-      }
-    }
-    currentTask.title = previousTitle
-    currentTask.description = previousDescription
-
-    const message = (err as any)?.message
-      ? `Failed to update task: ${(err as any).message}`
-      : 'Failed to update task'
-    errorMessage.value = message
-    console.warn('Failed to update task:', err)
+    localColumns.value = columnsSnapshot
+    notify.error(err, 'Unable to update task')
   }
 }
 
@@ -337,7 +446,6 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
 
   if (!targetCol || !deletedTask || targetIndex === -1) return
 
-  errorMessage.value = null
   const originalColId = targetCol.id
   const originalPosition = targetIndex
   const snapshotTask: KanbanTaskDto = { ...deletedTask }
@@ -348,6 +456,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
 
   try {
     await kanbanApi.deleteTask(taskId)
+    notify.success('Task deleted.')
   } catch (err) {
     // Restore task to original column and position
     let restoreCol = localColumns.value.find(col => sameId(col.id, originalColId)) || targetCol
@@ -355,11 +464,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
     restoreCol.tasks.splice(restorePos, 0, snapshotTask)
     reindexTasks(restoreCol.tasks)
 
-    const message = (err as any)?.message
-      ? `Failed to delete task: ${(err as any).message}`
-      : 'Failed to delete task'
-    errorMessage.value = message
-    console.warn('Failed to delete task:', err)
+    notify.error(err, 'Unable to delete task')
   }
 }
 
@@ -368,39 +473,294 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
     await handleCreateTask(savePayload.columnId, {
       title: savePayload.title,
       description: savePayload.description,
+      priority: savePayload.priority,
+      tags: savePayload.tags,
+      tagIds: savePayload.tagIds,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
     await handleUpdateTask(savePayload.taskId, {
       title: savePayload.title,
       description: savePayload.description,
+      priority: savePayload.priority,
+      tags: savePayload.tags,
+      tagIds: savePayload.tagIds,
+      columnId: savePayload.columnId,
     })
+    if (savePayload.timer) {
+      try {
+        const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
+        const targetTask = findTaskById(savePayload.taskId)
+        if (targetTask && updatedTimer) {
+          targetTask.timer = {
+            ...targetTask.timer,
+            ...updatedTimer,
+            taskId: savePayload.taskId,
+          }
+        }
+      } catch (err) {
+        notify.error(err, 'Unable to update timer configuration')
+      }
+    }
   }
+}
+
+const handleCreateTag = async (payload: { name: string } | string): Promise<TagDto> => {
+  const name = typeof payload === 'string' ? payload : payload.name
+  try {
+    const created = await kanbanApi.createTag({ name })
+    const exists = availableTags.value.some(
+      t => sameId(t.id, created.id) || t.name.toLowerCase() === created.name.toLowerCase(),
+    )
+    if (!exists) {
+      availableTags.value.push(created)
+    }
+    return created
+  } catch (err) {
+    notify.error(err, 'Unable to create tag')
+    throw err
+  }
+}
+
+const findTaskById = (taskId: string | number): KanbanTaskDto | undefined => {
+  for (const col of localColumns.value) {
+    const t = col.tasks.find(task => sameId(task.id, taskId))
+    if (t) return t
+  }
+  return undefined
+}
+
+const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task) return
+
+  const nowIso = new Date().toISOString()
+  const isResuming = task.timer?.state === 'PAUSED' && Boolean(task.timer?.startedAt)
+  const sessionStartedAt = isResuming ? task.timer!.startedAt : (defaultTimer?.startedAt || nowIso)
+
+  const updatedTimer: TaskTimerDto = {
+    taskId,
+    mode: defaultTimer?.mode || task.timer?.mode || 'COUNT_DOWN',
+    targetDurationSeconds: defaultTimer?.targetDurationSeconds ?? task.timer?.targetDurationSeconds ?? 1500,
+    state: 'RUNNING',
+    startedAt: sessionStartedAt,
+    lastResumedAt: nowIso,
+    lastPausedAt: null,
+    elapsedSeconds: task.timer?.elapsedSeconds || 0,
+  }
+
+  task.timer = { ...updatedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, updatedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to start timer')
+  }
+}
+
+const handlePauseTimer = async (taskId: string | number): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+
+  const currentTimer = task.timer
+  const nowIso = new Date().toISOString()
+  let accumulated = currentTimer.elapsedSeconds || 0
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
+    accumulated += delta
+  }
+
+  const pausedTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'PAUSED',
+    startedAt: currentTimer.startedAt,
+    lastResumedAt: null,
+    lastPausedAt: nowIso,
+    elapsedSeconds: accumulated,
+  }
+
+  task.timer = { ...pausedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, pausedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to pause timer')
+  }
+}
+
+const recentAlerts = new Map<string | number, number>()
+const recentlyStoppedTasks = new Map<string | number, number>()
+
+const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
+  const lastStopped = recentlyStoppedTasks.get(taskId) ?? 0
+  const now = Date.now()
+  if (now - lastStopped < 2000) {
+    return
+  }
+  recentlyStoppedTasks.set(taskId, now)
+
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+  if (task.timer.state === 'IDLE') return
+
+  const currentTimer = task.timer
+  let totalElapsed = currentTimer.elapsedSeconds || 0
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
+    totalElapsed += delta
+  }
+
+  const idleTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'IDLE',
+    startedAt: null,
+    lastResumedAt: null,
+    lastPausedAt: null,
+    elapsedSeconds: totalElapsed,
+  }
+
+  task.timer = {
+    ...idleTimer,
+    elapsedSeconds: 0,
+  }
+
+  if (entry) {
+    handleTimerExpired(task, entry)
+  }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, idleTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to stop timer')
+  }
+}
+
+const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
+  const lastAlertTime = recentAlerts.get(task.id) ?? 0
+  const now = Date.now()
+  if (now - lastAlertTime < 3000) {
+    return
+  }
+  recentAlerts.set(task.id, now)
+  notify.timerComplete(task.title)
+}
+
+const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
+  const task = activeTask.value
+  if (task) {
+    handleTimerExpired(task, entry)
+  }
+}
+
+const openCreateColumnDialog = () => {
+  console.log('Add Column clicked')
+
+  selectedColumn.value = null
+  columnDialogVisible.value = true
+
+  console.log('Dialog visibility:', columnDialogVisible.value)
+}
+
+const openEditColumnDialog = (column: KanbanColumnDto) => {
+  selectedColumn.value = column
+  columnDialogVisible.value = true
+}
+
+const handleColumnCreated = (column: KanbanColumnDto) => {
+  localColumns.value.push({
+    ...column,
+    tasks: column.tasks ?? [],
+  })
+
+  notify.success('Column created.')
+}
+
+const handleColumnUpdated = (updatedColumn: KanbanColumnDto) => {
+  const index = localColumns.value.findIndex(
+    column => sameId(column.id, updatedColumn.id),
+  )
+
+  if (index !== -1) {
+    const existingColumn = localColumns.value[index]
+
+    if (!existingColumn) return
+
+    localColumns.value[index] = {
+      ...existingColumn,
+      ...updatedColumn,
+      tasks: updatedColumn.tasks ?? existingColumn.tasks,
+    }
+
+    notify.success('Column updated.')
+  }
+}
+
+const handleColumnDeleted = (columnId: string | number) => {
+  localColumns.value = localColumns.value.filter(
+    column => !sameId(column.id, columnId),
+  )
+
+  notify.success('Column deleted.')
 }
 
 provide(kanbanContextKey, {
   columns: columnRegistry,
+  availableTags: computed(() => availableTags.value),
+  createTag: handleCreateTag,
   moveTask: handleMoveTask,
   openCreateTaskDialog,
   openEditTaskDialog,
   createTask: handleCreateTask,
   updateTask: handleUpdateTask,
   deleteTask: handleDeleteTask,
+  startTimer: handleStartTimer,
+  pauseTimer: handlePauseTimer,
+  stopTimer: handleStopTimer,
+  onTimerExpired: handleTimerExpired,
 })
 
 defineExpose({
   localColumns,
+  availableTags,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,
   activeTask,
   activeColumnId,
-  errorMessage,
   openCreateTaskDialog,
   openEditTaskDialog,
   closeTaskDialog,
+  loadTags,
+  handleCreateTag,
   handleCreateTask,
   handleUpdateTask,
   handleDeleteTask,
   handleSaveTask,
+  handleStartTimer,
+  handlePauseTimer,
+  handleStopTimer,
+  handleTimerExpired,
 })
 </script>
