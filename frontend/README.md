@@ -362,6 +362,9 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 See [Clean logout](../docs/clean-logout.md) for navbar logout, persistent token
 blacklisting, migration/cleanup commands, and tests.
+The app uses shared PrimeVue notifications and required-field validation. See
+[Notifications and required fields](../docs/frontend/notifications.md) for usage
+and testing conventions.
 
 Registration displays a live password checklist and password confirmation. See
 [Live registration password requirements](../docs/frontend/password-requirements.md)
@@ -387,6 +390,13 @@ database changes, endpoint contracts, and manual tests.
 - `ApiService` attaches the current bearer token to relative `/api/` requests, refreshes on 401, and retries once. Public endpoints use `{ auth: false }`; authentication routes opt out to avoid recursive refresh. A second 401 ends the session; a normal 403 permission error does not trigger refresh.
 - `setUser` stores profiles in memory; `clearTokens` removes the whole session. Only tokens are persisted, never the user or initialization state.
 - Run `pnpm typecheck` and `pnpm test` inside the frontend container. After `pnpm build`, run `pnpm test:smoke` to check production HTML.
+
+### Boards
+
+- The boards page (`app/pages/index.vue`) lists the signed-in user's boards. **New board** and each card's **Edit** open `app/components/kanban/BoardFormDialog.vue`, which creates or updates the board through `kanbanApi`. After every change, the page fetches the list again.
+- When editing, the dialog's footer has **Delete board**. It asks for confirmation first, naming the board and warning that its columns and tasks are deleted too. Confirming calls `kanbanApi.deleteBoard`, which sends `DELETE /api/kanban/boards/{id}`. The backend deletes the board with its columns and tasks. It can't be undone.
+- Only a board's owner can delete it. For anyone else the endpoint returns 404, as if the board didn't exist.
+- Tests: `tests/components/board-delete.test.ts`, and `DeleteBoardTests` in `backend/kanban/tests/test_board_api.py`.
 
 ---
 

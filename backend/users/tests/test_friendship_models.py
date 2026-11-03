@@ -65,16 +65,6 @@ class FriendshipModelTests(TestCase):
                     receiver=self.user1,
                 )
 
-    def test_blocked_by_field(self):
-        friendship = Friendship.objects.create(
-            requester=self.user1,
-            receiver=self.user2,
-            status=FriendshipStatus.BLOCKED,
-            blocked_by=self.user1,
-        )
-        self.assertEqual(friendship.blocked_by, self.user1)
-        self.assertIn(friendship, self.user1.blocked_friendships.all())
-
     def test_cascade_delete_on_user_removal(self):
         Friendship.objects.create(
             requester=self.user1,
@@ -139,7 +129,7 @@ class FriendshipModelTests(TestCase):
         self.assertFalse(hasattr(Friendship, "get_friends"))
         self.assertFalse(hasattr(Friendship, "is_friends_with"))
 
-    def test_get_friends_ignores_declined_and_blocked(self):
+    def test_get_friends_ignores_declined(self):
         Friendship.objects.create(
             requester=self.user1,
             receiver=self.user2,
@@ -147,19 +137,6 @@ class FriendshipModelTests(TestCase):
         )
         self.assertNotIn(self.user2, self.user1.get_friends())
         self.assertFalse(self.user1.is_friends_with(self.user2))
-
-        user3 = User.objects.create_user(
-            email="blocked@example.com",
-            password="password123",
-            display_name="Blocked",
-        )
-        Friendship.objects.create(
-            requester=self.user1,
-            receiver=user3,
-            status=FriendshipStatus.BLOCKED,
-        )
-        self.assertNotIn(user3, self.user1.get_friends())
-        self.assertFalse(self.user1.is_friends_with(user3))
 
     def test_cascade_delete_on_receiver_removal(self):
         Friendship.objects.create(

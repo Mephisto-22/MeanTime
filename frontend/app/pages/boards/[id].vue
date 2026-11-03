@@ -26,21 +26,19 @@
     </div>
 
     <!-- Not found: missing, or owned by someone else -->
-    <Message
+    <div
       v-else-if="isNotFound"
       data-testid="board-not-found"
-      severity="warn"
-      :closable="false"
+      class="rounded-lg border border-surface-300 p-4"
     >
       This board doesn't exist, or it isn't yours.
-    </Message>
+    </div>
 
     <!-- Any other error -->
-    <Message
+    <div
       v-else-if="error"
       data-testid="board-error"
-      severity="error"
-      :closable="false"
+      class="rounded-lg border border-surface-300 p-4"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load this board.</span>
@@ -53,7 +51,7 @@
           @click="() => refresh()"
         />
       </div>
-    </Message>
+    </div>
 
     <template v-else-if="board">
       <KanbanBoard :board="board" />
@@ -78,6 +76,7 @@ definePageMeta({
 });
 
 const route = useRoute();
+const notify = useNotifications();
 
 const {
   data: board,
@@ -98,4 +97,8 @@ const isNotFound = computed(() => {
     | undefined;
   return err?.statusCode === 404 || err?.cause?.statusCode === 404;
 });
+
+watch(error, value => {
+  if (value) notify.error(value, 'Unable to load board');
+}, {immediate: true});
 </script>

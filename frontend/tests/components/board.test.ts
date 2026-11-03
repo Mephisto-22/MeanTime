@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
+import ToastEventBus from 'primevue/toasteventbus'
 import { defineComponent, h, inject } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kanbanApi, kanbanContextKey } from '~/api/kanban'
@@ -18,7 +20,7 @@ function mountBoard(boardData: any) {
       board: boardData,
     },
     global: {
-      plugins: [PrimeVue],
+      plugins: [PrimeVue, ToastService],
       stubs: {
         Dialog: DialogStub,
       },
@@ -29,11 +31,20 @@ function mountBoard(boardData: any) {
 describe('Board Component DOM & Optimistic Mutation Verification', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.spyOn(ToastEventBus, 'emit')
     vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([])
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('notifies when task movement cannot be persisted', async () => {
+    const board = createBoardFixture({ columns: [createColumnFixture({ id: 'col-1', tasks: [createTaskFixture({ id: 'task-1', columnId: 'col-1' })] })] })
+    vi.spyOn(kanbanApi, 'moveTask').mockRejectedValue(new Error('Movement failed'))
+    const wrapper = mountBoard(board)
+    await (wrapper.vm as any).handleMoveTask({ taskId: 'task-1', fromColumnId: 'col-1', toColumnId: 'col-1', targetPosition: 0 })
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', summary: 'Unable to move task', detail: 'Movement failed' }))
   })
 
   it('renders board title, description, and column container', () => {
@@ -71,7 +82,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
         column: () => h(TestConsumer),
       },
       global: {
-        plugins: [PrimeVue],
+        plugins: [PrimeVue, ToastService],
         stubs: { Dialog: DialogStub },
       },
     })
@@ -109,7 +120,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
         column: () => h(TestConsumer),
       },
       global: {
-        plugins: [PrimeVue],
+        plugins: [PrimeVue, ToastService],
         stubs: { Dialog: DialogStub },
       },
     })
@@ -279,7 +290,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(revertedTask.tags).toEqual([originalTag])
 
     // Error banner is populated
-    expect(boardVm.errorMessage).toContain('Move relocation network failure')
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Move relocation network failure' }))
   })
 
   it('move-on-save rollback: network error in updateTask rolls back relocated task to source column and previous field values', async () => {
@@ -323,7 +334,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(revertedTask.title).toBe('Initial Title 2')
     expect(revertedTask.priority).toBe('MEDIUM')
 
-    expect(boardVm.errorMessage).toContain('Update network error')
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Update network error' }))
   })
 
   it('optimistic task creation: appends temporary task, calls kanbanApi, and reconciles server ID on success', async () => {
@@ -367,7 +378,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(colTasks[0].title).toBe('Created Task')
   })
 
-  it('optimistic task creation rollback: network error removes optimistic task and surfaces error banner', async () => {
+  it('optimistic task creation rollback: network error removes optimistic task and shows an error toast', async () => {
     const board = createBoardFixture({
       columns: [createColumnFixture({ id: 'col-1', tasks: [] })],
     })
@@ -388,7 +399,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     // Task must be rolled back
     expect(boardVm.localColumns[0].tasks).toHaveLength(0)
     // Error banner message should be populated
-    expect(boardVm.errorMessage).toContain('Network creation failure')
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Network creation failure' }))
   })
 
   it('vertical task drag-and-drop: reorders task within column and calls kanbanApi.moveTask', async () => {
@@ -483,7 +494,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     const currentTask = boardVm.localColumns[0].tasks[0]
     expect(currentTask.title).toBe('Original Title')
     expect(currentTask.description).toBe('Original Description')
-    expect(boardVm.errorMessage).toContain('Update failed')
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Update failed' }))
   })
 
   it('optimistic task delete rollback: network error restores task to original column', async () => {
@@ -508,7 +519,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     // Task should be restored to column
     expect(boardVm.localColumns[0].tasks).toHaveLength(1)
     expect(boardVm.localColumns[0].tasks[0].id).toBe('task-to-delete')
-    expect(boardVm.errorMessage).toContain('Delete rejected')
+    expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', detail: 'Delete rejected' }))
   })
 
   it('editing a task on initial page load (with backend column_id or null columnId) updates cleanly without destination column not found error', async () => {
@@ -562,7 +573,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       columnId: null,
     })
 
-    expect(boardVm.errorMessage).toBeNull()
+    expect(ToastEventBus.emit).not.toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error' }))
     expect(updateSpy).toHaveBeenCalledWith('task-backend-1', {
       title: 'Updated Title',
       description: 'Initial Description',
