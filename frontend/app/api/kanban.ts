@@ -77,6 +77,7 @@ export interface KanbanBoardDto {
   id: string | number
   title: string
   description: string
+  isOwner: boolean
   columns: KanbanColumnDto[]
 }
 

@@ -6,14 +6,28 @@
   >
     <!-- Column Header -->
     <div class="mb-3 flex shrink-0 items-center justify-between">
-      <h3 class="text-sm font-semibold">
-        {{ column.title }}
-      </h3>
-      <Tag
-        data-testid="column-task-count"
-        :value="column.tasks.length"
+      <div class="flex min-w-0 items-center gap-2">
+        <h3 class="truncate text-sm font-semibold">
+          {{ column.title }}
+        </h3>
+
+        <Tag
+          data-testid="column-task-count"
+          :value="column.tasks.length"
+          severity="secondary"
+          rounded
+        />
+      </div>
+
+      <Button
+        data-testid="edit-column-button"
+        icon="pi pi-pencil"
         severity="secondary"
+        text
         rounded
+        size="small"
+        aria-label="Edit column"
+        @click="handleEditColumn"
       />
     </div>
 
@@ -79,6 +93,10 @@ const props = defineProps<{
   columns?: KanbanColumnSummary[]
 }>()
 
+const emit = defineEmits<{
+  edit: [column: KanbanColumnDto]
+}>()
+
 defineSlots<{
   task?: (props: { task: KanbanTaskDto }) => any
 }>()
@@ -128,10 +146,15 @@ const handleAddTask = () => {
   }
 }
 
+const handleEditColumn = () => {
+  emit('edit', props.column)
+}
+
 defineExpose({
   tasks,
   onUpdate,
   onAdd,
   handleAddTask,
+  handleEditColumn,
 })
 </script>

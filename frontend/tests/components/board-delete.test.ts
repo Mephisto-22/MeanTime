@@ -8,7 +8,7 @@ import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
 
 afterEach(() => vi.restoreAllMocks())
 
-const board: KanbanBoardDto = { id: 7, title: 'School', description: '', columns: [] }
+const board: KanbanBoardDto = { id: 7, title: 'School', description: '', columns: [], isOwner: true }
 
 function mountDialog(props: { board: KanbanBoardDto | null }) {
   return mount(BoardFormDialog, {

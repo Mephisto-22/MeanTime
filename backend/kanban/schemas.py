@@ -119,6 +119,7 @@ class BoardOut(Schema):
     id: int
     title: str
     description: str
+    is_owner: bool
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime

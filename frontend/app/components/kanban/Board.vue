@@ -1,10 +1,27 @@
 <template>
   <Card data-testid="kanban-board">
-    <template v-if="board.title" #title>
-      <span data-testid="board-title">{{ board.title }}</span>
-    </template>
-    <template v-if="board.description" #subtitle>
-      <span data-testid="board-description">{{ board.description }}</span>
+    <template #title>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span v-if="board.title" data-testid="board-title">{{ board.title }}</span>
+          <p
+            v-if="board.description"
+            data-testid="board-description"
+            class="mt-1 text-sm font-normal text-surface-600 dark:text-surface-400"
+          >
+            {{ board.description }}
+          </p>
+        </div>
+        <Button
+          data-testid="add-column-button"
+          label="Add Column"
+          icon="pi pi-plus"
+          severity="secondary"
+          outlined
+          class="h-fit shrink-0"
+          @click="openCreateColumnDialog"
+        />
+      </div>
     </template>
     <template #content>
       <!-- Horizontal Column Track -->
@@ -14,7 +31,7 @@
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">
-            <KanbanColumn :column="column">
+            <KanbanColumn :column="column" @edit="openEditColumnDialog">
               <template v-if="$slots.task" #task="taskSlotProps">
                 <slot name="task" v-bind="taskSlotProps" />
               </template>
@@ -22,6 +39,16 @@
           </slot>
         </template>
       </div>
+
+      <!-- Column Dialog -->
+      <ColumnFormDialog
+        v-model:visible="columnDialogVisible"
+        :board-id="props.board.id"
+        :column="selectedColumn"
+        @created="handleColumnCreated"
+        @updated="handleColumnUpdated"
+        @deleted="handleColumnDeleted"
+      />
 
       <!-- Centralized Task Dialog -->
       <KanbanTaskDialog
@@ -52,6 +79,7 @@ import type {
   TaskTimeEntryDto,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
+import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 
 const notify = useNotifications()
 
@@ -66,6 +94,8 @@ defineSlots<{
 
 const localColumns = ref<KanbanColumnDto[]>([])
 const availableTags = ref<TagDto[]>([])
+const columnDialogVisible = ref(false)
+const selectedColumn = ref<KanbanColumnDto | null>(null)
 
 const loadTags = async (): Promise<void> => {
   try {
@@ -642,6 +672,57 @@ const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
   if (task) {
     handleTimerExpired(task, entry)
   }
+}
+
+const openCreateColumnDialog = () => {
+  console.log('Add Column clicked')
+
+  selectedColumn.value = null
+  columnDialogVisible.value = true
+
+  console.log('Dialog visibility:', columnDialogVisible.value)
+}
+
+const openEditColumnDialog = (column: KanbanColumnDto) => {
+  selectedColumn.value = column
+  columnDialogVisible.value = true
+}
+
+const handleColumnCreated = (column: KanbanColumnDto) => {
+  localColumns.value.push({
+    ...column,
+    tasks: column.tasks ?? [],
+  })
+
+  notify.success('Column created.')
+}
+
+const handleColumnUpdated = (updatedColumn: KanbanColumnDto) => {
+  const index = localColumns.value.findIndex(
+    column => sameId(column.id, updatedColumn.id),
+  )
+
+  if (index !== -1) {
+    const existingColumn = localColumns.value[index]
+
+    if (!existingColumn) return
+
+    localColumns.value[index] = {
+      ...existingColumn,
+      ...updatedColumn,
+      tasks: updatedColumn.tasks ?? existingColumn.tasks,
+    }
+
+    notify.success('Column updated.')
+  }
+}
+
+const handleColumnDeleted = (columnId: string | number) => {
+  localColumns.value = localColumns.value.filter(
+    column => !sameId(column.id, columnId),
+  )
+
+  notify.success('Column deleted.')
 }
 
 provide(kanbanContextKey, {

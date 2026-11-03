@@ -47,7 +47,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(ToastEventBus.emit).toHaveBeenCalledWith('add', expect.objectContaining({ severity: 'error', summary: 'Unable to move task', detail: 'Movement failed' }))
   })
 
-  it('renders board title, description, and column container', () => {
+  it('renders board title, description, add-column button in header, and column container', async () => {
     const board = createBoardFixture({
       title: 'Main Kanban Board',
       description: 'Sprint tasks and workflow tracking',
@@ -56,7 +56,11 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     const wrapper = mountBoard(board)
     expect(wrapper.find('[data-testid="board-title"]').text()).toBe('Main Kanban Board')
     expect(wrapper.find('[data-testid="board-description"]').text()).toBe('Sprint tasks and workflow tracking')
+    expect(wrapper.find('[data-testid="add-column-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="kanban-columns-track"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="add-column-button"]').trigger('click')
+    expect((wrapper.vm as any).columnDialogVisible).toBe(true)
   })
 
   it('fetches user tags on mount via kanbanApi.listTags and exposes availableTags and createTag via kanbanContextKey', async () => {
