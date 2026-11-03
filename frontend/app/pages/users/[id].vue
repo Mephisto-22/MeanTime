@@ -1,17 +1,5 @@
 <template>
   <div class="mx-auto max-w-4xl px-6 py-10">
-    <!-- Top-Left Navigation Back to Boards -->
-    <div class="mb-6">
-      <Button
-        data-testid="back-to-boards-button"
-        label="Your boards"
-        icon="pi pi-arrow-left"
-        text
-        severity="secondary"
-        @click="navigateTo('/')"
-      />
-    </div>
-
     <!-- Error Banner -->
     <Message
       v-if="saveError"

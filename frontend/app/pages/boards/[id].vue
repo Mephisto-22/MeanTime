@@ -1,45 +1,34 @@
 <template>
   <div class="mx-auto max-w-7xl px-6 py-8">
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <NuxtLink
-        to="/"
-        data-testid="back-to-boards"
-        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+    <!-- Board Share Action & Collaborators Preview -->
+    <div v-if="board" class="mb-6 flex flex-wrap items-center justify-end gap-3">
+      <div
+        v-if="board.collaborators && board.collaborators.length > 0"
+        data-testid="collaborators-preview"
+        class="flex -space-x-2 overflow-hidden"
       >
-        <i class="pi pi-arrow-left text-xs" />
-        All boards
-      </NuxtLink>
-
-      <!-- Board Share Action & Collaborators Preview -->
-      <div v-if="board" class="flex items-center gap-3">
-        <div
-          v-if="board.collaborators && board.collaborators.length > 0"
-          data-testid="collaborators-preview"
-          class="flex -space-x-2 overflow-hidden"
-        >
-          <Avatar
-            v-for="c in board.collaborators.slice(0, 3)"
-            :key="c.id"
-            :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
-            shape="circle"
-            class="border-2 border-surface-0 bg-primary-100 text-xs font-semibold text-primary-700 dark:border-surface-900 dark:bg-primary-950 dark:text-primary-300"
-          />
-          <span
-            v-if="board.collaborators.length > 3"
-            class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold text-surface-600 dark:bg-surface-700 dark:text-surface-300"
-          >
-            +{{ board.collaborators.length - 3 }}
-          </span>
-        </div>
-
-        <Button
-          label="Share"
-          icon="pi pi-users"
-          size="small"
-          data-testid="board-share-button"
-          @click="isShareDialogOpen = true"
+        <Avatar
+          v-for="c in board.collaborators.slice(0, 3)"
+          :key="c.id"
+          :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
+          shape="circle"
+          class="border-2 border-surface-0 bg-primary-100 text-xs font-semibold text-primary-700 dark:border-surface-900 dark:bg-primary-950 dark:text-primary-300"
         />
+        <span
+          v-if="board.collaborators.length > 3"
+          class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+        >
+          +{{ board.collaborators.length - 3 }}
+        </span>
       </div>
+
+      <Button
+        label="Share"
+        icon="pi pi-users"
+        size="small"
+        data-testid="board-share-button"
+        @click="isShareDialogOpen = true"
+      />
     </div>
 
     <!-- Loading -->
