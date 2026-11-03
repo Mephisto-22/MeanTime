@@ -15,7 +15,7 @@
 <script setup lang="ts">
 import { authApi } from '~/api/auth'
 
-definePageMeta({ public: true })
+definePageMeta({ public: true, layout: 'headless' })
 const loading = ref(false)
 const message = ref('')
 const error = ref('')
