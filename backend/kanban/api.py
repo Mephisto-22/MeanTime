@@ -1,9 +1,10 @@
 from django.shortcuts import get_object_or_404
-from django.db.models import Prefetch, Max, Q
+from django.db.models import Prefetch, Max, Q, Exists, OuterRef
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 from ninja import Router
+from users.models import UserBlock
 from .models import Board, BoardColumn, Task, TaskTimeEntry, Tag
 from .schemas import (
     TaskIn, 
@@ -30,6 +31,33 @@ DEFAULT_COLUMN_TITLES = ("To Do", "In Progress", "Done")
 
 # Helpers
 
+def get_accessible_boards(user):
+    """
+    Return boards owned by or shared with the user,
+    excluding boards where either user has blocked the other.
+    """
+
+    # Check whether the board owner blocked the requesting user
+    owner_blocked_user = UserBlock.objects.filter(
+        blocker=OuterRef("owner"),
+        blocked=user,
+    )
+
+    # Check whether the requesting user blocked the board owner
+    user_blocked_owner = UserBlock.objects.filter(
+        blocker=user,
+        blocked=OuterRef("owner")
+    )
+
+    return Board.objects.filter(
+        Q(owner=user) | Q(collaborators=user)
+    ).annotate(owner_blocked_user=Exists(owner_blocked_user),
+               user_blocked_owner=Exists(user_blocked_owner),
+    ).filter(
+        owner_blocked_user=False,
+        user_blocked_owner=False,
+    ).distinct()
+
 def get_owned_board(user, board_id: int) -> Board:
     """Retrieve a board owned by the authenticated user."""
     return get_object_or_404(
@@ -40,9 +68,9 @@ def get_owned_board(user, board_id: int) -> Board:
 def get_accessible_board(user, board_id: int) -> Board:
     """Retrieve a board owned by or shared with the user."""
     return get_object_or_404(
-        Board.objects.filter(
-            Q(owner=user) | Q(collaborators=user)
-        ).distinct().prefetch_related("columns__tasks__tags"),
+        get_accessible_boards(user).prefetch_related(
+            "columns__tasks__tags"
+        ),
         id=board_id,
     )
 
@@ -50,8 +78,8 @@ def get_accessible_column(user, column_id: int) -> BoardColumn:
     """Retrieve a column on a board the user can access."""
     return get_object_or_404(
         BoardColumn.objects.filter(
-            Q(board__owner=user) | Q(board__collaborators=user)
-        ).distinct(),
+            board__in=get_accessible_boards(user)
+        ),
         id=column_id,
     )
 
@@ -59,8 +87,8 @@ def get_accessible_task(user, task_id: int) -> Task:
     """Retrieve a task on a board the user can access."""
     return get_object_or_404(
         Task.objects.select_related("column__board").filter(
-            Q(column__board__owner=user) | Q(column__board__collaborators=user)
-        ).distinct(),
+            column__board__in=get_accessible_boards(user)
+        ),
         id=task_id,
     )
 
@@ -91,9 +119,9 @@ def _reindex(items):
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by or shared with the authenticated user."""
-    return Board.objects.filter(
-        Q(owner=request.auth) | Q(collaborators=request.auth)
-    ).distinct().prefetch_related("columns__tasks__tags")
+    return get_accessible_boards(request.auth).prefetch_related(
+        "columns__tasks__tags"
+    )
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
