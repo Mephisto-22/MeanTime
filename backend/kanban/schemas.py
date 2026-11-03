@@ -102,6 +102,11 @@ class BoardColumnOut(Schema):
     created_at: datetime
     updated_at: datetime
 
+class BoardColumnUpdateIn(Schema):
+    """Payload expected for partially updating a board column."""
+    title: str | None = None
+    position: int | None = None
+
 
 # Board Schemas
 class BoardIn(Schema):
@@ -122,6 +127,10 @@ class TaskMoveIn(Schema):
     """Payload expected when moving a task to another column."""
     to_column_id: int
     target_position: int
+
+class BoardShareIn(Schema):
+    """Payload expected when sharing a board with a friend."""
+    friend_id: int
 
 
 # Tag Schemas
