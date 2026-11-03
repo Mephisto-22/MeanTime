@@ -32,17 +32,4 @@ describe('Headless Layout Suite', () => {
     expect(wrapper.find('[data-testid="friends-nav-link"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="boards-nav-link"]').exists()).toBe(false)
   })
-
-  it('renders footer with copyright and environment information', () => {
-    const wrapper = mount(HeadlessLayout, {
-      slots: {
-        default: '<div>Content</div>',
-      },
-    })
-
-    const footer = wrapper.find('footer')
-    expect(footer.exists()).toBe(true)
-    expect(footer.text()).toContain('MeanTime')
-    expect(footer.text()).toContain('2026')
-  })
 })

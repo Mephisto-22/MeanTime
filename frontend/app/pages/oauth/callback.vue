@@ -18,7 +18,7 @@ import { useAuthStore } from '~/stores/auth'
 
 // The backend sends the browser here after Google sign-in, with the session's
 // tokens in the URL fragment (backend/users/oauth.py).
-definePageMeta({ public: true })
+definePageMeta({ public: true, layout: 'headless' })
 // Never send this page's address, tokens included, to another site.
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] })
 const auth = useAuthStore()

@@ -2,12 +2,18 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { useNuxtApp } from '#app'
 import type { Pinia } from 'pinia'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { friendsApi } from '~/api/friends'
 import Layout from '~/layouts/default.vue'
 import Login from '~/pages/login.vue'
 import { useAuthStore } from '~/stores/auth'
 
 let wrapper: VueWrapper | undefined
+
+beforeEach(() => {
+  vi.spyOn(friendsApi, 'getRequests').mockResolvedValue({ incoming: [], outgoing: [] })
+})
+
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); localStorage.clear() })
 
 describe('Navbar logout', () => {
@@ -17,7 +23,12 @@ describe('Navbar logout', () => {
     store.setUser({ id: 1, email: 'user@example.com', display_name: 'User', timezone: 'UTC', created_at: '2026-11-01T12:00:00Z' })
     const logout = vi.spyOn(store, 'logout').mockResolvedValue(true)
     wrapper = await mountSuspended(Layout)
+
+    expect(wrapper.find('[data-testid="boards-nav-link"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="user-profile-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="logout-button"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="logout-button"]').text()).toContain('Log out')
+
     await wrapper.get('[data-testid="logout-button"]').trigger('click')
     await flushPromises()
     expect(logout).toHaveBeenCalledTimes(1)

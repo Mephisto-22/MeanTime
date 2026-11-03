@@ -28,7 +28,7 @@
                 v-if="item.badge"
                 :value="item.badge"
                 severity="warn"
-                data-testid="friends-pending-badge"
+                :data-testid="item.badgeTestId"
               />
             </NuxtLink>
           </template>
@@ -63,9 +63,6 @@
     <main class="flex-1">
       <slot />
     </main>
-    <footer class="border-t border-surface-200 bg-surface-0 px-6 py-4 text-center text-sm text-surface-500 dark:border-surface-800 dark:bg-surface-900 dark:text-surface-400">
-      MeanTime &copy; 2026 - Containerized Development Environment
-    </footer>
   </div>
 </template>
 
@@ -81,8 +78,12 @@ const authStore = useAuthStore()
 const route = useRoute()
 const pendingIncomingCount = ref(0)
 
-const isBoardsActive = computed(() => route.path === '/' || route.path.startsWith('/boards'))
-const isFriendsActive = computed(() => route.path.startsWith('/friends'))
+const isBoardsActive = computed(
+  () => route.path === '/' || route.path === '/boards' || route.path.startsWith('/boards/')
+)
+const isFriendsActive = computed(
+  () => route.path === '/friends' || route.path.startsWith('/friends/')
+)
 
 const menuItems = computed(() => {
   if (!authStore.isAuthenticated) return []
@@ -101,6 +102,7 @@ const menuItems = computed(() => {
       active: isFriendsActive.value,
       testId: 'friends-nav-link',
       badge: pendingIncomingCount.value > 0 ? pendingIncomingCount.value : undefined,
+      badgeTestId: 'friends-pending-badge',
     },
   ]
 })

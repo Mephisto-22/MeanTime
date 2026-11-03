@@ -22,11 +22,8 @@ vi.mock('~/stores/auth', () => ({
   useAuthStore: () => mockAuthStore,
 }))
 
-function mountLayout(options: { slots?: Record<string, string>; route?: string } = {}) {
+function mountLayout(options: { slots?: Record<string, string> } = {}) {
   const router = useRouter()
-  if (options.route) {
-    router.push(options.route)
-  }
   return mount(DefaultLayout, {
     global: {
       plugins: [PrimeVue, router],
@@ -144,6 +141,14 @@ describe('Default Layout Header Suite', () => {
       expect(rootBoardsLink.classes()).toContain('bg-surface-100')
       expect(rootBoardsLink.classes()).toContain('text-primary')
 
+      await router.push('/boards')
+      const wrapperBoards = mountLayout()
+      await flushPromises()
+
+      const boardsLink = wrapperBoards.find('[data-testid="boards-nav-link"]')
+      expect(boardsLink.classes()).toContain('bg-surface-100')
+      expect(boardsLink.classes()).toContain('text-primary')
+
       await router.push('/boards/123')
       const wrapperBoard = mountLayout()
       await flushPromises()
@@ -151,6 +156,14 @@ describe('Default Layout Header Suite', () => {
       const boardLink = wrapperBoard.find('[data-testid="boards-nav-link"]')
       expect(boardLink.classes()).toContain('bg-surface-100')
       expect(boardLink.classes()).toContain('text-primary')
+
+      await router.push('/boards-other')
+      const wrapperUnrelatedBoard = mountLayout()
+      await flushPromises()
+
+      const unrelatedBoardsLink = wrapperUnrelatedBoard.find('[data-testid="boards-nav-link"]')
+      expect(unrelatedBoardsLink.classes()).not.toContain('bg-surface-100')
+      expect(unrelatedBoardsLink.classes()).toContain('text-surface-700')
 
       await router.push('/friends')
       const wrapperFriends = mountLayout()
@@ -181,6 +194,22 @@ describe('Default Layout Header Suite', () => {
       const activeFriendsLink = wrapper.find('[data-testid="friends-nav-link"]')
       expect(activeFriendsLink.classes()).toContain('bg-surface-100')
       expect(activeFriendsLink.classes()).toContain('text-primary')
+
+      await router.push('/friends/requests')
+      const wrapperFriendsRequests = mountLayout()
+      await flushPromises()
+
+      const friendsRequestsLink = wrapperFriendsRequests.find('[data-testid="friends-nav-link"]')
+      expect(friendsRequestsLink.classes()).toContain('bg-surface-100')
+      expect(friendsRequestsLink.classes()).toContain('text-primary')
+
+      await router.push('/friends-other')
+      const wrapperUnrelatedFriends = mountLayout()
+      await flushPromises()
+
+      const unrelatedFriendsLink = wrapperUnrelatedFriends.find('[data-testid="friends-nav-link"]')
+      expect(unrelatedFriendsLink.classes()).not.toContain('bg-surface-100')
+      expect(unrelatedFriendsLink.classes()).toContain('text-surface-700')
 
       await router.push('/')
       const wrapperRoot = mountLayout()
