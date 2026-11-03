@@ -25,7 +25,7 @@
 import type { LoginRequest } from '~/api/auth'
 import { useAuthStore } from '~/stores/auth'
 
-definePageMeta({ public: true })
+definePageMeta({ public: true, layout: 'headless' })
 
 // Why Google sign-in sent the browser back here (oauth_error in backend/users/oauth.py).
 const googleErrors: Record<string, string> = {
