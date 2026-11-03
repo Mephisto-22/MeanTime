@@ -153,6 +153,9 @@ const authStore = useAuthStore();
 const isEditing = computed(() => props.board !== null);
 const isOwner = computed(() => {
   if (!props.board) return true;
+  if (typeof props.board.isOwner === 'boolean') {
+    return props.board.isOwner;
+  }
   return Boolean(props.board.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id);
 });
 const isBusy = computed(() => isSaving.value || isDeleting.value);

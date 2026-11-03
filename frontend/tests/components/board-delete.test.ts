@@ -14,6 +14,7 @@ const board: KanbanBoardDto = {
   title: 'School',
   description: '',
   columns: [],
+  isOwner: true,
   owner: { id: 1, email: 'owner@example.com', display_name: 'Owner', timezone: 'UTC', created_at: '' },
   collaborators: [],
 }
@@ -46,6 +47,7 @@ describe('Deleting a board from the editor dialog', () => {
       id: 7,
       title: 'Shared School',
       description: '',
+      isOwner: false,
       owner: { id: 1, email: 'owner@example.com', display_name: 'Owner', timezone: 'UTC', created_at: '' },
       collaborators: [],
       columns: [],

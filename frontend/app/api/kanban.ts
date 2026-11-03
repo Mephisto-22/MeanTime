@@ -78,8 +78,9 @@ export interface KanbanBoardDto {
   id: string | number
   title: string
   description: string
-  owner: UserOut
-  collaborators: UserOut[]
+  isOwner?: boolean
+  owner?: UserOut
+  collaborators?: UserOut[]
   columns: KanbanColumnDto[]
 }
 

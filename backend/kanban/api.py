@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Prefetch, Max, Q, Exists, OuterRef
+from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
@@ -60,6 +60,11 @@ def get_accessible_boards(user):
         Q(owner=user) | Q(collaborators=user)
     ).annotate(owner_blocked_user=Exists(owner_blocked_user),
                user_blocked_owner=Exists(user_blocked_owner),
+               is_owner=Case(
+                   When(owner=user, then=Value(True)),
+                   default=Value(False),
+                   output_field=BooleanField(),
+               )
     ).filter(
         owner_blocked_user=False,
         user_blocked_owner=False,
@@ -209,6 +214,7 @@ def create_board(request, payload: BoardIn):
             BoardColumn(board=board, title=title, position=position)
             for position, title in enumerate(DEFAULT_COLUMN_TITLES)
         )
+    board.is_owner = True
     return 201, board
 
 @router.get("/boards/{board_id}", response=BoardOut)

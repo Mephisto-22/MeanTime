@@ -122,6 +122,7 @@ class BoardOut(Schema):
     description: str
     owner: UserOut
     collaborators: list[UserOut] = []
+    is_owner: bool = True
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime
