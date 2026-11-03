@@ -1,18 +1,6 @@
 <template>
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
 
-    <!-- Top-Left Navigation Back to Boards -->
-    <div class="mb-6">
-      <Button
-        data-testid="back-to-boards-button"
-        label="Your boards"
-        icon="pi pi-arrow-left"
-        text
-        severity="secondary"
-        @click="navigateTo('/')"
-      />
-    </div>
-
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
