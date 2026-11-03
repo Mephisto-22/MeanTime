@@ -360,6 +360,8 @@ MeanTime is configured with **PrimeVue 5** (Aura preset) and **Tailwind CSS 3.4*
 
 ## Running Locally
 
+See [Clean logout](../docs/clean-logout.md) for navbar logout, persistent token
+blacklisting, migration/cleanup commands, and tests.
 The app uses shared PrimeVue notifications and required-field validation. See
 [Notifications and required fields](../docs/frontend/notifications.md) for usage
 and testing conventions.

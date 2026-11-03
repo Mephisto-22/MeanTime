@@ -26,6 +26,38 @@ describe('ApiService & Auth Access', () => {
     mockFetch.mockReset()
   })
 
+  it('never retries an old request under a new session after logout', async () => {
+    let revision = 1
+    let access = 'old-session'
+    const refresh = vi.fn()
+    const expireSession = vi.fn()
+    mockFetch.mockImplementation(async () => {
+      revision++
+      access = 'new-session'
+      throw unauthorizedError()
+    })
+    const api = new ApiService()
+    api.setAuthHandler({ getAccessToken: () => access, getSessionRevision: () => revision, refresh, expireSession })
+    await expect(api.get('/api/tasks')).rejects.toMatchObject({ statusCode: 401 })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(refresh).not.toHaveBeenCalled()
+    expect(expireSession).not.toHaveBeenCalled()
+  })
+
+  it('does not replay a request if the session changes during refresh', async () => {
+    let revision = 1
+    const expireSession = vi.fn()
+    mockFetch.mockRejectedValue(unauthorizedError())
+    const api = new ApiService()
+    api.setAuthHandler({
+      getAccessToken: () => 'token', getSessionRevision: () => revision,
+      async refresh() { revision++ }, expireSession,
+    })
+    await expect(api.get('/api/tasks')).rejects.toMatchObject({ statusCode: 401 })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(expireSession).not.toHaveBeenCalled()
+  })
+
   it('protected API retries once with the refreshed token, preserving request data and headers', async () => {
     const calls: Array<{ url: string; options: any }> = []
     let access = 'old'
