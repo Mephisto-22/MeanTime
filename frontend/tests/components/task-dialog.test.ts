@@ -181,7 +181,7 @@ describe('TaskDialog Component DOM Suite', () => {
       taskId: null,
       priority: null,
       tags: [],
-      tag_ids: [],
+      tagIds: [],
     })
     expect(wrapper.emitted('update:visible')?.[0]).toEqual([false])
   })
@@ -379,7 +379,7 @@ describe('TaskDialog Component DOM Suite', () => {
     await wrapper.find('form').trigger('submit.prevent')
     const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
     expect(savePayload.tags).toEqual([tag2])
-    expect(savePayload.tag_ids).toEqual(['tag-2'])
+    expect(savePayload.tagIds).toEqual(['tag-2'])
   })
 
   it('in-layout suggestions box: displays unattached library tags, filters case-insensitively, and attaches directly on click', async () => {

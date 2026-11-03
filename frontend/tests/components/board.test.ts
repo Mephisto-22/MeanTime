@@ -189,8 +189,8 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       await new Promise(resolve => setTimeout(resolve, 20))
       return {
         id,
-        columnId: req.to_column_id,
-        position: req.target_position,
+        columnId: req.toColumnId,
+        position: req.targetPosition,
       } as any
     })
 
@@ -207,7 +207,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       description: 'New Description Notes',
       priority: 'HIGH',
       tags: [newTag],
-      tag_ids: ['tag-10'],
+      tagIds: ['tag-10'],
     })
 
     // Verify optimistic placement and field values immediately before API promises resolve
@@ -228,11 +228,11 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       title: 'Moved & Updated Title',
       description: 'New Description Notes',
       priority: 'HIGH',
-      tag_ids: ['tag-10'],
+      tagIds: ['tag-10'],
     })
     expect(moveSpy).toHaveBeenCalledWith('task-1', {
-      to_column_id: 'col-2',
-      target_position: 1, // length of col-2 tasks before relocation
+      toColumnId: 'col-2',
+      targetPosition: 1, // length of col-2 tasks before relocation
     })
     expect(updateRunningDuringMove).toBe(true)
   })
@@ -425,8 +425,8 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     })
 
     expect(moveSpy).toHaveBeenCalledWith('t-1', {
-      to_column_id: 'col-1',
-      target_position: 2,
+      toColumnId: 'col-1',
+      targetPosition: 2,
     })
 
     const reorderedIds = boardVm.localColumns[0].tasks.map((t: any) => t.id)
@@ -455,8 +455,8 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     })
 
     expect(moveSpy).toHaveBeenCalledWith('t-1', {
-      to_column_id: 'col-target',
-      target_position: 0,
+      toColumnId: 'col-target',
+      targetPosition: 0,
     })
 
     expect(boardVm.localColumns[0].tasks).toHaveLength(0)
