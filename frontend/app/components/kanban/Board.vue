@@ -698,6 +698,8 @@ const handleColumnUpdated = (updatedColumn: KanbanColumnDto) => {
   if (index !== -1) {
     const existingColumn = localColumns.value[index]
 
+    if (!existingColumn) return
+
     localColumns.value[index] = {
       ...existingColumn,
       ...updatedColumn,
