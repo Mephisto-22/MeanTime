@@ -34,5 +34,6 @@ describe('Board Page ([id].vue)', () => {
 
     expect(wrapper.find('[data-testid="board-share-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="collaborators-preview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="back-to-boards"]').exists()).toBe(false)
   })
 })

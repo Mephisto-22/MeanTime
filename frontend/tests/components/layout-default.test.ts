@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
+import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DefaultLayout from '~/layouts/default.vue'
 import { friendsApi } from '~/api/friends'
@@ -27,10 +28,29 @@ function mountLayout(options: { slots?: Record<string, string> } = {}) {
     global: {
       plugins: [PrimeVue, router],
       stubs: {
-        NuxtLink: {
-          props: ['to'],
-          template: '<a :href="to"><slot /></a>',
-        },
+        NuxtLink: defineComponent({
+          props: {
+            to: {
+              type: [String, Object],
+              required: true,
+            },
+          },
+          setup(props, { slots }) {
+            const router = useRouter()
+            return () =>
+              h(
+                'a',
+                {
+                  href: props.to,
+                  onClick: (e: MouseEvent) => {
+                    e.preventDefault()
+                    router.push(props.to as string)
+                  },
+                },
+                slots.default ? slots.default() : []
+              )
+          },
+        }),
       },
     },
     slots: options.slots,
@@ -38,7 +58,7 @@ function mountLayout(options: { slots?: Record<string, string> } = {}) {
 }
 
 describe('Default Layout Header Suite', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks()
     vi.spyOn(friendsApi, 'getRequests').mockResolvedValue({ incoming: [], outgoing: [] })
     mockAuthStore.sessionInitialized = true
@@ -50,6 +70,8 @@ describe('Default Layout Header Suite', () => {
       timezone: 'UTC',
       created_at: '2026-01-01T00:00:00Z',
     }
+    const router = useRouter()
+    await router.push('/')
   })
 
   afterEach(() => {
@@ -57,6 +79,156 @@ describe('Default Layout Header Suite', () => {
   })
 
   describe('Authenticated state', () => {
+    it('does not render v0.1.0-dev tag', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('v0.1.0-dev')
+      expect(wrapper.find('.p-tag').exists()).toBe(false)
+    })
+
+    it('renders navigation within a PrimeVue Menubar component', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      expect(wrapper.find('.p-menubar').exists()).toBe(true)
+      expect(wrapper.find('nav').exists()).toBe(false)
+    })
+
+    it('renders static, non-clickable MeanTime brand in header', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const clockIcon = wrapper.find('.pi-clock')
+      expect(clockIcon.exists()).toBe(true)
+      expect(wrapper.text()).toContain('MeanTime')
+
+      expect(clockIcon.element.closest('a')).toBeNull()
+      expect(clockIcon.element.closest('button')).toBeNull()
+    })
+
+    it('renders boards navigation button when authenticated pointing to /', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
+      expect(boardsLink.exists()).toBe(true)
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+      expect(boardsLink.text()).toContain('Boards')
+    })
+
+    it('navigates to / when boards navigation button is clicked', async () => {
+      const router = useRouter()
+      await router.push('/friends')
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
+      expect(boardsLink.exists()).toBe(true)
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+
+      await boardsLink.trigger('click')
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
+    })
+
+    it('displays active visual highlight on boards navigation button when route is / or /boards/*', async () => {
+      const router = useRouter()
+      await router.push('/')
+      const wrapperRoot = mountLayout()
+      await flushPromises()
+
+      const rootBoardsLink = wrapperRoot.find('[data-testid="boards-nav-link"]')
+      expect(rootBoardsLink.classes()).toContain('bg-surface-100')
+      expect(rootBoardsLink.classes()).toContain('text-primary')
+
+      await router.push('/boards')
+      const wrapperBoards = mountLayout()
+      await flushPromises()
+
+      const boardsLink = wrapperBoards.find('[data-testid="boards-nav-link"]')
+      expect(boardsLink.classes()).toContain('bg-surface-100')
+      expect(boardsLink.classes()).toContain('text-primary')
+
+      await router.push('/boards/123')
+      const wrapperBoard = mountLayout()
+      await flushPromises()
+
+      const boardLink = wrapperBoard.find('[data-testid="boards-nav-link"]')
+      expect(boardLink.classes()).toContain('bg-surface-100')
+      expect(boardLink.classes()).toContain('text-primary')
+
+      await router.push('/boards-other')
+      const wrapperUnrelatedBoard = mountLayout()
+      await flushPromises()
+
+      const unrelatedBoardsLink = wrapperUnrelatedBoard.find('[data-testid="boards-nav-link"]')
+      expect(unrelatedBoardsLink.classes()).not.toContain('bg-surface-100')
+      expect(unrelatedBoardsLink.classes()).toContain('text-surface-700')
+
+      await router.push('/friends')
+      const wrapperFriends = mountLayout()
+      await flushPromises()
+
+      const inactiveBoardsLink = wrapperFriends.find('[data-testid="boards-nav-link"]')
+      expect(inactiveBoardsLink.classes()).not.toContain('bg-surface-100')
+      expect(inactiveBoardsLink.classes()).toContain('text-surface-700')
+    })
+
+    it('renders navigation link pointing to /friends with users icon and label', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const link = wrapper.find('[data-testid="friends-nav-link"]')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href') || link.attributes('to')).toBe('/friends')
+      expect(link.text()).toContain('Friends')
+      expect(link.find('.pi-users').exists()).toBe(true)
+    })
+
+    it('displays active visual highlight on friends navigation link when route is /friends*', async () => {
+      const router = useRouter()
+      await router.push('/friends')
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const activeFriendsLink = wrapper.find('[data-testid="friends-nav-link"]')
+      expect(activeFriendsLink.classes()).toContain('bg-surface-100')
+      expect(activeFriendsLink.classes()).toContain('text-primary')
+
+      await router.push('/friends/requests')
+      const wrapperFriendsRequests = mountLayout()
+      await flushPromises()
+
+      const friendsRequestsLink = wrapperFriendsRequests.find('[data-testid="friends-nav-link"]')
+      expect(friendsRequestsLink.classes()).toContain('bg-surface-100')
+      expect(friendsRequestsLink.classes()).toContain('text-primary')
+
+      await router.push('/friends-other')
+      const wrapperUnrelatedFriends = mountLayout()
+      await flushPromises()
+
+      const unrelatedFriendsLink = wrapperUnrelatedFriends.find('[data-testid="friends-nav-link"]')
+      expect(unrelatedFriendsLink.classes()).not.toContain('bg-surface-100')
+      expect(unrelatedFriendsLink.classes()).toContain('text-surface-700')
+
+      await router.push('/')
+      const wrapperRoot = mountLayout()
+      await flushPromises()
+
+      const inactiveFriendsLink = wrapperRoot.find('[data-testid="friends-nav-link"]')
+      expect(inactiveFriendsLink.classes()).not.toContain('bg-surface-100')
+      expect(inactiveFriendsLink.classes()).toContain('text-surface-700')
+    })
+
+    it('renders profile button with user display name', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const button = wrapper.find('[data-testid="user-profile-button"]')
+      expect(button.exists()).toBe(true)
+      expect(button.text()).toContain('Alex Engineer')
+    })
+
     it('renders display name button in top right when authenticated', async () => {
       const wrapper = mountLayout({
         slots: {
@@ -70,24 +242,24 @@ describe('Default Layout Header Suite', () => {
       expect(button.text()).toContain('Alex Engineer')
     })
 
-    it('renders profile button with user display name', async () => {
+    it('orders header elements correctly: brand & nav cluster on left, profile and logout on right', async () => {
       const wrapper = mountLayout()
       await flushPromises()
 
-      const button = wrapper.find('[data-testid="user-profile-button"]')
-      expect(button.exists()).toBe(true)
-      expect(button.text()).toContain('Alex Engineer')
-    })
+      const header = wrapper.find('header')
+      const brandIcon = header.find('.pi-clock').element
+      const boardsLink = header.find('[data-testid="boards-nav-link"]').element
+      const friendsLink = header.find('[data-testid="friends-nav-link"]').element
+      const profileBtn = header.find('[data-testid="user-profile-button"]').element
+      const logoutBtn = header.find('[data-testid="logout-button"]').element
 
-    it('renders navigation link pointing to /friends with users icon and label', async () => {
-      const wrapper = mountLayout()
-      await flushPromises()
+      expect(brandIcon.compareDocumentPosition(boardsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(boardsLink.compareDocumentPosition(friendsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(friendsLink.compareDocumentPosition(profileBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(profileBtn.compareDocumentPosition(logoutBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
-      const link = wrapper.find('[data-testid="friends-nav-link"]')
-      expect(link.exists()).toBe(true)
-      expect(link.attributes('href') || link.attributes('to')).toBe('/friends')
-      expect(link.text()).toContain('Friends')
-      expect(link.find('.pi-users').exists()).toBe(true)
+      const buttons = header.findAll('button')
+      expect(buttons[buttons.length - 1].attributes('data-testid')).toBe('logout-button')
     })
 
     it('fetches requests from friendsApi.getRequests on mount', async () => {
@@ -160,6 +332,16 @@ describe('Default Layout Header Suite', () => {
   })
 
   describe('Unauthenticated state', () => {
+    it('does not render boards nav link when unauthenticated', async () => {
+      mockAuthStore.isAuthenticated = false
+      mockAuthStore.user = null as any
+
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="boards-nav-link"]').exists()).toBe(false)
+    })
+
     it('does not render profile button when unauthenticated', async () => {
       mockAuthStore.isAuthenticated = false
       mockAuthStore.user = null as any

@@ -18,7 +18,7 @@
 import { authApi, type PasswordResetLink } from '~/api/auth'
 import { useAuthStore } from '~/stores/auth'
 
-definePageMeta({ public: true })
+definePageMeta({ public: true, layout: 'headless' })
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] })
 const auth = useAuthStore()
 const checking = ref(true)
