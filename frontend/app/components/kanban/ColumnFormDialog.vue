@@ -9,9 +9,9 @@
   >
     <form @submit.prevent="handleSave" class="flex flex-col gap-4">
       <div class="flex flex-col gap-2">
-        <label for="column-title" class="font-medium">
+        <Label for="column-title" class="font-medium">
           Column Title
-        </label>
+        </Label>
 
         <InputText
           id="column-title"

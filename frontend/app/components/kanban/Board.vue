@@ -1,10 +1,27 @@
 <template>
   <Card data-testid="kanban-board">
-    <template v-if="board.title" #title>
-      <span data-testid="board-title">{{ board.title }}</span>
-    </template>
-    <template v-if="board.description" #subtitle>
-      <span data-testid="board-description">{{ board.description }}</span>
+    <template #title>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span v-if="board.title" data-testid="board-title">{{ board.title }}</span>
+          <p
+            v-if="board.description"
+            data-testid="board-description"
+            class="mt-1 text-sm font-normal text-surface-600 dark:text-surface-400"
+          >
+            {{ board.description }}
+          </p>
+        </div>
+        <Button
+          data-testid="add-column-button"
+          label="Add Column"
+          icon="pi pi-plus"
+          severity="secondary"
+          outlined
+          class="h-fit shrink-0"
+          @click="openCreateColumnDialog"
+        />
+      </div>
     </template>
     <template #content>
       <!-- Horizontal Column Track -->
@@ -21,16 +38,6 @@
             </KanbanColumn>
           </slot>
         </template>
-
-        <Button
-          data-testid="add-column-button"
-          label="Add Column"
-          icon="pi pi-plus"
-          severity="secondary"
-          outlined
-          class="h-fit min-w-40"
-          @click="openCreateColumnDialog"
-        />
       </div>
 
       <!-- Column Dialog -->
