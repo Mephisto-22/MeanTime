@@ -84,7 +84,7 @@
       </template>
       <template v-else>
         <Button
-          v-if="isEditing"
+          v-if="isEditing && isOwner"
           type="button"
           class="mr-auto"
           data-testid="board-delete-button"
@@ -118,6 +118,7 @@
 
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
+import {useAuthStore} from '~/stores/auth';
 
 interface Props {
   /** The board to edit, or null to create a new one. */
@@ -147,8 +148,13 @@ const isDeleting = ref(false);
 // Deleting asks for confirmation first, in place of the editor's buttons.
 const isConfirmingDelete = ref(false);
 const notify = useNotifications();
+const authStore = useAuthStore();
 
 const isEditing = computed(() => props.board !== null);
+const isOwner = computed(() => {
+  if (!props.board?.owner) return true;
+  return props.board.owner.id === authStore.user?.id;
+});
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
 const showTitleError = computed(

@@ -5,6 +5,7 @@ import ToastEventBus from 'primevue/toasteventbus'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import BoardFormDialog from '~/components/kanban/BoardFormDialog.vue'
 import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
+import { useAuthStore } from '~/stores/auth'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -24,6 +25,20 @@ describe('Deleting a board from the editor dialog', () => {
   it('offers Delete board only when editing', () => {
     expect(mountDialog({ board }).find('[data-testid="board-delete-button"]').exists()).toBe(true)
     expect(mountDialog({ board: null }).find('[data-testid="board-delete-button"]').exists()).toBe(false)
+  })
+
+  it('hides Delete board button when editing a board owned by someone else', () => {
+    const auth = useAuthStore()
+    auth.user = { id: 99, email: 'collaborator@example.com' } as any
+    const sharedBoard: KanbanBoardDto = {
+      id: 7,
+      title: 'Shared School',
+      description: '',
+      owner: { id: 1, email: 'owner@example.com', display_name: 'Owner', timezone: 'UTC', created_at: '' },
+      collaborators: [],
+      columns: [],
+    }
+    expect(mountDialog({ board: sharedBoard }).find('[data-testid="board-delete-button"]').exists()).toBe(false)
   })
 
   it('asks for confirmation before deleting anything', async () => {
