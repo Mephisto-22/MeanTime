@@ -2,14 +2,21 @@ import { mount, flushPromises } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import ToastEventBus from 'primevue/toasteventbus'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BoardFormDialog from '~/components/kanban/BoardFormDialog.vue'
 import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
 import { useAuthStore } from '~/stores/auth'
 
 afterEach(() => vi.restoreAllMocks())
 
-const board: KanbanBoardDto = { id: 7, title: 'School', description: '', columns: [] }
+const board: KanbanBoardDto = {
+  id: 7,
+  title: 'School',
+  description: '',
+  columns: [],
+  owner: { id: 1, email: 'owner@example.com', display_name: 'Owner', timezone: 'UTC', created_at: '' },
+  collaborators: [],
+}
 
 function mountDialog(props: { board: KanbanBoardDto | null }) {
   return mount(BoardFormDialog, {
@@ -22,6 +29,11 @@ function mountDialog(props: { board: KanbanBoardDto | null }) {
 }
 
 describe('Deleting a board from the editor dialog', () => {
+  beforeEach(() => {
+    const auth = useAuthStore()
+    auth.user = { id: 1, email: 'owner@example.com' } as any
+  })
+
   it('offers Delete board only when editing', () => {
     expect(mountDialog({ board }).find('[data-testid="board-delete-button"]').exists()).toBe(true)
     expect(mountDialog({ board: null }).find('[data-testid="board-delete-button"]').exists()).toBe(false)

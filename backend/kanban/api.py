@@ -162,10 +162,10 @@ def get_owned_task(user, task_id: int) -> Task:
     )
 
 def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
-    """Retrieve a time entry belonging to the authenticated user's task."""
+    """Retrieve a time entry belonging to the authenticated user's task or created by the user."""
     return get_object_or_404(
         TaskTimeEntry.objects.select_related("task__column__board").filter(
-            task__column__board__owner=user
+            Q(user=user) | Q(task__column__board__owner=user)
         ),
         id=entry_id
     )

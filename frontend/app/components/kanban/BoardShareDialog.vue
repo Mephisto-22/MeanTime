@@ -228,8 +228,7 @@ const isConfirmingLeave = ref(false)
 const dialogTitle = computed(() => `Share "${props.board?.title || 'Board'}"`)
 
 const isOwner = computed(() => {
-  if (!props.board?.owner) return true
-  return authStore.user?.id === props.board.owner.id
+  return Boolean(props.board?.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id)
 })
 
 const isCollaborator = computed(() => {
@@ -243,11 +242,12 @@ const availableFriends = computed(() => {
 })
 
 async function loadFriends() {
+  if (!isOwner.value) return
   try {
     const list = await friendsApi.getFriends()
     friends.value = list || []
   } catch (err) {
-    // Silently continue or notify if needed
+    notify.error(err, 'Failed to load friends list.')
   }
 }
 

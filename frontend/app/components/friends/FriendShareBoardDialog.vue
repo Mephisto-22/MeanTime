@@ -98,7 +98,7 @@ const eligibleBoards = computed(() => {
   const currentUserId = authStore.user?.id
   return boards.value.filter(b => {
     // Only boards owned by current user
-    const isOwner = !b.owner || b.owner.id === currentUserId
+    const isOwner = Boolean(b.owner?.id && currentUserId && b.owner.id === currentUserId)
     if (!isOwner) return false
     // Must not already have friend as collaborator
     const alreadyShared = b.collaborators?.some(c => c.id === props.friend?.id)

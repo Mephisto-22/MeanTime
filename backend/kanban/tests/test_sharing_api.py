@@ -93,3 +93,34 @@ class BoardSharingApiTests(TestCase):
         )
         self.assertEqual(entry_res.status_code, 201)
         self.assertEqual(entry_res.json()["user_id"], self.friend.id)
+
+    def test_collaborator_can_update_and_delete_own_time_entry(self):
+        self.board.collaborators.add(self.friend)
+        from kanban.models import TaskTimeEntry
+        from django.utils import timezone
+        from datetime import timedelta
+        entry = TaskTimeEntry.objects.create(
+            task=self.task,
+            user=self.friend,
+            started_at=timezone.now() - timedelta(minutes=10),
+            ended_at=timezone.now(),
+            duration_seconds=600,
+            note="Original note",
+        )
+        # Update note
+        update_res = self.client.patch(
+            f"/api/kanban/time-entries/{entry.id}",
+            data=json.dumps({"note": "Updated note"}),
+            content_type="application/json",
+            **self.auth_headers("friend@example.com"),
+        )
+        self.assertEqual(update_res.status_code, 200)
+        self.assertEqual(update_res.json()["note"], "Updated note")
+
+        # Delete entry
+        del_res = self.client.delete(
+            f"/api/kanban/time-entries/{entry.id}",
+            **self.auth_headers("friend@example.com"),
+        )
+        self.assertEqual(del_res.status_code, 200)
+        self.assertFalse(TaskTimeEntry.objects.filter(id=entry.id).exists())

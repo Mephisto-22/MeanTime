@@ -152,8 +152,8 @@ const authStore = useAuthStore();
 
 const isEditing = computed(() => props.board !== null);
 const isOwner = computed(() => {
-  if (!props.board?.owner) return true;
-  return props.board.owner.id === authStore.user?.id;
+  if (!props.board) return true;
+  return Boolean(props.board.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id);
 });
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
