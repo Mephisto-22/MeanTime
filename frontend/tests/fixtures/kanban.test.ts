@@ -18,11 +18,11 @@ describe('Domain Fixture Factories', () => {
       const tag = createTagFixture({
         id: 'tag-custom',
         name: 'Urgent',
-        created_at: '2026-10-27T00:00:00Z',
+        createdAt: '2026-10-27T00:00:00Z',
       })
       expect(tag.id).toBe('tag-custom')
       expect(tag.name).toBe('Urgent')
-      expect(tag.created_at).toBe('2026-10-27T00:00:00Z')
+      expect(tag.createdAt).toBe('2026-10-27T00:00:00Z')
     })
   })
 

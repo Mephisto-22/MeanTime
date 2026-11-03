@@ -26,7 +26,7 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
       const tag = createTagFixture({
         id: 1,
         name: 'Urgent',
-        created_at: '2026-10-27T20:00:00Z',
+        createdAt: '2026-10-27T20:00:00Z',
       })
 
       const priorityHigh: TaskPriorityType = 'HIGH'
@@ -56,7 +56,7 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
       expect(unassignedTask.tags).toBeUndefined()
     })
 
-    it('supports priority, tags, and tag_ids on TaskDialogSavePayload', () => {
+    it('supports priority, tags, and tagIds on TaskDialogSavePayload', () => {
       const tag = createTagFixture({ id: 'tag-1', name: 'Frontend' })
       const payload: TaskDialogSavePayload = {
         title: 'Updated Task',
@@ -66,20 +66,20 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
         taskId: 10,
         priority: 'MEDIUM',
         tags: [tag],
-        tag_ids: [tag.id],
+        tagIds: [tag.id],
       }
 
       expect(payload.priority).toBe('MEDIUM')
       expect(payload.tags).toEqual([tag])
-      expect(payload.tag_ids).toEqual(['tag-1'])
+      expect(payload.tagIds).toEqual(['tag-1'])
     })
   })
 
   describe('listTags endpoint', () => {
     it('routes listTags to GET /api/kanban/tags and returns TagDto array', async () => {
       const mockTags: TagDto[] = [
-        createTagFixture({ id: 1, name: 'Backend', created_at: '2026-10-27T10:00:00Z' }),
-        createTagFixture({ id: 2, name: 'Frontend', created_at: '2026-10-27T11:00:00Z' }),
+        createTagFixture({ id: 1, name: 'Backend', createdAt: '2026-10-27T10:00:00Z' }),
+        createTagFixture({ id: 2, name: 'Frontend', createdAt: '2026-10-27T11:00:00Z' }),
       ]
       const getSpy = vi.spyOn(apiService, 'get').mockResolvedValue(mockTags)
 
@@ -99,10 +99,10 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
 
     it('deserializes GET /api/kanban/tags response through ApiService with auth headers', async () => {
       const sampleTags: TagDto[] = [
-        createTagFixture({ id: 101, name: 'DevOps', created_at: '2026-10-27T12:00:00Z' }),
+        createTagFixture({ id: 101, name: 'DevOps', createdAt: '2026-10-27T12:00:00Z' }),
       ]
 
-      mockFetch.mockResolvedValueOnce(sampleTags)
+      mockFetch.mockResolvedValueOnce([{ id: 101, name: 'DevOps', created_at: '2026-10-27T12:00:00Z' }])
 
       apiService.setAuthHandler({
         getAccessToken: () => 'valid-access-token',
@@ -154,10 +154,10 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
       const createdTag: TagDto = createTagFixture({
         id: 202,
         name: 'Design System',
-        created_at: '2026-10-27T15:30:00Z',
+        createdAt: '2026-10-27T15:30:00Z',
       })
 
-      mockFetch.mockResolvedValueOnce(createdTag)
+      mockFetch.mockResolvedValueOnce({ id: 202, name: 'Design System', created_at: '2026-10-27T15:30:00Z' })
 
       apiService.setAuthHandler({
         getAccessToken: () => 'auth-token-123',

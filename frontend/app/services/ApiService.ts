@@ -1,4 +1,5 @@
 import { getErrorMessage } from '~/utils/errors'
+import { toCamelCase, toSnakeCase } from '~/utils/case'
 
 /**
  * ApiService provides a centralized HTTP client wrapper around Nuxt's $fetch.
@@ -8,12 +9,21 @@ import { getErrorMessage } from '~/utils/errors'
 
 export interface ApiRequestOptions extends Omit<Parameters<typeof $fetch>[1], 'method' | 'body' | 'query'> {
   headers?: Record<string, string>
+  /** Maximum request duration in milliseconds (passed through to ofetch). */
+  timeout?: number
   /** Disable automatic bearer authentication for public/authentication endpoints. */
   auth?: boolean
+  /**
+   * Automatically convert outgoing payload keys to snake_case and
+   * incoming response keys to camelCase.
+   * If omitted, defaults to true for endpoints starting with /api/kanban.
+   */
+  transformCase?: boolean
 }
 
 export interface ApiAuthHandler {
   getAccessToken(): string | null
+  getSessionRevision?(): number
   refresh(): Promise<void>
   expireSession(): Promise<void>
 }
@@ -47,40 +57,49 @@ export class ApiService {
     options: ApiRequestOptions = {},
   ): Promise<T> {
     const isBodyMethod = method === 'POST' || method === 'PUT' || method === 'PATCH' || (method === 'DELETE' && data !== undefined)
-    const { auth = true, headers, ...fetchOptions } = options
+    const { auth = true, transformCase, headers, ...fetchOptions } = options
+    const shouldTransformCase = transformCase ?? endpoint.startsWith('/api/kanban')
+    const requestPayload = shouldTransformCase && data !== undefined ? toSnakeCase(data) : data
     // Never send application tokens to arbitrary external URLs.
     const handler = auth && endpoint.startsWith('/api/') ? this.authHandler : undefined
     const sentToken = handler?.getAccessToken()
-    const execute = (token?: string | null) => $fetch<T>(endpoint, {
-      ...fetchOptions,
-      method,
-      retry: 0,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: isBodyMethod ? data : undefined,
-      query: !isBodyMethod ? data : undefined,
-    })
+    const sentRevision = handler?.getSessionRevision?.()
+    const sameSession = () => !handler?.getSessionRevision || handler.getSessionRevision() === sentRevision
+    const execute = async (token?: string | null): Promise<T> => {
+      const response = await $fetch<any>(endpoint, {
+        ...fetchOptions,
+        method,
+        retry: 0,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: isBodyMethod ? requestPayload : undefined,
+        query: !isBodyMethod ? requestPayload : undefined,
+      })
+      return shouldTransformCase ? toCamelCase<T>(response) : (response as T)
+    }
 
     try {
       try {
         return await execute(sentToken)
       } catch (error: any) {
         if (!handler || (error.statusCode || error.response?.status) !== 401) throw error
+        if (!sameSession()) throw error
         if (!sentToken || !handler.getAccessToken()) {
           await handler.expireSession()
           throw error
         }
         // Another concurrent request may have already refreshed this token.
         if (handler.getAccessToken() === sentToken) await handler.refresh()
+        if (!sameSession()) throw error
         const updatedToken = handler.getAccessToken()
         if (!updatedToken) throw error
         try {
           return await execute(updatedToken)
         } catch (retryError: any) {
-          if ((retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
+          if (sameSession() && (retryError.statusCode || retryError.response?.status) === 401) await handler.expireSession()
           throw retryError
         }
       }

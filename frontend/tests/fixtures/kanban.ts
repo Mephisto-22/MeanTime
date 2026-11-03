@@ -10,7 +10,7 @@ export function createTagFixture(overrides: Partial<TagDto> = {}): TagDto {
   return {
     id,
     name: overrides.name ?? `Tag ${id}`,
-    created_at: overrides.created_at,
+    createdAt: overrides.createdAt,
   }
 }
 
@@ -52,4 +52,11 @@ export function createBoardFixture(overrides: Partial<KanbanBoardDto> = {}): Kan
     description: overrides.description,
     columns,
   }
+}
+
+
+export const DialogStub = {
+  name: 'Dialog',
+  props: ['visible', 'header'],
+  template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
 }

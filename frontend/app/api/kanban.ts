@@ -2,6 +2,31 @@ import type { ComputedRef, InjectionKey } from 'vue'
 import { apiService } from '~/services/ApiService'
 
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
+export type TimerMode = 'NONE' | 'COUNT_UP' | 'COUNT_DOWN'
+export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
+
+export interface TaskTimerDto {
+  id?: number
+  taskId: number | string
+  mode: TimerMode
+  targetDurationSeconds: number | null
+  state: TimerState
+  startedAt: string | null
+  lastResumedAt?: string | null
+  lastPausedAt?: string | null
+  elapsedSeconds: number
+}
+
+export interface TaskTimeEntryDto {
+  id: number | string
+  taskId: number | string
+  userId?: number | string
+  startedAt: string
+  endedAt?: string | null
+  durationSeconds: number
+  note: string
+  createdAt?: string
+}
 
 export const TASK_PRIORITY_CONFIG = {
   HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
@@ -9,10 +34,22 @@ export const TASK_PRIORITY_CONFIG = {
   LOW: { label: 'Low', dotClass: 'bg-sky-500', badgeClass: 'border-sky-500 text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
 } as const
 
+export const TIMER_MODE_CONFIG = {
+  NONE: { label: 'None' },
+  COUNT_DOWN: { label: 'Count down' },
+  COUNT_UP: { label: 'Count up' },
+} as const
+
+export const TIMER_STATE_CONFIG = {
+  IDLE: { label: 'Idle', dotClass: 'bg-surface-400', badgeClass: 'text-surface-500' },
+  RUNNING: { label: 'Live session', dotClass: 'bg-emerald-500 animate-pulse', badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' },
+  PAUSED: { label: 'Paused', dotClass: 'bg-amber-500', badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
+} as const
+
 export interface TagDto {
   id: string | number
   name: string
-  created_at?: string
+  createdAt?: string
 }
 
 export interface KanbanTaskDto {
@@ -20,11 +57,12 @@ export interface KanbanTaskDto {
   title: string
   description?: string
   position: number
-  columnId?: string | number
-  column_id?: string | number
+  columnId: string | number
+  timer?: TaskTimerDto | null
+  timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
-  tag_ids?: Array<string | number>
+  tagIds?: Array<string | number>
 }
 
 export interface KanbanColumnDto {
@@ -38,23 +76,22 @@ export interface KanbanColumnDto {
 export interface KanbanBoardDto {
   id: string | number
   title: string
-  description?: string
+  description: string
   columns: KanbanColumnDto[]
-}
-
-export interface TaskMoveRequest {
-  to_column_id: string | number
-  target_position: number
 }
 
 export interface SuccessResponse {
   success: boolean
 }
 
+export interface TaskMoveRequest {
+  toColumnId: number | string
+  targetPosition: number
+}
+
 export interface KanbanColumnSummary {
   id: string | number
   title: string
-  position: number
 }
 
 export interface TaskMoveContext {
@@ -70,9 +107,11 @@ export interface TaskDialogSavePayload {
   mode: 'create' | 'edit'
   columnId?: string | number | null
   taskId?: string | number | null
+  timer?: TaskTimerDto | null
+  timeEntries?: TaskTimeEntryDto[]
   priority?: TaskPriorityType
   tags?: TagDto[]
-  tag_ids?: Array<string | number>
+  tagIds?: Array<string | number>
 }
 
 export interface KanbanContext {
@@ -85,12 +124,16 @@ export interface KanbanContext {
   createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   deleteTask: (taskId: string | number) => Promise<void> | void
+  startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
+  pauseTimer?: (taskId: string | number) => void
+  stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+  onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
 }
 
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')
 
 export class KanbanApi {
-  readonly endpoint = '/api/kanban'
+  private readonly endpoint = '/api/kanban'
 
   // -----------------
   // Board Endpoints
@@ -150,6 +193,34 @@ export class KanbanApi {
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -----------------
+  // Timer Endpoints
+  // -----------------
+
+  updateTaskTimer(taskId: string | number, payload: Partial<TaskTimerDto>): Promise<TaskTimerDto> {
+    return apiService.patch<TaskTimerDto>(`${this.endpoint}/tasks/${taskId}/timer`, payload)
+  }
+
+  // -----------------
+  // Time Entry Endpoints
+  // -----------------
+
+  listTimeEntries(taskId: string | number): Promise<TaskTimeEntryDto[]> {
+    return apiService.get<TaskTimeEntryDto[]>(`${this.endpoint}/tasks/${taskId}/time-entries`)
+  }
+
+  createTimeEntry(taskId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.post<TaskTimeEntryDto>(`${this.endpoint}/tasks/${taskId}/time-entries`, payload)
+  }
+
+  updateTimeEntry(entryId: string | number, payload: Partial<TaskTimeEntryDto>): Promise<TaskTimeEntryDto> {
+    return apiService.patch<TaskTimeEntryDto>(`${this.endpoint}/time-entries/${entryId}`, payload)
+  }
+
+  deleteTimeEntry(entryId: string | number): Promise<SuccessResponse> {
+    return apiService.delete<SuccessResponse>(`${this.endpoint}/time-entries/${entryId}`)
   }
 
   // -----------------

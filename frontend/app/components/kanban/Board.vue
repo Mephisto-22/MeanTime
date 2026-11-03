@@ -31,6 +31,7 @@
         :column-id="activeColumnId"
         @save="handleSaveTask"
         @delete="handleDeleteTask"
+        @timer-expired="handleDialogTimerExpired"
       />
     </template>
   </Card>
@@ -47,6 +48,8 @@ import type {
   TaskDialogSavePayload,
   TagDto,
   TaskPriorityType,
+  TaskTimerDto,
+  TaskTimeEntryDto,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 
@@ -84,7 +87,7 @@ watch(
     raw.forEach((col: KanbanColumnDto) => {
       col.tasks?.forEach((t: KanbanTaskDto) => {
         if (t.columnId == null) {
-          t.columnId = (t as any).column_id ?? col.id
+          t.columnId = col.id
         }
       })
     })
@@ -177,8 +180,8 @@ const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
 
   try {
     await kanbanApi.moveTask(req.taskId, {
-      to_column_id: req.toColumnId,
-      target_position: req.targetPosition,
+      toColumnId: req.toColumnId,
+      targetPosition: req.targetPosition,
     })
   } catch (err) {
     notify.error(err, 'Unable to move task')
@@ -200,7 +203,7 @@ const openCreateTaskDialog = (columnId: string | number): void => {
 const openEditTaskDialog = (task: KanbanTaskDto): void => {
   dialogMode.value = 'edit'
   activeTask.value = task
-  let colId = task.columnId ?? (task as any).column_id
+  let colId = task.columnId
   if (colId == null) {
     const containingCol = localColumns.value.find(c => c.tasks.some(t => sameId(t.id, task.id)))
     if (containingCol) colId = containingCol.id
@@ -240,8 +243,8 @@ const handleCreateTask = async (
       title: payload.title,
       description: payload.description,
       priority: payload.priority,
-      tag_ids: payload.tag_ids,
-    } as any)
+      tagIds: payload.tagIds,
+    })
     notify.success('Task created.')
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
@@ -253,8 +256,8 @@ const handleCreateTask = async (
     }
     if (taskInCol && createdTask) {
       taskInCol.id = createdTask.id
-      if (createdTask.columnId != null || (createdTask as any).column_id != null) {
-        taskInCol.columnId = createdTask.columnId ?? (createdTask as any).column_id
+      if (createdTask.columnId != null) {
+        taskInCol.columnId = createdTask.columnId
       }
       if (createdTask.position !== undefined) {
         taskInCol.position = createdTask.position
@@ -305,7 +308,6 @@ const handleUpdateTask = async (
   taskId: string | number,
   payload: Omit<Partial<KanbanTaskDto>, 'columnId'> & {
     columnId?: string | number | null
-    tag_ids?: Array<string | number>
   },
 ): Promise<void> => {
   let sourceCol: KanbanColumnDto | undefined
@@ -329,7 +331,7 @@ const handleUpdateTask = async (
   const destinationColumnId =
     payload.columnId != null
       ? payload.columnId
-      : (targetTask.columnId ?? (targetTask as any)?.column_id ?? sourceCol.id)
+      : (targetTask.columnId ?? sourceCol.id)
   const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
   const destCol = isColumnChanged
     ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
@@ -363,8 +365,8 @@ const handleUpdateTask = async (
     if (payload.priority !== undefined) {
       updatePayload.priority = payload.priority
     }
-    if (payload.tag_ids !== undefined) {
-      updatePayload.tag_ids = payload.tag_ids
+    if (payload.tagIds !== undefined) {
+      updatePayload.tagIds = payload.tagIds
     }
 
     const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
@@ -372,8 +374,8 @@ const handleUpdateTask = async (
 
     if (isColumnChanged) {
       const movePromise = kanbanApi.moveTask(taskId, {
-        to_column_id: destCol.id,
-        target_position: targetPosition,
+        toColumnId: destCol.id,
+        targetPosition: targetPosition,
       })
       const [updateResult] = await Promise.all([updatePromise, movePromise])
       updated = updateResult
@@ -387,8 +389,8 @@ const handleUpdateTask = async (
       if (updated.position !== undefined) {
         targetTask.position = updated.position
       }
-      if (updated.columnId != null || (updated as any)?.column_id != null) {
-        targetTask.columnId = updated.columnId ?? (updated as any)?.column_id
+      if (updated.columnId != null) {
+        targetTask.columnId = updated.columnId
       }
     }
   } catch (err) {
@@ -443,7 +445,7 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       description: savePayload.description,
       priority: savePayload.priority,
       tags: savePayload.tags,
-      tag_ids: savePayload.tag_ids,
+      tagIds: savePayload.tagIds,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
     await handleUpdateTask(savePayload.taskId, {
@@ -451,9 +453,24 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       description: savePayload.description,
       priority: savePayload.priority,
       tags: savePayload.tags,
-      tag_ids: savePayload.tag_ids,
+      tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
     })
+    if (savePayload.timer) {
+      try {
+        const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
+        const targetTask = findTaskById(savePayload.taskId)
+        if (targetTask && updatedTimer) {
+          targetTask.timer = {
+            ...targetTask.timer,
+            ...updatedTimer,
+            taskId: savePayload.taskId,
+          }
+        }
+      } catch (err) {
+        notify.error(err, 'Unable to update timer configuration')
+      }
+    }
   }
 }
 
@@ -474,6 +491,159 @@ const handleCreateTag = async (payload: { name: string } | string): Promise<TagD
   }
 }
 
+const findTaskById = (taskId: string | number): KanbanTaskDto | undefined => {
+  for (const col of localColumns.value) {
+    const t = col.tasks.find(task => sameId(task.id, taskId))
+    if (t) return t
+  }
+  return undefined
+}
+
+const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task) return
+
+  const nowIso = new Date().toISOString()
+  const isResuming = task.timer?.state === 'PAUSED' && Boolean(task.timer?.startedAt)
+  const sessionStartedAt = isResuming ? task.timer!.startedAt : (defaultTimer?.startedAt || nowIso)
+
+  const updatedTimer: TaskTimerDto = {
+    taskId,
+    mode: defaultTimer?.mode || task.timer?.mode || 'COUNT_DOWN',
+    targetDurationSeconds: defaultTimer?.targetDurationSeconds ?? task.timer?.targetDurationSeconds ?? 1500,
+    state: 'RUNNING',
+    startedAt: sessionStartedAt,
+    lastResumedAt: nowIso,
+    lastPausedAt: null,
+    elapsedSeconds: task.timer?.elapsedSeconds || 0,
+  }
+
+  task.timer = { ...updatedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, updatedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to start timer')
+  }
+}
+
+const handlePauseTimer = async (taskId: string | number): Promise<void> => {
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+
+  const currentTimer = task.timer
+  const nowIso = new Date().toISOString()
+  let accumulated = currentTimer.elapsedSeconds || 0
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
+    accumulated += delta
+  }
+
+  const pausedTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'PAUSED',
+    startedAt: currentTimer.startedAt,
+    lastResumedAt: null,
+    lastPausedAt: nowIso,
+    elapsedSeconds: accumulated,
+  }
+
+  task.timer = { ...pausedTimer }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, pausedTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to pause timer')
+  }
+}
+
+const recentAlerts = new Map<string | number, number>()
+const recentlyStoppedTasks = new Map<string | number, number>()
+
+const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
+  const lastStopped = recentlyStoppedTasks.get(taskId) ?? 0
+  const now = Date.now()
+  if (now - lastStopped < 2000) {
+    return
+  }
+  recentlyStoppedTasks.set(taskId, now)
+
+  const task = findTaskById(taskId)
+  if (!task || !task.timer) return
+  if (task.timer.state === 'IDLE') return
+
+  const currentTimer = task.timer
+  let totalElapsed = currentTimer.elapsedSeconds || 0
+  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
+  if (currentTimer.state === 'RUNNING' && anchorTime) {
+    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
+    totalElapsed += delta
+  }
+
+  const idleTimer: TaskTimerDto = {
+    ...currentTimer,
+    state: 'IDLE',
+    startedAt: null,
+    lastResumedAt: null,
+    lastPausedAt: null,
+    elapsedSeconds: totalElapsed,
+  }
+
+  task.timer = {
+    ...idleTimer,
+    elapsedSeconds: 0,
+  }
+
+  if (entry) {
+    handleTimerExpired(task, entry)
+  }
+
+  try {
+    const persisted = await kanbanApi.updateTaskTimer(taskId, idleTimer)
+    if (persisted) {
+      task.timer = {
+        ...task.timer,
+        ...persisted,
+        taskId,
+      }
+    }
+  } catch (err) {
+    notify.error(err, 'Unable to stop timer')
+  }
+}
+
+const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
+  const lastAlertTime = recentAlerts.get(task.id) ?? 0
+  const now = Date.now()
+  if (now - lastAlertTime < 3000) {
+    return
+  }
+  recentAlerts.set(task.id, now)
+  notify.timerComplete(task.title)
+}
+
+const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
+  const task = activeTask.value
+  if (task) {
+    handleTimerExpired(task, entry)
+  }
+}
+
 provide(kanbanContextKey, {
   columns: columnRegistry,
   availableTags: computed(() => availableTags.value),
@@ -484,6 +654,10 @@ provide(kanbanContextKey, {
   createTask: handleCreateTask,
   updateTask: handleUpdateTask,
   deleteTask: handleDeleteTask,
+  startTimer: handleStartTimer,
+  pauseTimer: handlePauseTimer,
+  stopTimer: handleStopTimer,
+  onTimerExpired: handleTimerExpired,
 })
 
 defineExpose({
@@ -503,5 +677,9 @@ defineExpose({
   handleUpdateTask,
   handleDeleteTask,
   handleSaveTask,
+  handleStartTimer,
+  handlePauseTimer,
+  handleStopTimer,
+  handleTimerExpired,
 })
 </script>

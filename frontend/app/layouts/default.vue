@@ -8,6 +8,16 @@
         </div>
         <div class="flex items-center gap-4">
           <Tag value="v0.1.0-dev" severity="info" />
+          <Button
+            v-if="authStore.isAuthenticated || authStore.loggingOut"
+            data-testid="logout-button"
+            label="Log out"
+            icon="pi pi-sign-out"
+            severity="secondary"
+            :loading="authStore.loggingOut"
+            :disabled="authStore.loggingOut"
+            @click="authStore.logout()"
+          />
 
           <template v-if="authStore.isAuthenticated">
             <NuxtLink

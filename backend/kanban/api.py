@@ -1,11 +1,13 @@
+from datetime import timedelta
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.db.models import Prefetch, Max, Q, Exists, OuterRef
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 from ninja import Router
 from users.models import UserBlock
-from .models import Board, BoardColumn, Task, TaskTimeEntry, Tag
+from .models import Board, BoardColumn, Task, TaskTimer, TaskTimeEntry, Tag, TimerMode, TimerState
 from .schemas import (
     TaskIn, 
     TaskOut, 
@@ -19,6 +21,11 @@ from .schemas import (
     TaskMoveIn,
     TagIn,
     TagOut,
+    TaskTimerOut,
+    TaskTimerPatchIn,
+    TaskTimeEntryIn,
+    TaskTimeEntryUpdateIn,
+    TaskTimeEntryOut,
 )
 
 router = Router(tags=["Kanban"])
@@ -58,6 +65,56 @@ def get_accessible_boards(user):
         user_blocked_owner=False,
     ).distinct()
 
+def reconcile_expired_countdowns(user):
+    """
+    Find any RUNNING COUNT_DOWN timers belonging to user's boards that have expired,
+    commit TaskTimeEntry records capped at target_duration_seconds, and reset timers to IDLE.
+    """
+    now = timezone.now()
+    running_timers = TaskTimer.objects.select_related("task__column__board").filter(
+        task__column__board__owner=user,
+        state=TimerState.RUNNING,
+        mode=TimerMode.COUNT_DOWN,
+        started_at__isnull=False,
+    )
+    for timer in running_timers:
+        target = timer.target_duration_seconds or 0
+        elapsed_prior = timer.elapsed_seconds or 0
+        remaining = max(0, target - elapsed_prior)
+        anchor = timer.last_resumed_at or timer.started_at
+        if remaining > 0 and anchor and now >= anchor + timedelta(seconds=remaining):
+            with transaction.atomic():
+                ended_at = anchor + timedelta(seconds=remaining)
+                start_time = timer.started_at or (ended_at - timedelta(seconds=target))
+                duplicate = TaskTimeEntry.objects.filter(
+                    task=timer.task,
+                    created_at__gte=timezone.now() - timedelta(seconds=15),
+                ).exists() or TaskTimeEntry.objects.filter(
+                    task=timer.task,
+                    started_at__gte=start_time - timedelta(seconds=5),
+                    started_at__lte=start_time + timedelta(seconds=5),
+                ).exists()
+                if not duplicate:
+                    TaskTimeEntry.objects.create(
+                        task=timer.task,
+                        user=user,
+                        started_at=start_time,
+                        ended_at=ended_at,
+                        duration_seconds=target,
+                        note="Completed countdown session",
+                    )
+                timer.state = TimerState.IDLE
+                timer.started_at = None
+                timer.last_resumed_at = None
+                timer.last_paused_at = None
+                timer.elapsed_seconds = 0
+                timer.save()
+
+def get_board_queryset(user):
+    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
+    col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
+    return get_accessible_boards(user).prefetch_related(Prefetch("columns", queryset=col_qs))
+
 def get_owned_board(user, board_id: int) -> Board:
     """Retrieve a board owned by the authenticated user."""
     return get_object_or_404(
@@ -68,9 +125,7 @@ def get_owned_board(user, board_id: int) -> Board:
 def get_accessible_board(user, board_id: int) -> Board:
     """Retrieve a board owned by or shared with the user."""
     return get_object_or_404(
-        get_accessible_boards(user).prefetch_related(
-            "columns__tasks__tags"
-        ),
+        get_board_queryset(user),
         id=board_id,
     )
 
@@ -90,6 +145,25 @@ def get_accessible_task(user, task_id: int) -> Task:
             column__board__in=get_accessible_boards(user)
         ),
         id=task_id,
+    )
+
+def get_owned_task(user, task_id: int) -> Task:
+    """Retrieve a task belonging to the authenticated user."""
+    reconcile_expired_countdowns(user)
+    return get_object_or_404(
+        Task.objects.select_related("column__board", "timer").prefetch_related("time_entries").filter(
+            column__board__owner=user
+        ),
+        id=task_id,
+    )
+
+def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
+    """Retrieve a time entry belonging to the authenticated user's task."""
+    return get_object_or_404(
+        TaskTimeEntry.objects.select_related("task__column__board").filter(
+            task__column__board__owner=user
+        ),
+        id=entry_id
     )
 
 def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
@@ -119,9 +193,8 @@ def _reindex(items):
 @router.get("/boards", response=list[BoardOut])
 def list_boards(request):
     """List boards owned by or shared with the authenticated user."""
-    return get_accessible_boards(request.auth).prefetch_related(
-        "columns__tasks__tags"
-    )
+    reconcile_expired_countdowns(request.auth)
+    return get_board_queryset(request.auth)
 
 @router.post("/boards", response={201: BoardOut})
 def create_board(request, payload: BoardIn):
@@ -137,6 +210,7 @@ def create_board(request, payload: BoardIn):
 @router.get("/boards/{board_id}", response=BoardOut)
 def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
+    reconcile_expired_countdowns(request.auth)
     return get_accessible_board(request.auth, board_id)
 
 @router.patch("/boards/{board_id}", response=BoardOut)
@@ -327,6 +401,180 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
             _reindex(src_tasks)
         _reindex(dest_tasks)
     return task
+
+# ------------------
+# Timer Endpoints
+# ------------------
+
+@router.patch("/tasks/{task_id}/timer", response=TaskTimerOut)
+def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
+    """Configure or transition the execution state of a task's timer."""
+    task = get_owned_task(request.auth, task_id)
+    with transaction.atomic():
+        timer, _ = TaskTimer.objects.select_for_update().get_or_create(task=task)
+        data = payload.dict(exclude_unset=True)
+
+        new_state = data.get("state")
+        prev_state = timer.state
+        elapsed = data.get("elapsed_seconds")
+        if elapsed is None:
+            elapsed = timer.elapsed_seconds
+
+        # If transitioning to IDLE
+        if new_state == TimerState.IDLE:
+            if prev_state in (TimerState.RUNNING, TimerState.PAUSED):
+                total_duration = elapsed
+                if prev_state == TimerState.RUNNING:
+                    anchor = timer.last_resumed_at or timer.started_at
+                    if anchor:
+                        anchor_delta = int((timezone.now() - anchor).total_seconds())
+                        if anchor_delta > 0 and data.get("elapsed_seconds") is None:
+                            total_duration += anchor_delta
+                    end_time = timezone.now()
+                else:
+                    end_time = timer.last_paused_at or timezone.now()
+
+                if total_duration > 0:
+                    start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
+                    default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
+                    duplicate = TaskTimeEntry.objects.filter(
+                        task=task,
+                        created_at__gte=timezone.now() - timedelta(seconds=15),
+                    ).exists() or TaskTimeEntry.objects.filter(
+                        task=task,
+                        started_at__gte=start_time - timedelta(seconds=5),
+                        started_at__lte=start_time + timedelta(seconds=5),
+                    ).exists()
+                    if not duplicate:
+                        TaskTimeEntry.objects.create(
+                            task=task,
+                            user=request.auth,
+                            started_at=start_time,
+                            ended_at=end_time,
+                            duration_seconds=total_duration,
+                            note=default_note,
+                        )
+
+            # Reset ephemeral runtime fields
+            timer.state = TimerState.IDLE
+            timer.started_at = None
+            timer.last_resumed_at = None
+            timer.last_paused_at = None
+            timer.elapsed_seconds = 0
+            if "mode" in data and data["mode"] is not None:
+                timer.mode = data["mode"]
+            if "target_duration_seconds" in data:
+                timer.target_duration_seconds = data["target_duration_seconds"]
+            timer.save()
+            return timer
+
+        for field, value in data.items():
+            if field == "state":
+                timer.state = value
+            elif field == "mode":
+                if value is not None:
+                    timer.mode = value
+            elif field == "target_duration_seconds":
+                timer.target_duration_seconds = value
+            elif field == "started_at":
+                if value is not None or prev_state == TimerState.IDLE:
+                    timer.started_at = value
+            elif field == "last_resumed_at":
+                timer.last_resumed_at = value
+            elif field == "last_paused_at":
+                timer.last_paused_at = value
+            elif field == "elapsed_seconds":
+                if value is not None:
+                    timer.elapsed_seconds = value
+
+        if new_state == TimerState.RUNNING:
+            if not timer.started_at:
+                timer.started_at = timezone.now()
+            if not timer.last_resumed_at:
+                timer.last_resumed_at = timezone.now()
+            timer.last_paused_at = None
+        elif new_state == TimerState.PAUSED:
+            if prev_state == TimerState.RUNNING and data.get("elapsed_seconds") is None:
+                anchor = timer.last_resumed_at or timer.started_at
+                if anchor:
+                    delta = max(0, int((timezone.now() - anchor).total_seconds()))
+                    timer.elapsed_seconds += delta
+            timer.last_resumed_at = None
+            if not timer.last_paused_at:
+                timer.last_paused_at = timezone.now()
+
+        timer.save()
+        return timer
+
+# ------------------
+# Time Entry Endpoints
+# ------------------
+
+@router.get("/tasks/{task_id}/time-entries", response=list[TaskTimeEntryOut])
+def list_time_entries(request, task_id: int):
+    """List historical time entries recorded for a task."""
+    task = get_owned_task(request.auth, task_id)
+    return task.time_entries.all()
+
+@router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
+def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
+    """Manually log a past work session for a task."""
+    task = get_owned_task(request.auth, task_id)
+    data = payload.dict()
+    start = data["started_at"]
+    end = data.get("ended_at")
+    duration = data.get("duration_seconds", 0)
+
+    if end is not None and end < start:
+        raise HttpError(400, "End time cannot precede start time")
+
+    if end is None and duration > 0:
+        end = start + timedelta(seconds=duration)
+    elif end is not None and duration <= 0:
+        duration = max(0, int((end - start).total_seconds()))
+    elif end is not None and duration > int((end - start).total_seconds()):
+        raise HttpError(400, "Duration cannot exceed elapsed time range")
+
+    with transaction.atomic():
+        entry = TaskTimeEntry.objects.create(
+            task=task,
+            user=request.auth,
+            started_at=start,
+            ended_at=end,
+            duration_seconds=duration,
+            note=data.get("note", ""),
+        )
+    return 201, entry
+
+@router.patch("/time-entries/{entry_id}", response=TaskTimeEntryOut)
+def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
+    """Partially update a recorded time entry, enforcing duration_seconds <= ended_at - started_at."""
+    entry = get_owned_time_entry(request.auth, entry_id)
+    updates = payload.dict(exclude_unset=True)
+
+    with transaction.atomic():
+        start = updates.get("started_at", entry.started_at)
+        end = updates.get("ended_at", entry.ended_at)
+        duration = updates.get("duration_seconds", entry.duration_seconds)
+
+        if start and end:
+            if end < start:
+                raise HttpError(400, "End time cannot precede start time")
+            if duration is not None and duration > int((end - start).total_seconds()):
+                raise HttpError(400, "Duration cannot exceed elapsed time range")
+
+        for field, val in updates.items():
+            setattr(entry, field, val)
+
+        entry.save()
+    return entry
+
+@router.delete("/time-entries/{entry_id}")
+def delete_time_entry(request, entry_id: int):
+    """Delete a recorded work session."""
+    entry = get_owned_time_entry(request.auth, entry_id)
+    entry.delete()
+    return {"success": True}
 
 # ------------------
 # Tag Endpoints

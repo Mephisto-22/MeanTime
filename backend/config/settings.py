@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "ninja_jwt",
+    "ninja_jwt.token_blacklist",
     "users.apps.UsersConfig",
     "kanban",
 ]

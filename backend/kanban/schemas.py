@@ -1,7 +1,54 @@
 from __future__ import annotations
 from datetime import datetime
 from ninja import Schema
-from .models import TaskPriority
+from .models import TaskPriority, TimerMode, TimerState
+
+# Timer schemas
+class TaskTimerOut(Schema):
+    id: int
+    task_id: int
+    mode: TimerMode
+    target_duration_seconds: int | None = None
+    state: TimerState
+    started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
+    elapsed_seconds: int
+
+class TaskTimerPatchIn(Schema):
+    mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    state: TimerState | None = None
+    started_at: datetime | None = None
+    last_resumed_at: datetime | None = None
+    last_paused_at: datetime | None = None
+    elapsed_seconds: int | None = None
+
+# Time entry schemas
+class TaskTimeEntryIn(Schema):
+    """Payload expected when manually recording past work."""
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int = 0
+    note: str = ""
+
+class TaskTimeEntryUpdateIn(Schema):
+    """Payload expected when updating a recorded time entry."""
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    duration_seconds: int | None = None
+    note: str | None = None
+
+class TaskTimeEntryOut(Schema):
+    """Shape of recorded time entry returned to clients."""
+    id: int
+    task_id: int
+    user_id: int | None = None
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int
+    note: str
+    created_at: datetime
 
 # Task schemas
 class TaskIn(Schema):
@@ -20,8 +67,16 @@ class TaskOut(Schema):
     position: int
     column_id: int
     tags: list[TagOut]
+    timer: TaskTimerOut | None = None
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_timer(obj):
+        try:
+            return obj.timer
+        except Exception:
+            return None
 
 # Allows us to update only part of a task without having to send a full TaskIn Schema
 class TaskUpdateIn(Schema):
