@@ -14,29 +14,29 @@
       </p>
 
       <div class="flex flex-col gap-2">
-        <label for="share-board-select" class="text-sm font-medium text-surface-700 dark:text-surface-300">
+        <label for="share-board-select" class="text-sm font-medium">
           Select Board
         </label>
-        <select
+        <Select
           id="share-board-select"
-          v-model.number="selectedBoardId"
+          v-model="selectedBoardId"
           data-testid="board-select"
-          class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 p-2 text-sm text-surface-900 dark:text-surface-0 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          :options="eligibleBoards"
+          option-value="id"
+          option-label="title"
+          :placeholder="eligibleBoards.length > 0 ? 'Select a board to share...' : 'No available boards to share'"
+          :disabled="eligibleBoards.length === 0 || isLoading"
+          class="w-full"
+          size="small"
+        />
+        <Message
+          v-if="eligibleBoards.length === 0 && !isLoading"
+          severity="info"
+          :closable="false"
+          size="small"
         >
-          <option :value="null" disabled>
-            {{ eligibleBoards.length > 0 ? 'Select a board to share...' : 'No available boards to share' }}
-          </option>
-          <option
-            v-for="b in eligibleBoards"
-            :key="b.id"
-            :value="b.id"
-          >
-            {{ b.title }}
-          </option>
-        </select>
-        <p v-if="eligibleBoards.length === 0 && !isLoading" class="text-xs text-surface-500 dark:text-surface-400 mt-1">
           All your owned boards are already shared with this friend, or you haven't created any boards yet.
-        </p>
+        </Message>
       </div>
     </div>
 
@@ -132,7 +132,7 @@ onMounted(() => {
 })
 
 async function handleShare() {
-  if (!selectedBoardId.value || !props.friend) return
+  if (!props.friend || !selectedBoardId.value) return
   isSharing.value = true
   try {
     await kanbanApi.shareBoard(selectedBoardId.value, props.friend.id)

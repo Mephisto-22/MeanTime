@@ -40,6 +40,28 @@ const testBoard: KanbanBoardDto = {
   columns: [],
 }
 
+const SelectStub = {
+  name: 'Select',
+  props: ['modelValue', 'options', 'optionValue', 'optionLabel', 'disabled', 'placeholder'],
+  emits: ['update:modelValue'],
+  template: `
+    <select
+      :value="modelValue ?? ''"
+      :disabled="disabled"
+      @change="$emit('update:modelValue', $event.target.value === '' || $event.target.value === 'null' ? null : (Number($event.target.value) || $event.target.value))"
+    >
+      <option value="" disabled>{{ placeholder }}</option>
+      <option
+        v-for="o in options"
+        :key="optionValue ? o[optionValue] : (o.id ?? o.value)"
+        :value="optionValue ? o[optionValue] : (o.id ?? o.value)"
+      >
+        {{ optionLabel ? o[optionLabel] : (o.label ?? o.title) }}
+      </option>
+    </select>
+  `,
+}
+
 function mountShareDialog(props: { board?: KanbanBoardDto; visible?: boolean } = {}) {
   return mount(BoardShareDialog, {
     props: {
@@ -55,6 +77,7 @@ function mountShareDialog(props: { board?: KanbanBoardDto; visible?: boolean } =
           props: ['visible', 'header'],
           template: '<div v-if="visible" class="p-dialog" :data-header="header"><slot /><slot name="footer" /></div>',
         },
+        Select: SelectStub,
       },
     },
   })

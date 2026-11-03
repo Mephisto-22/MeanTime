@@ -10,27 +10,22 @@
     <div class="flex flex-col gap-5 py-2">
       <!-- Owner Invite Section -->
       <div v-if="isOwner" data-testid="invite-section" class="flex flex-col gap-2">
-        <label for="friend-share-select" class="text-sm font-medium text-surface-700 dark:text-surface-300">
+        <label for="friend-share-select" class="text-sm font-medium">
           Invite friends to collaborate
         </label>
         <div class="flex gap-2">
-          <select
+          <Select
             id="friend-share-select"
-            v-model.number="selectedFriendId"
+            v-model="selectedFriendId"
             data-testid="friend-select"
-            class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 p-2 text-sm text-surface-900 dark:text-surface-0 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option :value="null" disabled>
-              {{ availableFriends.length > 0 ? 'Select a friend...' : 'No new friends to invite' }}
-            </option>
-            <option
-              v-for="friend in availableFriends"
-              :key="friend.id"
-              :value="friend.id"
-            >
-              {{ friend.display_name }} ({{ friend.email }})
-            </option>
-          </select>
+            :options="availableFriends"
+            option-value="id"
+            option-label="label"
+            :placeholder="availableFriends.length > 0 ? 'Select a friend...' : 'No new friends to invite'"
+            :disabled="availableFriends.length === 0"
+            class="w-full"
+            size="small"
+          />
           <Button
             label="Invite"
             icon="pi pi-user-plus"
@@ -44,132 +39,135 @@
       </div>
 
       <!-- Non-owner Notice -->
-      <p
+      <Message
         v-else-if="!isOwner"
+        severity="info"
+        size="small"
+        :closable="false"
         data-testid="non-owner-invite-message"
-        class="text-xs text-surface-500 dark:text-surface-400"
       >
         Only the board owner can invite collaborators.
-      </p>
+      </Message>
 
       <!-- People with Access List -->
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2">
         <h4 class="text-sm font-semibold tracking-wide text-surface-700 dark:text-surface-300">
           People with access
         </h4>
 
-        <div class="flex flex-col divide-y divide-surface-200 dark:divide-surface-800 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-0 dark:bg-surface-900">
-          <!-- Board Owner Row -->
-          <div
-            v-if="board.owner"
-            data-testid="board-owner-row"
-            class="flex items-center justify-between p-3"
-          >
-            <div class="flex items-center gap-3">
-              <Avatar
-                :label="getInitials(board.owner.display_name, board.owner.email)"
-                shape="circle"
-                class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 text-xs font-bold"
-              />
-              <div class="flex flex-col">
-                <span class="text-sm font-medium text-surface-900 dark:text-surface-0">
-                  {{ board.owner.display_name }}
-                  <span v-if="authStore.user?.id === board.owner.id" class="text-xs text-surface-500 font-normal">(you)</span>
-                </span>
-                <span class="text-xs text-surface-500 dark:text-surface-400">
-                  {{ board.owner.email }}
-                </span>
-              </div>
-            </div>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
-              Owner
-            </span>
-          </div>
-
-          <!-- Collaborator Rows -->
-          <template v-if="board.collaborators && board.collaborators.length > 0">
+        <Card class="border border-surface-200 dark:border-surface-800 shadow-none" :pt="{ body: 'p-0', content: 'p-0' }">
+          <template #content>
+            <!-- Board Owner Row -->
             <div
-              v-for="collaborator in board.collaborators"
-              :key="collaborator.id"
-              :data-testid="'collaborator-row-' + collaborator.id"
-              class="flex items-center justify-between p-3"
+              v-if="board.owner"
+              data-testid="board-owner-row"
+              class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800"
             >
               <div class="flex items-center gap-3">
                 <Avatar
-                  :label="getInitials(collaborator.display_name, collaborator.email)"
+                  :label="getInitials(board.owner.display_name, board.owner.email)"
                   shape="circle"
-                  class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 text-xs font-bold"
+                  class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 text-xs font-bold"
                 />
                 <div class="flex flex-col">
-                  <span class="text-sm font-medium text-surface-900 dark:text-surface-0">
-                    {{ collaborator.display_name }}
-                    <span v-if="authStore.user?.id === collaborator.id" class="text-xs text-surface-500 font-normal">(you)</span>
+                  <span class="text-sm font-medium">
+                    {{ board.owner.display_name }}
+                    <span v-if="authStore.user?.id === board.owner.id" class="text-xs text-surface-500 font-normal">(you)</span>
                   </span>
-                  <span class="text-xs text-surface-500 dark:text-surface-400">
-                    {{ collaborator.email }}
+                  <span class="text-xs text-surface-500">
+                    {{ board.owner.email }}
                   </span>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300">
-                  Editor
-                </span>
-                <Button
-                  v-if="isOwner"
-                  :data-testid="'remove-collaborator-' + collaborator.id"
-                  icon="pi pi-times"
-                  text
-                  rounded
-                  severity="danger"
-                  size="small"
-                  aria-label="Remove collaborator"
-                  :disabled="isRemovingId === collaborator.id"
-                  :loading="isRemovingId === collaborator.id"
-                  @click="handleRemoveCollaborator(collaborator)"
-                />
+              <Tag value="Owner" severity="info" />
+            </div>
+
+            <!-- Collaborator Rows -->
+            <template v-if="board.collaborators && board.collaborators.length > 0">
+              <div
+                v-for="collaborator in board.collaborators"
+                :key="collaborator.id"
+                :data-testid="'collaborator-row-' + collaborator.id"
+                class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
+              >
+                <div class="flex items-center gap-3">
+                  <Avatar
+                    :label="getInitials(collaborator.display_name, collaborator.email)"
+                    shape="circle"
+                    class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 text-xs font-bold"
+                  />
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium">
+                      {{ collaborator.display_name }}
+                      <span v-if="authStore.user?.id === collaborator.id" class="text-xs text-surface-500 font-normal">(you)</span>
+                    </span>
+                    <span class="text-xs text-surface-500">
+                      {{ collaborator.email }}
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Tag value="Editor" severity="secondary" />
+                  <Button
+                    v-if="isOwner"
+                    :data-testid="'remove-collaborator-' + collaborator.id"
+                    icon="pi pi-times"
+                    text
+                    rounded
+                    severity="danger"
+                    size="small"
+                    aria-label="Remove collaborator"
+                    :disabled="isRemovingId === collaborator.id"
+                    :loading="isRemovingId === collaborator.id"
+                    @click="handleRemoveCollaborator(collaborator)"
+                  />
+                </div>
               </div>
+            </template>
+
+            <div
+              v-else
+              data-testid="no-collaborators-message"
+              class="p-4 text-center text-xs text-surface-500"
+            >
+              No collaborators yet. Invite friends above to work together.
             </div>
           </template>
-
-          <div
-            v-else
-            data-testid="no-collaborators-message"
-            class="p-4 text-center text-xs text-surface-500 dark:text-surface-400"
-          >
-            No collaborators yet. Invite friends above to work together.
-          </div>
-        </div>
+        </Card>
       </div>
 
       <!-- Leave Board Confirmation Banner (Collaborators only) -->
-      <div
+      <Message
         v-if="isConfirmingLeave"
+        severity="error"
+        :closable="false"
         data-testid="leave-board-confirmation"
-        class="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30"
       >
-        <p class="text-sm font-medium text-red-900 dark:text-red-200">
-          Are you sure you want to leave "{{ board.title }}"? You will lose access to all tasks and columns.
-        </p>
-        <div class="mt-3 flex justify-end gap-2">
-          <Button
-            data-testid="cancel-leave-button"
-            label="Cancel"
-            text
-            severity="secondary"
-            size="small"
-            :disabled="isLeaving"
-            @click="isConfirmingLeave = false"
-          />
-          <Button
-            data-testid="confirm-leave-button"
-            label="Leave board"
-            severity="danger"
-            size="small"
-            :loading="isLeaving"
-            @click="handleConfirmLeave"
-          />
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-medium">
+            Are you sure you want to leave "{{ board.title }}"? You will lose access to all tasks and columns.
+          </span>
+          <div class="flex justify-end gap-2">
+            <Button
+              data-testid="cancel-leave-button"
+              label="Cancel"
+              text
+              severity="secondary"
+              size="small"
+              :disabled="isLeaving"
+              @click="isConfirmingLeave = false"
+            />
+            <Button
+              data-testid="confirm-leave-button"
+              label="Leave board"
+              severity="danger"
+              size="small"
+              :loading="isLeaving"
+              @click="handleConfirmLeave"
+            />
+          </div>
         </div>
-      </div>
+      </Message>
     </div>
 
     <template #footer>
@@ -238,7 +236,12 @@ const isCollaborator = computed(() => {
 const availableFriends = computed(() => {
   const ownerId = props.board?.owner?.id
   const collaboratorIds = new Set(props.board?.collaborators?.map(c => c.id) || [])
-  return friends.value.filter(f => f.id !== ownerId && !collaboratorIds.has(f.id))
+  return friends.value
+    .filter(f => f.id !== ownerId && !collaboratorIds.has(f.id))
+    .map(f => ({
+      ...f,
+      label: `${f.display_name} (${f.email})`,
+    }))
 })
 
 async function loadFriends() {
