@@ -41,6 +41,7 @@
 <script setup lang="ts">
 import { requiredText, validEmail, validPassword } from '~/utils/validation'
 import { authApi, type PasswordRequirement, type RegistrationRequest } from '~/api/auth'
+import { getClientTimezone } from '~/utils/timezone'
 
 const props = defineProps<{ loading?: boolean }>()
 const displayName = ref('')
@@ -108,6 +109,6 @@ onBeforeUnmount(() => { clearTimeout(timer); requestId++ })
 function submit() {
   if (props.loading || !canSubmit.value) return
   // Confirmation is a local check; preserve the backend registration contract.
-  emit('submit', { display_name: displayName.value.trim(), email: email.value.trim(), password: password.value })
+  emit('submit', { display_name: displayName.value.trim(), email: email.value.trim(), password: password.value, timezone: getClientTimezone() })
 }
 </script>
