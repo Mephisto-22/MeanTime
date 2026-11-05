@@ -1,13 +1,19 @@
 <template>
-  <div class="mx-auto max-w-md px-6 py-8">
-    <Card>
-      <template #title><h2 class="text-2xl font-bold">Signing in with Google</h2></template>
+  <div class="mx-auto w-full max-w-md px-4 py-8">
+    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+      <template #title>
+        <h2 class="text-2xl font-bold tracking-tight">Signing in with Google</h2>
+      </template>
       <template #content>
-        <p v-if="!error" role="status">Signing you in...</p>
-        <template v-else>
-          <p role="alert">{{ error }}</p>
-          <NuxtLink to="/login" class="mt-4 block text-primary underline">Back to login</NuxtLink>
-        </template>
+        <div class="flex flex-col gap-4">
+          <Message v-if="!error" severity="info" role="status">Signing you in...</Message>
+          <template v-else>
+            <Message severity="error" role="alert">{{ error }}</Message>
+            <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
+              <NuxtLink to="/login" class="text-primary hover:underline">Back to login</NuxtLink>
+            </div>
+          </template>
+        </div>
       </template>
     </Card>
   </div>

@@ -8,7 +8,7 @@
       <Label for="reset-password-confirm">Confirm new password</Label>
       <InputText id="reset-password-confirm" v-model="passwordConfirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required />
     </div>
-    <p v-if="mismatch" role="alert">Passwords do not match.</p>
+    <Message v-if="mismatch" severity="error" role="alert">Passwords do not match.</Message>
     <Button type="submit" label="Reset password" :loading="loading" :disabled="loading" />
   </form>
 </template>
