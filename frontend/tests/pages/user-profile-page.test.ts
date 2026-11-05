@@ -125,12 +125,10 @@ describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
     await wrapper.find('[data-testid="save-profile-button"]').trigger('click')
     await flushPromises()
 
-    // SaveConfirmDialog should be open
-    const saveDialog = wrapper.findComponent({ name: 'SaveConfirmDialog' })
-    expect(saveDialog.props('visible')).toBe(true)
-
-    // Confirm save
-    await saveDialog.vm.$emit('confirm')
+    // SaveConfirmDialog is open; click confirm button in rendered DOM
+    const confirmSaveBtn = document.body.querySelector('[data-testid="save-confirm-save-button"]') as HTMLButtonElement
+    expect(confirmSaveBtn).not.toBeNull()
+    confirmSaveBtn.click()
     await flushPromises()
 
     expect(updateSpy).toHaveBeenCalledWith({
@@ -168,5 +166,8 @@ describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
 
     const deleteDialog = wrapper.findComponent({ name: 'DeleteAccountDialog' })
     expect(deleteDialog.props('visible')).toBe(true)
+
+    const confirmDeleteBtn = document.body.querySelector('[data-testid="delete-confirm-button"]') as HTMLButtonElement
+    expect(confirmDeleteBtn).not.toBeNull()
   })
 })

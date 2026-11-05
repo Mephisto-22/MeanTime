@@ -37,7 +37,7 @@
       <div class="flex flex-col gap-4 text-sm text-surface-700 dark:text-surface-300">
         <!-- Username / Email (Read-Only: No Edit Button) -->
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label class="font-medium text-surface-700 dark:text-surface-300 sm:w-1/3">Username / Email</label>
+          <label class="font-medium sm:w-1/3">Username / Email</label>
           <div class="flex flex-1 items-center justify-between gap-4">
             <span data-testid="field-email" class="font-medium text-surface-900 dark:text-surface-0">{{ currentUser?.email || 'N/A' }}</span>
             <Tag value="Read-only" severity="secondary" />
@@ -51,7 +51,7 @@
       <div class="flex flex-col gap-4 text-sm text-surface-700 dark:text-surface-300">
         <!-- Display Name (Editable) -->
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label for="input-display-name" class="font-medium text-surface-700 dark:text-surface-300 sm:w-1/3">Display Name</label>
+          <label for="input-display-name" class="font-medium sm:w-1/3">Display Name</label>
           <div class="flex flex-1 items-center justify-between gap-4">
             <div class="flex-1">
               <InputText
@@ -80,7 +80,7 @@
 
         <!-- Timezone (Editable) -->
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label for="input-timezone" class="font-medium text-surface-700 dark:text-surface-300 sm:w-1/3">Timezone</label>
+          <label for="input-timezone" class="font-medium sm:w-1/3">Timezone</label>
           <div class="flex flex-1 items-center justify-between gap-4">
             <div class="flex-1">
               <InputText
@@ -128,7 +128,7 @@
       <div class="flex flex-col gap-4 text-sm text-surface-700 dark:text-surface-300">
         <!-- Password (Has Edit Button, but No-Op) -->
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label class="font-medium text-surface-700 dark:text-surface-300 sm:w-1/3">Password</label>
+          <label class="font-medium sm:w-1/3">Password</label>
           <div class="flex flex-1 items-center justify-between gap-4">
             <span data-testid="field-password" class="tracking-widest font-mono text-surface-900 dark:text-surface-0">••••••••</span>
             <Button

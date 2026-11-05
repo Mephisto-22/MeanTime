@@ -47,25 +47,23 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end gap-2">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          text
-          data-testid="delete-cancel-button"
-          :disabled="loading"
-          @click="handleCancel"
-        />
-        <Button
-          type="button"
-          label="Confirm Delete"
-          severity="danger"
-          data-testid="delete-confirm-button"
-          :loading="loading"
-          @click="handleConfirm"
-        />
-      </div>
+      <Button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        text
+        data-testid="delete-cancel-button"
+        :disabled="loading"
+        @click="handleCancel"
+      />
+      <Button
+        type="button"
+        label="Confirm Delete"
+        severity="danger"
+        data-testid="delete-confirm-button"
+        :loading="loading"
+        @click="handleConfirm"
+      />
     </template>
   </Dialog>
 </template>

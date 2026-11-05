@@ -14,24 +14,22 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end gap-2">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          text
-          data-testid="save-confirm-cancel-button"
-          :disabled="loading"
-          @click="visible = false"
-        />
-        <Button
-          type="button"
-          label="Save"
-          data-testid="save-confirm-save-button"
-          :loading="loading"
-          @click="emit('confirm')"
-        />
-      </div>
+      <Button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        text
+        data-testid="save-confirm-cancel-button"
+        :disabled="loading"
+        @click="visible = false"
+      />
+      <Button
+        type="button"
+        label="Save"
+        data-testid="save-confirm-save-button"
+        :loading="loading"
+        @click="emit('confirm')"
+      />
     </template>
   </Dialog>
 </template>
