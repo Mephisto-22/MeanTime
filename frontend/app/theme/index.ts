@@ -7,9 +7,10 @@ import { definePreset } from '@primeuix/themes'
  * Visual Identity:
  * - Domain: Engineering-grade time-tracking and Kanban board.
  * - Base Palette:
- *   - Obsidian Canvas Void (#090D16) for dark canvas depth
- *   - Elevated Slate Surface (#0F172A / #1E293B) for headers, cards, and modal panels
- *   - Precision Cobalt Blue (#3B82F6 in dark / #2563EB in light) primary interactive accent
+ *   - Rich Black Void (#09090B) for deep canvas grounding without navy/blue color cast
+ *   - Monochromatic Graphite & Charcoal Surfaces (#18181B / #27272A / #3F3F46) for elevated containers, cards, and borders
+ *   - Pure White (#FFFFFF) & Crisp Light Greys (#FAFAFA / #F4F4F5 / #D4D4D8) for high-contrast typography
+ *   - Precision Cobalt Blue (#3B82F6 in dark / #2563EB in light) as a prominent, vibrant chromatic accent
  *   - Active Chronicle Emerald (#10B981) for running timer states
  *   - Cadence Amber (#F59E0B) for pending friend requests and paused timers
  * - Central Semantic Tokens:
@@ -50,17 +51,17 @@ export const MeanTimePreset = definePreset(Aura, {
       light: {
         surface: {
           0: '#ffffff',
-          50: '{slate.50}',
-          100: '{slate.100}',
-          200: '{slate.200}',
-          300: '{slate.300}',
-          400: '{slate.400}',
-          500: '{slate.500}',
-          600: '{slate.600}',
-          700: '{slate.700}',
-          800: '{slate.800}',
-          900: '{slate.900}',
-          950: '{slate.950}',
+          50: '{zinc.50}',
+          100: '{zinc.100}',
+          200: '{zinc.200}',
+          300: '{zinc.300}',
+          400: '{zinc.400}',
+          500: '{zinc.500}',
+          600: '{zinc.600}',
+          700: '{zinc.700}',
+          800: '{zinc.800}',
+          900: '{zinc.900}',
+          950: '{zinc.950}',
         },
         primary: {
           color: '{primary.600}',
@@ -86,17 +87,17 @@ export const MeanTimePreset = definePreset(Aura, {
       dark: {
         surface: {
           0: '#ffffff',
-          50: '{slate.50}',
-          100: '{slate.100}',
-          200: '{slate.200}',
-          300: '{slate.300}',
-          400: '{slate.400}',
-          500: '{slate.500}',
-          600: '{slate.600}',
-          700: '{slate.700}',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#090d16',
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+          950: '#09090b',
         },
         primary: {
           color: '{primary.500}',
@@ -107,14 +108,14 @@ export const MeanTimePreset = definePreset(Aura, {
         content: {
           background: '{surface.900}',
           hoverBackground: '{surface.800}',
-          borderColor: '#1e293b',
+          borderColor: '{surface.800}',
           color: '{text.color}',
           hoverColor: '{text.hover.color}',
         },
         formField: {
           background: '{surface.950}',
-          borderColor: '#334155',
-          hoverBorderColor: '#475569',
+          borderColor: '{surface.700}',
+          hoverBorderColor: '{surface.600}',
           focusBorderColor: '{primary.color}',
           color: '{surface.0}',
         },

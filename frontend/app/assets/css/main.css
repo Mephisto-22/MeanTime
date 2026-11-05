@@ -9,7 +9,7 @@
   @tailwind utilities;
 }
 
-/* Base Theme Tokens: Precision Blue & High-Contrast Obsidian/Slate Surfaces */
+/* Base Theme Tokens: Precision Blue Accent & Monochromatic Grey/Black Void */
 :root,
 .dark {
   --p-primary-50: #eff6ff;
@@ -26,29 +26,29 @@
   --p-primary-color: #3b82f6;
   --p-primary-contrast-color: #ffffff;
   --p-primary-hover-color: #60a5fa;
-  --p-primary-active-color: #93c5fd;
+  --p-primary-active-color: #2563eb;
 
   --p-surface-0: #ffffff;
-  --p-surface-50: #f8fafc;
-  --p-surface-100: #f1f5f9;
-  --p-surface-200: #e2e8f0;
-  --p-surface-300: #cbd5e1;
-  --p-surface-400: #94a3b8;
-  --p-surface-500: #64748b;
-  --p-surface-600: #475569;
-  --p-surface-700: #334155;
-  --p-surface-800: #1e293b;
-  --p-surface-900: #0f172a;
-  --p-surface-950: #090d16;
+  --p-surface-50: #fafafa;
+  --p-surface-100: #f4f4f5;
+  --p-surface-200: #e4e4e7;
+  --p-surface-300: #d4d4d8;
+  --p-surface-400: #a1a1aa;
+  --p-surface-500: #71717a;
+  --p-surface-600: #52525b;
+  --p-surface-700: #3f3f46;
+  --p-surface-800: #27272a;
+  --p-surface-900: #18181b;
+  --p-surface-950: #09090b;
 
-  --p-content-background: #0f172a;
-  --p-content-hover-background: #1e293b;
-  --p-content-border-color: #1e293b;
-  --p-content-color: #f8fafc;
-  --p-text-color: #f8fafc;
-  --p-text-muted-color: #94a3b8;
+  --p-content-background: #18181b;
+  --p-content-hover-background: #27272a;
+  --p-content-border-color: #27272a;
+  --p-content-color: #ffffff;
+  --p-text-color: #ffffff;
+  --p-text-muted-color: #a1a1aa;
   --p-text-hover-color: #ffffff;
-  --p-text-hover-muted-color: #cbd5e1;
+  --p-text-hover-muted-color: #d4d4d8;
 }
 
 /* Kanban Drag and Drop Styles */
@@ -127,6 +127,11 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+}
+
+/* Subtle border on Card components for depth against black canvas */
+.p-card {
+  border: 1px solid var(--p-surface-800);
 }
 
 /* Scrollbar Styling for Dark Theme */
