@@ -23,8 +23,8 @@
       <template #content>
         <div class="flex flex-col gap-3.5">
           <!-- Row 1: Username / Email (Read-Only) -->
-          <div class="profile-field-row">
-            <div class="profile-field-meta">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
               <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Username / Email</span>
               <span class="text-xs text-surface-500 dark:text-surface-400">Primary account identifier</span>
             </div>
@@ -39,8 +39,8 @@
           <Divider />
 
           <!-- Row 2: Display Name (Editable) -->
-          <div class="profile-field-row">
-            <div class="profile-field-meta">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
               <label for="input-display-name" class="text-sm font-medium text-surface-900 dark:text-surface-100">Display Name</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Public name on boards and tasks</span>
             </div>
@@ -74,8 +74,8 @@
           <Divider />
 
           <!-- Row 3: Timezone (Editable) -->
-          <div class="profile-field-row">
-            <div class="profile-field-meta">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
               <label for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Used for timer logs and daily summaries</span>
             </div>
@@ -109,8 +109,8 @@
           <Divider />
 
           <!-- Row 4: Password (Read-only representation with edit action) -->
-          <div class="profile-field-row">
-            <div class="profile-field-meta">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
               <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Password</span>
               <span class="text-xs text-surface-500 dark:text-surface-400">Account login credentials</span>
             </div>
@@ -154,24 +154,31 @@
     </Card>
 
     <!-- Danger Zone: Delete Account -->
-    <div class="danger-zone-card">
-      <div class="flex flex-col gap-0.5">
-        <span class="text-sm font-semibold text-red-700 dark:text-red-400">Delete Account</span>
-        <p class="text-xs text-surface-600 dark:text-surface-400">
-          Deactivate your user account and revoke active sessions. This action cannot be undone.
-        </p>
-      </div>
-      <Button
-        data-testid="delete-account-button"
-        label="Delete Account"
-        severity="danger"
-        variant="outlined"
-        size="small"
-        icon="pi pi-trash"
-        class="shrink-0"
-        @click="openDeleteDialog"
-      />
-    </div>
+    <Card
+      class="border border-red-200 bg-red-50/30 dark:border-red-950/80 dark:bg-red-950/20 shadow-none"
+      :pt="{ body: 'p-4', content: 'p-0' }"
+    >
+      <template #content>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex flex-col gap-0.5">
+            <span class="text-sm font-semibold text-red-700 dark:text-red-400">Delete Account</span>
+            <p class="text-xs text-surface-600 dark:text-surface-400">
+              Deactivate your user account and revoke active sessions. This action cannot be undone.
+            </p>
+          </div>
+          <Button
+            data-testid="delete-account-button"
+            label="Delete Account"
+            severity="danger"
+            variant="outlined"
+            size="small"
+            icon="pi pi-trash"
+            class="shrink-0"
+            @click="openDeleteDialog"
+          />
+        </div>
+      </template>
+    </Card>
 
     <!-- Confirmation Modal for Saving Changes -->
     <SaveConfirmDialog
@@ -306,3 +313,4 @@ async function deleteAccount(password: string) {
   }
 }
 </script>
+

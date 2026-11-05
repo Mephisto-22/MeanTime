@@ -3,7 +3,7 @@
     data-testid="kanban-task"
     :data-task-id="task.id"
     :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="cursor-grab active:cursor-grabbing select-none border border-surface-200 dark:border-surface-800 rounded-xl overflow-hidden"
+    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm"
     :class="priorityBorderClass"
     @click="handleClick"
     @pointerdown="handlePointerDown"
@@ -39,7 +39,7 @@
           <span
             v-if="task.priority"
             data-testid="task-priority-indicator"
-            class="kanban-priority-pip"
+            class="kanban-priority-pip inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
             :class="priorityBadgeClass"
           >
             <span
@@ -60,7 +60,7 @@
               v-for="tag in visibleTags"
               :key="tag.id"
               data-testid="task-tag-chip"
-              class="kanban-tag-chip"
+              class="kanban-tag-chip inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
             >
               <span class="text-surface-400">&bull;</span>
               {{ tag.name }}
@@ -68,7 +68,7 @@
             <span
               v-if="overflowTagCount > 0"
               data-testid="task-tag-overflow-badge"
-              class="kanban-tag-overflow"
+              class="kanban-tag-overflow inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
             >
               +{{ overflowTagCount }}
             </span>
@@ -190,3 +190,4 @@ defineExpose({
   handleTimerStop,
 })
 </script>
+

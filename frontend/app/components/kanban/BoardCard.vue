@@ -1,18 +1,18 @@
 <template>
   <Card
     data-testid="board-card"
-    class="group board-card"
+    class="group relative flex flex-col justify-between h-full rounded-2xl border border-surface-200 dark:border-surface-800 bg-surface-0 dark:bg-surface-900 transition-colors hover:border-primary-400 dark:hover:border-primary-600 focus-within:ring-2 focus-within:ring-primary overflow-hidden"
     :pt="{ body: 'flex flex-col justify-between h-full p-5 gap-4 pt-6', content: 'flex-1 flex flex-col justify-between p-0 gap-4' }"
   >
     <template #header>
       <!-- Top Primary Accent Strip -->
-      <div class="h-1 w-full bg-primary" />
+      <div class="h-1 bg-primary" />
     </template>
     <template #title>
-      <div class="flex items-start justify-between gap-3">
+      <div class="flex justify-between gap-3">
         <NuxtLink
           :to="`/boards/${board.id}`"
-          class="board-card-title-link"
+          class="min-w-0 truncate text-lg font-bold tracking-tight text-surface-900 dark:text-surface-0 group-hover:text-primary outline-none transition-colors after:absolute after:inset-0 after:content-['']"
         >
           {{ board.title }}
         </NuxtLink>
@@ -36,7 +36,7 @@
 
         <!-- Live Timer Running Pill (if any task on this board has a running timer) -->
         <div v-if="activeTimerCount > 0">
-          <span class="board-timer-pill">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
             <span class="h-2 w-2 rounded-full bg-emerald-500" />
             {{ activeTimerCount }} timer{{ activeTimerCount > 1 ? 's' : '' }} running
           </span>
@@ -49,7 +49,7 @@
             <span
               v-for="col in board.columns.slice(0, 3)"
               :key="col.id"
-              class="board-col-chip"
+              class="inline-flex items-center gap-1.5 rounded-md bg-surface-100 dark:bg-surface-800/80 px-2 py-0.5 text-[11px] font-medium text-surface-700 dark:text-surface-300 truncate max-w-[120px]"
             >
               <span class="h-1.5 w-1.5 rounded-full shrink-0" :class="col.tasks?.length ? 'bg-primary' : 'bg-surface-400'" />
               <span class="truncate">{{ col.title }}</span>
@@ -67,7 +67,7 @@
           <!-- Collaborators preview if available -->
           <div
             v-if="board.collaborators && board.collaborators.length > 0"
-            class="flex -space-x-1.5 overflow-hidden shrink-0"
+            class="avatar-stack shrink-0"
           >
             <Avatar
               v-for="c in board.collaborators.slice(0, 3)"
@@ -109,16 +109,10 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const totalTaskCount = computed(() => {
-  return (props.board.columns || []).reduce(
-    (acc, col) => acc + (col.tasks?.length || 0),
-    0,
-  );
-});
-
 const activeTimerCount = computed(() => {
   return (props.board.columns || []).reduce((acc, col) => {
     return acc + (col.tasks || []).filter(t => t.timer && t.timer.state === 'RUNNING').length;
   }, 0);
 });
 </script>
+

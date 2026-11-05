@@ -60,10 +60,10 @@
     <Panel
       v-else-if="boards.length === 0"
       data-testid="boards-empty"
-      class="empty-panel-card"
+      class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
     >
       <div class="flex flex-col items-center justify-center gap-5 py-20 text-center">
-        <div class="empty-icon-card">
+        <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50 shadow-sm">
           <i class="pi pi-th-large text-4xl" />
         </div>
         <div class="flex flex-col gap-1.5 max-w-sm">
@@ -77,7 +77,6 @@
         <Button
           label="New board"
           icon="pi pi-plus"
-          class="mt-2"
           @click="openCreateDialog"
         />
       </div>
@@ -143,3 +142,4 @@ watch(error, value => {
   if (value) notify.error(value, 'Unable to load boards');
 }, {immediate: true});
 </script>
+

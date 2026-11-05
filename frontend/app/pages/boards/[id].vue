@@ -50,7 +50,7 @@
           <div
             v-if="board.collaborators && board.collaborators.length > 0"
             data-testid="collaborators-preview"
-            class="flex -space-x-2 overflow-hidden"
+            class="avatar-stack"
           >
             <Avatar
               v-for="c in board.collaborators.slice(0, 3)"

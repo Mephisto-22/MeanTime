@@ -24,7 +24,7 @@
           :aria-describedby="isSaveDisabled ? 'task-title-error' : undefined"
           fluid
           placeholder="Task title..."
-          class="task-title-input border-0"
+          class="text-xl font-bold tracking-tight border-b border-surface-200/90 rounded-none px-0 py-2 focus:ring-0 focus:border-primary-500 dark:border-surface-700 bg-transparent placeholder-surface-400 border-0"
         />
         <small v-if="isSaveDisabled" id="task-title-error" class="field-error-text">Enter a title for the task.</small>
       </div>
@@ -35,7 +35,7 @@
         <div class="flex flex-col gap-3 md:col-span-5">
           <!-- Column Selector / Badge -->
           <div class="flex flex-col gap-1">
-            <Label for="task-column-select" class="property-section-label">
+            <Label for="task-column-select" class="text-xs font-semibold text-surface-500 dark:text-surface-400">
               Column
             </Label>
             <div v-if="mode === 'edit'">
@@ -54,7 +54,7 @@
             <div
               v-else
               data-testid="task-column-badge"
-              class="task-column-badge"
+              class="flex items-center h-8 px-2.5 rounded border border-surface-200 bg-surface-50 text-xs font-medium text-surface-600 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
             >
               <i class="pi pi-bars text-[10px] mr-1.5 opacity-60" />
               {{ currentColumnTitle }}
@@ -63,7 +63,7 @@
 
           <!-- Priority Selector (Stacked directly below Column) -->
           <div class="flex flex-col gap-1">
-            <Label for="task-priority-select" class="property-section-label">
+            <Label for="task-priority-select" class="text-xs font-semibold text-surface-500 dark:text-surface-400">
               Priority
             </Label>
             <Select
@@ -97,7 +97,7 @@
         <!-- Right: Tags Management (Static Add Tag on left, Tags populate right, In-Layout Suggestions below) (7 cols) -->
         <div class="flex flex-col gap-1.5 md:col-span-7 md:border-l md:border-surface-200/70 md:pl-5 dark:md:border-surface-800">
           <div class="flex items-center justify-between">
-            <Label class="property-section-label">
+            <Label class="text-xs font-semibold text-surface-500 dark:text-surface-400">
               Tags
             </Label>
             <span class="text-[11px] text-surface-400">
@@ -116,7 +116,7 @@
                 maxlength="50"
                 placeholder="+ add tag..."
                 data-testid="task-tag-input"
-                class="tag-input-box"
+                class="!h-6 !w-24 rounded-full border border-dashed border-surface-300 bg-transparent px-2.5 text-[11px] text-surface-800 placeholder-surface-400 focus:!w-36 focus:border-primary-500 focus:outline-none dark:border-surface-600 dark:text-surface-200"
                 @keydown.enter.prevent="addTagFromInput"
               />
             </div>
@@ -126,7 +126,7 @@
               v-for="tag in attachedTags"
               :key="tag.id"
               data-testid="task-attached-tag"
-              class="tag-attached-chip"
+              class="inline-flex items-center gap-1 rounded-full border border-surface-200 bg-surface-100/80 px-2.5 py-0.5 text-[11px] font-medium text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
             >
               {{ tag.name }}
               <Button
@@ -166,7 +166,7 @@
                 type="button"
                 data-testid="task-tag-suggestion"
                 unstyled
-                class="tag-suggestion-chip"
+                class="inline-flex items-center rounded-full border border-dashed border-surface-300/90 bg-surface-50/70 px-2.5 py-0.5 text-[11px] font-medium text-surface-600 hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800/70 dark:text-surface-300 dark:hover:border-primary-400 dark:hover:bg-primary-950/40 dark:hover:text-primary-300 cursor-pointer"
                 @click="attachExistingTag(tag)"
               >
                 + {{ tag.name }}
@@ -181,7 +181,7 @@
 
       <!-- Description Textarea -->
       <div class="flex flex-col gap-1.5">
-        <Label for="task-description-input" class="property-section-label">
+        <Label for="task-description-input" class="text-xs font-semibold text-surface-500 dark:text-surface-400">
           Notes & Description
         </Label>
         <Textarea
@@ -587,3 +587,4 @@ defineExpose({
   timeEntriesState,
 })
 </script>
+

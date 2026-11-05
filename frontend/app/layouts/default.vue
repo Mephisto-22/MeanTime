@@ -2,12 +2,12 @@
   <div class="flex min-h-screen flex-col">
     <header class="border-b border-surface bg-[var(--p-content-background)] px-6 py-3.5 shadow-sm">
       <div class="mx-auto max-w-7xl">
-        <Menubar :model="menuItems" class="border-none bg-transparent p-0">
+        <Menubar :model="menuItems" class="border-none bg-transparent p-0 gap-6">
           <template #start>
             <NuxtLink
               to="/"
               data-testid="brand-link"
-              class="mr-6 flex items-center gap-3 no-underline"
+              class="flex items-center gap-3 no-underline"
               aria-label="MeanTime Home"
             >
               <i class="pi pi-clock text-2xl text-primary" />

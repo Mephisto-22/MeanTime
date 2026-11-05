@@ -2,7 +2,7 @@
   <div
     v-if="hasTimer"
     data-testid="task-timer-dock"
-    class="kanban-timer-dock"
+    class="kanban-timer-dock -mx-2.5 -mb-2.5 mt-2.5 flex flex-col gap-1.5 border-t border-surface-200 bg-surface-50 px-2.5 py-1.5 dark:border-surface-700 dark:bg-surface-800 rounded-b-xl select-none"
     @click.stop
     @pointerdown.stop
     @mousedown.stop
@@ -114,7 +114,7 @@
 
     <!-- Countdown Progress Line flush with bottom edge (Persistent for Countdown tasks to prevent layout shift) -->
     <div v-if="isCountDownTask">
-      <div class="timer-progress-track">
+      <div class="timer-progress-track h-1 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
         <div
           class="h-full"
           :class="progressBarColorClass"
@@ -220,3 +220,4 @@ const handleStop = () => {
   emit('stop', props.taskId)
 }
 </script>
+
