@@ -1,12 +1,12 @@
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="border-b border-surface-200 bg-surface-0 px-6 py-2 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+    <header class="border-b border-surface bg-[var(--p-content-background)] px-6 py-2 shadow-sm">
       <div class="mx-auto max-w-7xl">
         <Menubar :model="menuItems" class="border-none bg-transparent p-0">
           <template #start>
             <div class="mr-6 flex items-center gap-3">
               <i class="pi pi-clock text-2xl text-primary" />
-              <span class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">MeanTime</span>
+              <span class="text-xl font-bold tracking-tight text-color">MeanTime</span>
             </div>
           </template>
 
@@ -15,11 +15,11 @@
               :to="item.route"
               :data-testid="item.testId"
               :aria-current="item.active ? 'page' : undefined"
-              class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium"
               :class="[
                 item.active
-                  ? 'bg-surface-100 text-primary dark:bg-surface-800 dark:text-primary-400 font-semibold'
-                  : 'text-surface-700 hover:bg-surface-100 hover:text-primary dark:text-surface-200 dark:hover:bg-surface-800'
+                  ? 'bg-surface-100 text-primary dark:bg-surface-800 font-semibold'
+                  : 'text-surface-700 dark:text-surface-300'
               ]"
             >
               <i :class="item.icon" />
