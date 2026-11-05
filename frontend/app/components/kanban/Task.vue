@@ -16,8 +16,8 @@
     <template #content>
       <div class="flex justify-between gap-3">
         <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-          <h4 class="text-sm font-semibold text-surface-900 leading-snug break-words dark:text-surface-100">
+        <div class="flex-1 min-w-0 flex flex-col">
+          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100">
             {{ task.title }}
           </h4>
           <p
@@ -39,7 +39,7 @@
           <span
             v-if="task.priority"
             data-testid="task-priority-indicator"
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            class="kanban-priority-pip"
             :class="priorityBadgeClass"
           >
             <span
@@ -60,7 +60,7 @@
               v-for="tag in visibleTags"
               :key="tag.id"
               data-testid="task-tag-chip"
-              class="inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+              class="kanban-tag-chip"
             >
               <span class="text-surface-400">&bull;</span>
               {{ tag.name }}
@@ -68,7 +68,7 @@
             <span
               v-if="overflowTagCount > 0"
               data-testid="task-tag-overflow-badge"
-              class="inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+              class="kanban-tag-overflow"
             >
               +{{ overflowTagCount }}
             </span>
@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
-import { kanbanContextKey } from '~/api/kanban'
+import { kanbanContextKey, TASK_PRIORITY_CONFIG, DEFAULT_TASK_PRIORITY_BORDER_CLASS } from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
@@ -138,60 +138,25 @@ const hasDescription = computed(() => {
   return Boolean(props.task.description && props.task.description.trim().length > 0)
 })
 
+const priorityConfig = computed(() => {
+  const p = props.task.priority
+  return (p && p in TASK_PRIORITY_CONFIG) ? TASK_PRIORITY_CONFIG[p] : null
+})
+
 const priorityBorderClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'border-l-4 border-l-red-500 dark:border-l-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'border-l-4 border-l-amber-500 dark:border-l-amber-500'
-    case 'LOW':
-      return 'border-l-4 border-l-sky-500 dark:border-l-sky-500'
-    default:
-      return 'border-l-4 border-l-transparent'
-  }
+  return priorityConfig.value?.borderClass ?? DEFAULT_TASK_PRIORITY_BORDER_CLASS
 })
 
 const priorityLabel = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'HIGH'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'MED'
-    case 'LOW':
-      return 'LOW'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.shortLabel ?? ''
 })
 
 const priorityBadgeClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-    case 'LOW':
-      return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.badgeClass ?? ''
 })
 
 const priorityDotClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-500'
-    case 'LOW':
-      return 'bg-sky-500'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.dotClass ?? ''
 })
 
 const MAX_VISIBLE_TAGS = 3
