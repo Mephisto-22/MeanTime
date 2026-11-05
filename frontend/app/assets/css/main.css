@@ -10,42 +10,7 @@
 }
 
 /* Base Theme Tokens: Precision Blue & High-Contrast Obsidian/Slate Surfaces */
-:root {
-  --p-primary-50: #eff6ff;
-  --p-primary-100: #dbeafe;
-  --p-primary-200: #bfdbfe;
-  --p-primary-300: #93c5fd;
-  --p-primary-400: #60a5fa;
-  --p-primary-500: #3b82f6;
-  --p-primary-600: #2563eb;
-  --p-primary-700: #1d4ed8;
-  --p-primary-800: #1e40af;
-  --p-primary-900: #1e3a8a;
-  --p-primary-950: #172554;
-  --p-primary-color: #2563eb;
-  --p-primary-contrast-color: #ffffff;
-  --p-primary-hover-color: #1d4ed8;
-  --p-primary-active-color: #1e40af;
-
-  --p-surface-0: #ffffff;
-  --p-surface-50: #f8fafc;
-  --p-surface-100: #f1f5f9;
-  --p-surface-200: #e2e8f0;
-  --p-surface-300: #cbd5e1;
-  --p-surface-400: #94a3b8;
-  --p-surface-500: #64748b;
-  --p-surface-600: #475569;
-  --p-surface-700: #334155;
-  --p-surface-800: #1e293b;
-  --p-surface-900: #0f172a;
-  --p-surface-950: #090d16;
-
-  --p-content-background: #ffffff;
-  --p-content-hover-background: #f1f5f9;
-  --p-content-border-color: #e2e8f0;
-  --p-content-color: #0f172a;
-}
-
+:root,
 .dark {
   --p-primary-50: #eff6ff;
   --p-primary-100: #dbeafe;
@@ -80,6 +45,10 @@
   --p-content-hover-background: #1e293b;
   --p-content-border-color: #1e293b;
   --p-content-color: #f8fafc;
+  --p-text-color: #f8fafc;
+  --p-text-muted-color: #94a3b8;
+  --p-text-hover-color: #ffffff;
+  --p-text-hover-muted-color: #cbd5e1;
 }
 
 /* Kanban Drag and Drop Styles */
@@ -93,14 +62,15 @@
 
 .kanban-task-chosen {
   cursor: grabbing !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0.5rem !important;
 }
 
 .kanban-task-drag {
-  cursor: grabbing !important;
-  transform: rotate(2deg) scale(1.02) !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
-  opacity: 0.95 !important;
-  transition: transform 0.1s ease;
+  opacity: 1 !important;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 0.5rem !important;
 }
 
 /* Hovered column active drop-target highlight */
@@ -147,4 +117,33 @@ p, .prose {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Base Body Application Shell */
+html,
+body {
+  background-color: var(--p-surface-950);
+  color: var(--p-text-color);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Scrollbar Styling for Dark Theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--p-surface-950);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--p-surface-800);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-700);
 }

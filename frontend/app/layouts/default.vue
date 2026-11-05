@@ -6,7 +6,7 @@
           <template #start>
             <div class="mr-6 flex items-center gap-3">
               <i class="pi pi-clock text-2xl text-primary" />
-              <span class="text-xl font-bold tracking-tight text-color">MeanTime</span>
+              <span class="text-xl font-bold tracking-tight text-[var(--p-text-color)]">MeanTime</span>
             </div>
           </template>
 
