@@ -1,14 +1,20 @@
 <template>
-  <div class="mx-auto max-w-md px-6 py-8">
-    <Card>
-      <template #title><h2 class="text-2xl font-bold">Register</h2></template>
+  <div class="mx-auto w-full max-w-md px-4 py-8">
+    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+      <template #title>
+        <h2 class="text-2xl font-bold tracking-tight">Register</h2>
+      </template>
       <template #content>
-        <RegistrationForm :loading="loading" @submit="register" />
-        <GoogleSignInButton class="mt-4" />
-        <p class="mt-4">
-          Already have an account?
-          <NuxtLink to="/login" class="text-primary underline">Log in</NuxtLink>
-        </p>
+        <div class="flex flex-col gap-4">
+          <RegistrationForm :loading="loading" @submit="register" />
+          <GoogleSignInButton />
+          <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
+            <p>
+              Already have an account?
+              <NuxtLink to="/login" class="text-primary hover:underline">Log in</NuxtLink>
+            </p>
+          </div>
+        </div>
       </template>
     </Card>
   </div>

@@ -1,21 +1,24 @@
 <template>
-  <div class="mx-auto max-w-md px-6 py-8">
-    <Card>
-      <template #title><h2 class="text-2xl font-bold">Log in</h2></template>
+  <div class="mx-auto w-full max-w-md px-4 py-8">
+    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+      <template #title>
+        <h2 class="text-2xl font-bold tracking-tight">Log in</h2>
+      </template>
       <template #content>
-        <p v-if="route.query.logout === 'unconfirmed'" role="alert" class="mb-4">
-          You are signed out on this device, but server token revocation could not be confirmed.
-        </p>
-        <p v-if="route.query.registered === '1'" role="status" class="mb-4">
-          Account created. Please log in.
-        </p>
-        <LoginForm :loading="loading" @submit="login" />
-        <GoogleSignInButton class="mt-4" />
-        <NuxtLink to="/forgot-password" class="mt-4 block text-primary underline">Forgot your password?</NuxtLink>
-        <p class="mt-4">
-          Need an account?
-          <NuxtLink to="/register" class="text-primary underline">Register</NuxtLink>
-        </p>
+        <div class="flex flex-col gap-4">
+          <Message v-if="route.query.logout === 'unconfirmed'" severity="warn" role="alert">
+            You are signed out on this device, but server token revocation could not be confirmed.
+          </Message>
+          <LoginForm :loading="loading" @submit="login" />
+          <GoogleSignInButton />
+          <div class="flex flex-col gap-2 pt-2 text-sm text-surface-600 dark:text-surface-400">
+            <NuxtLink to="/forgot-password" class="text-primary hover:underline">Forgot your password?</NuxtLink>
+            <p>
+              Need an account?
+              <NuxtLink to="/register" class="text-primary hover:underline">Register</NuxtLink>
+            </p>
+          </div>
+        </div>
       </template>
     </Card>
   </div>
@@ -44,6 +47,9 @@ const oauthError = route.query.oauth_error
 onMounted(async () => {
   // Let the client-only toast host mount before announcing a redirect error.
   await nextTick()
+  if (route.query.registered === '1') {
+    notify.success('Account created. Please log in.')
+  }
   if (typeof oauthError === 'string') notify.error(new Error(googleErrors[oauthError] ?? 'Google sign-in failed. Please try again.'), 'Unable to sign in with Google')
 })
 

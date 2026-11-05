@@ -13,17 +13,17 @@
     <div class="flex flex-col gap-2">
       <Label for="register-password">Password</Label>
       <InputText :invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" :aria-invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" id="register-password" v-model="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-requirements" required />
-      <section id="password-requirements" aria-labelledby="password-requirements-title" :aria-busy="checking">
+      <section id="password-requirements" aria-labelledby="password-requirements-title" :aria-busy="checking" class="flex flex-col gap-2">
         <h3 id="password-requirements-title" class="text-sm font-semibold">Password requirements</h3>
-        <ul class="mt-2 space-y-1 text-sm" aria-live="polite">
+        <ul class="flex flex-col gap-1.5 text-sm" aria-live="polite">
           <li v-for="requirement in requirements" :key="requirement.id" :data-requirement="requirement.id" :data-met="requirement.met" :class="requirement.met ? 'text-green-700 dark:text-green-400' : 'text-surface-600 dark:text-surface-400'">
             <i :class="requirement.met ? 'pi pi-check-circle' : 'pi pi-circle'" aria-hidden="true" />
             <span class="sr-only">{{ requirement.met ? 'Met:' : 'Not met:' }}</span>
             {{ requirement.description }}
           </li>
         </ul>
-        <p v-if="checking" role="status" class="mt-2 text-sm">Checking password requirements...</p>
-        <p v-if="checkError" role="alert" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ checkError }}</p>
+        <Message v-if="checking" severity="info" size="small" role="status">Checking password requirements...</Message>
+        <Message v-if="checkError" severity="error" size="small" role="alert">{{ checkError }}</Message>
         <Button v-if="checkError" type="button" label="Retry password check" severity="secondary" size="small" @click="checkRequirements" />
       </section>
     </div>
