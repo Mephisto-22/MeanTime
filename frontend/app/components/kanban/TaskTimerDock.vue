@@ -2,7 +2,7 @@
   <div
     v-if="hasTimer"
     data-testid="task-timer-dock"
-    class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col justify-between border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none"
+    class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col gap-1.5 border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none"
     @click.stop
     @pointerdown.stop
     @mousedown.stop
@@ -113,10 +113,10 @@
     </div>
 
     <!-- Countdown Progress Line flush with bottom edge (Persistent for Countdown tasks to prevent layout shift) -->
-    <div v-if="isCountDownTask" class="w-full mt-1.5">
-      <div class="h-1 w-full bg-surface-200/80 dark:bg-surface-700/80 rounded-full overflow-hidden">
+    <div v-if="isCountDownTask">
+      <div class="h-1 bg-surface-200/80 dark:bg-surface-700/80 rounded-full overflow-hidden">
         <div
-          class="h-full transition-all duration-300"
+          class="h-full"
           :class="progressBarColorClass"
           :style="{ width: `${progressPercent}%` }"
           data-testid="card-timer-progress"
@@ -179,9 +179,12 @@ const isCountDownTask = computed(() => {
 
 const progressBarColorClass = computed(() => {
   if (isPaused.value) {
-    return 'bg-amber-500 dark:bg-amber-400'
+    return TIMER_STATE_CONFIG.PAUSED.progressClass
   }
-  return 'bg-emerald-500 dark:bg-emerald-400'
+  if (isRunning.value) {
+    return TIMER_STATE_CONFIG.RUNNING.progressClass
+  }
+  return TIMER_STATE_CONFIG.IDLE.progressClass
 })
 
 // Inherited idle mode and label

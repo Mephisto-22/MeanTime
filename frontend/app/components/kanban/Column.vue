@@ -68,17 +68,15 @@
     </div>
 
     <!-- Add Task Button -->
-    <div class="shrink-0">
-      <Button
-        data-testid="add-task-button"
-        label="Add Task"
-        severity="secondary"
-        icon="pi pi-plus"
-        size="small"
-        class="w-full justify-center bg-surface-200 hover:bg-surface-300 dark:bg-surface-800 dark:hover:bg-surface-700"
-        @click="handleAddTask"
-      />
-    </div>
+    <Button
+      data-testid="add-task-button"
+      label="Add Task"
+      severity="secondary"
+      icon="pi pi-plus"
+      size="small"
+      class="shrink-0 w-full justify-center bg-surface-200 hover:bg-surface-300 dark:bg-surface-800 dark:hover:bg-surface-700"
+      @click="handleAddTask"
+    />
   </div>
 </template>
 
