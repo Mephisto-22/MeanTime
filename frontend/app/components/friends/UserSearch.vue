@@ -1,14 +1,16 @@
 <template>
-  <div class="space-y-6">
+  <div class="flex flex-col gap-6">
     <!-- Search Bar Form -->
     <div class="p-6 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-2xl shadow-sm">
-      <div class="max-w-2xl">
-        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0 mb-1">
-          Find Friends
-        </h3>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
-          Search for users by exact email address or display name to connect and collaborate.
-        </p>
+      <div class="max-w-2xl flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+            Find Friends
+          </h3>
+          <p class="text-sm text-surface-500 dark:text-surface-400">
+            Search for users by exact email address or display name to connect and collaborate.
+          </p>
+        </div>
 
         <form
           class="flex flex-col sm:flex-row gap-3"
@@ -48,53 +50,47 @@
     </div>
 
     <!-- Self-Search Alert -->
-    <div
+    <Message
       v-if="isSelfSearch"
       data-testid="self-search-alert"
-      role="alert"
-      class="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-200 transition-all"
+      severity="warn"
     >
-      <i class="pi pi-info-circle text-lg shrink-0" />
-      <div class="text-sm">
-        <strong>This is your email address.</strong> You cannot send a friend request to yourself.
-      </div>
-    </div>
+      <strong>This is your email address.</strong> You cannot send a friend request to yourself.
+    </Message>
 
     <!-- Error Alert -->
-    <div
+    <Message
       v-if="errorMessage"
       data-testid="search-error"
-      role="alert"
-      class="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-200 transition-all"
+      severity="error"
     >
-      <i class="pi pi-exclamation-triangle text-lg shrink-0" />
-      <div class="text-sm">
-        {{ errorMessage }}
-      </div>
-    </div>
+      {{ errorMessage }}
+    </Message>
 
     <!-- Empty Search Results State -->
     <div
       v-if="hasSearched && !isSearching && searchResults && searchResults.length === 0"
       data-testid="search-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl"
+      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
     >
-      <div class="w-16 h-16 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center mb-4 text-surface-400 dark:text-surface-500">
+      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
         <i class="pi pi-search text-3xl" />
       </div>
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0 mb-1">
-        No users found
-      </h3>
-      <p class="text-sm text-surface-500 dark:text-surface-400 max-w-md">
-        No user found matching '{{ lastSearchedQuery }}'. Please verify the exact email or username.
-      </p>
+      <div class="flex flex-col gap-1 max-w-md">
+        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+          No users found
+        </h3>
+        <p class="text-sm text-surface-500 dark:text-surface-400">
+          No user found matching '{{ lastSearchedQuery }}'. Please verify the exact email or username.
+        </p>
+      </div>
     </div>
 
     <!-- Search Results List -->
     <div
       v-else-if="searchResults && searchResults.length > 0"
       data-testid="search-results-list"
-      class="space-y-3"
+      class="flex flex-col gap-3"
     >
       <div class="flex items-center justify-between pb-1">
         <h4 class="text-sm font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider">
@@ -108,7 +104,7 @@
           :key="user.id"
           data-testid="search-result-card"
           :data-testid-user="user.id"
-          class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4 transition-colors"
+          class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
         >
           <!-- User Details -->
           <div class="flex items-center gap-3">
@@ -119,7 +115,7 @@
               data-testid="user-avatar"
               class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
             />
-            <div class="flex flex-col">
+            <div class="flex flex-col gap-0.5">
               <span
                 data-testid="user-name"
                 class="font-semibold text-surface-900 dark:text-surface-0 text-base"
@@ -135,7 +131,7 @@
               </span>
               <span
                 data-testid="user-timezone"
-                class="text-xs text-surface-500 dark:text-surface-400 flex items-center gap-1 mt-0.5"
+                class="text-xs text-surface-500 dark:text-surface-400 flex items-center gap-1"
               >
                 <i class="pi pi-globe text-[11px]" />
                 {{ user.timezone }}

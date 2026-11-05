@@ -1,15 +1,12 @@
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-          Friends & Social
-        </h1>
-        <p class="mt-1 text-surface-600 dark:text-surface-400">
-          Manage your friends list, accept pending requests, find new connections, and view blocked users.
-        </p>
-      </div>
+  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 flex flex-col gap-6">
+    <div class="flex flex-col gap-1">
+      <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+        Friends & Social
+      </h1>
+      <p class="text-surface-600 dark:text-surface-400">
+        Manage your friends list, accept pending requests, find new connections, and view blocked users.
+      </p>
     </div>
 
     <Tabs
@@ -17,7 +14,7 @@
       data-testid="friends-tabs"
       class="w-full"
     >
-      <TabList class="border-b border-surface-200 dark:border-surface-700">
+      <TabList class="border-b border-surface-200 dark:border-surface-800">
         <Tab
           value="friends"
           data-testid="tab-friends"
@@ -121,7 +118,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import Button from 'primevue/button'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
