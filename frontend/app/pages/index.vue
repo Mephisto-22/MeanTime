@@ -1,22 +1,27 @@
 <template>
-  <div class="mx-auto max-w-7xl px-6 py-10">
-    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h2 class="text-3xl font-bold tracking-tight">
-          Your boards
-        </h2>
-        <p class="mt-1 text-surface-600 dark:text-surface-300">
-          Pick a board to open, or create a new one.
-        </p>
-      </div>
-      <Button
-        v-if="boards.length != 0"
-        data-testid="new-board-button"
-        label="New board"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-    </div>
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-8 flex flex-col gap-8">
+    <!-- Header Toolbar -->
+    <Toolbar class="border-none bg-transparent p-0">
+      <template #start>
+        <div class="flex flex-col gap-1">
+          <h1 class="text-3xl font-extrabold tracking-tight text-surface-900 dark:text-surface-0">
+            Your boards
+          </h1>
+          <p class="text-sm text-surface-600 dark:text-surface-400">
+            Pick a board to open, or create a new one.
+          </p>
+        </div>
+      </template>
+      <template #end>
+        <Button
+          v-if="boards.length !== 0"
+          data-testid="new-board-button"
+          label="New board"
+          icon="pi pi-plus"
+          @click="openCreateDialog"
+        />
+      </template>
+    </Toolbar>
 
     <!-- Loading (first load only; a re-fetch keeps showing the current boards) -->
     <div
@@ -27,8 +32,8 @@
       <Skeleton
         v-for="n in 3"
         :key="n"
-        height="9rem"
-        border-radius="12px"
+        height="14rem"
+        border-radius="16px"
       />
     </div>
 
@@ -36,7 +41,7 @@
     <div
       v-else-if="error"
       data-testid="boards-error"
-      class="rounded-lg border border-surface-300 p-4"
+      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load your boards.</span>
@@ -52,30 +57,36 @@
     </div>
 
     <!-- Empty -->
-    <div
+    <Panel
       v-else-if="boards.length === 0"
       data-testid="boards-empty"
-      class="rounded-xl border border-dashed border-surface-300 px-6 py-16 text-center dark:border-surface-700"
+      class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
     >
-      <i class="pi pi-th-large text-4xl text-surface-400" />
-      <h3 class="mt-4 text-xl font-semibold">
-        You have no boards yet
-      </h3>
-      <p class="mt-1 text-surface-600 dark:text-surface-300">
-        Create your first board to start tracking tasks.
-      </p>
-      <Button
-        class="mt-6"
-        label="New board"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-    </div>
+      <div class="flex flex-col items-center justify-center gap-5 py-20 text-center">
+        <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50 shadow-sm">
+          <i class="pi pi-th-large text-4xl" />
+        </div>
+        <div class="flex flex-col gap-1.5 max-w-sm">
+          <h2 class="text-xl font-bold text-surface-900 dark:text-surface-0">
+            You have no boards yet
+          </h2>
+          <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+            Create your first board to start tracking tasks and recording focused time sessions.
+          </p>
+        </div>
+        <Button
+          label="New board"
+          icon="pi pi-plus"
+          class="mt-2"
+          @click="openCreateDialog"
+        />
+      </div>
+    </Panel>
 
     <!-- List -->
     <ul
       v-else
-      class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 list-none p-0 m-0"
     >
       <li
         v-for="board in boards"

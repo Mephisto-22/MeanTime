@@ -3,7 +3,7 @@
     data-testid="kanban-task"
     :data-task-id="task.id"
     :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="cursor-grab active:cursor-grabbing select-none transition-shadow duration-150"
+    class="cursor-grab active:cursor-grabbing select-none border border-surface-200 dark:border-surface-800"
     :class="priorityBorderClass"
     @click="handleClick"
     @pointerdown="handlePointerDown"
@@ -14,9 +14,9 @@
     @dragend="handleDragEnd"
   >
     <template #content>
-      <div class="flex items-start justify-between gap-3">
+      <div class="flex justify-between gap-3">
         <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
           <h4 class="text-sm font-semibold text-surface-900 leading-snug break-words dark:text-surface-100">
             {{ task.title }}
           </h4>
