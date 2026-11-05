@@ -1,22 +1,26 @@
 <template>
-  <div class="mx-auto max-w-7xl px-6 py-10">
-    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h2 class="text-3xl font-bold tracking-tight">
-          Your boards
-        </h2>
-        <p class="mt-1 text-surface-600 dark:text-surface-300">
-          Pick a board to open, or create a new one.
-        </p>
-      </div>
-      <Button
-        v-if="boards.length != 0"
-        data-testid="new-board-button"
-        label="New board"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-    </div>
+  <div class="mx-auto max-w-7xl px-6 py-10 flex flex-col gap-8">
+    <Toolbar class="border-none bg-transparent p-0">
+      <template #start>
+        <div class="flex flex-col gap-1">
+          <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+            Your boards
+          </h1>
+          <p class="text-surface-600 dark:text-surface-400">
+            Pick a board to open, or create a new one.
+          </p>
+        </div>
+      </template>
+      <template #end>
+        <Button
+          v-if="boards.length !== 0"
+          data-testid="new-board-button"
+          label="New board"
+          icon="pi pi-plus"
+          @click="openCreateDialog"
+        />
+      </template>
+    </Toolbar>
 
     <!-- Loading (first load only; a re-fetch keeps showing the current boards) -->
     <div
@@ -36,7 +40,7 @@
     <div
       v-else-if="error"
       data-testid="boards-error"
-      class="rounded-lg border border-surface-300 p-4"
+      class="rounded-lg border border-surface-300 p-4 dark:border-surface-700"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load your boards.</span>
@@ -52,30 +56,35 @@
     </div>
 
     <!-- Empty -->
-    <div
+    <Panel
       v-else-if="boards.length === 0"
       data-testid="boards-empty"
-      class="rounded-xl border border-dashed border-surface-300 px-6 py-16 text-center dark:border-surface-700"
+      class="border-dashed"
     >
-      <i class="pi pi-th-large text-4xl text-surface-400" />
-      <h3 class="mt-4 text-xl font-semibold">
-        You have no boards yet
-      </h3>
-      <p class="mt-1 text-surface-600 dark:text-surface-300">
-        Create your first board to start tracking tasks.
-      </p>
-      <Button
-        class="mt-6"
-        label="New board"
-        icon="pi pi-plus"
-        @click="openCreateDialog"
-      />
-    </div>
+      <div class="flex flex-col items-center justify-center gap-4 py-12 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500">
+          <i class="pi pi-th-large text-3xl" />
+        </div>
+        <div class="flex flex-col gap-1 max-w-sm">
+          <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-0">
+            You have no boards yet
+          </h2>
+          <p class="text-sm text-surface-600 dark:text-surface-400">
+            Create your first board to start tracking tasks.
+          </p>
+        </div>
+        <Button
+          label="New board"
+          icon="pi pi-plus"
+          @click="openCreateDialog"
+        />
+      </div>
+    </Panel>
 
     <!-- List -->
     <ul
       v-else
-      class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 list-none p-0 m-0"
     >
       <li
         v-for="board in boards"

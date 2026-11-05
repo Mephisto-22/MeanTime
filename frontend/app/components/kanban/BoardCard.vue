@@ -1,14 +1,14 @@
 <template>
   <Card
     data-testid="board-card"
-    class="relative h-full shadow-md transition-shadow focus-within:ring-2 focus-within:ring-primary hover:shadow-lg"
+    class="relative h-full border border-surface-200 dark:border-surface-800 focus-within:ring-2 focus-within:ring-primary"
   >
     <template #title>
-      <div class="flex items-start justify-between gap-2">
+      <div class="flex justify-between gap-2">
         <!-- The after: classes stretch this link over the whole card, so clicking anywhere opens the board. -->
         <NuxtLink
           :to="`/boards/${board.id}`"
-          class="min-w-0 break-words outline-none after:absolute after:inset-0 after:content-['']"
+          class="min-w-0 break-words outline-none text-surface-900 dark:text-surface-0 hover:text-primary after:absolute after:inset-0 after:content-['']"
         >
           {{ board.title }}
         </NuxtLink>
@@ -26,7 +26,7 @@
       </div>
     </template>
     <template #content>
-      <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-300">
+      <p class="text-sm leading-relaxed text-surface-600 dark:text-surface-400">
         {{ board.description || 'No description' }}
       </p>
     </template>

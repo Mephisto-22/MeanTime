@@ -1,33 +1,40 @@
 <template>
   <Card data-testid="kanban-board">
     <template #title>
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span v-if="board.title" data-testid="board-title">{{ board.title }}</span>
-          <p
-            v-if="board.description"
-            data-testid="board-description"
-            class="mt-1 text-sm font-normal text-surface-600 dark:text-surface-400"
-          >
-            {{ board.description }}
-          </p>
-        </div>
-        <Button
-          data-testid="add-column-button"
-          label="Add Column"
-          icon="pi pi-plus"
-          severity="secondary"
-          outlined
-          class="h-fit shrink-0"
-          @click="openCreateColumnDialog"
-        />
-      </div>
+      <Toolbar class="border-none bg-transparent p-0">
+        <template #start>
+          <div class="flex flex-col gap-1">
+            <span v-if="board.title" data-testid="board-title" class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">{{ board.title }}</span>
+            <p
+              v-if="board.description"
+              data-testid="board-description"
+              class="text-sm font-normal text-surface-600 dark:text-surface-400"
+            >
+              {{ board.description }}
+            </p>
+          </div>
+        </template>
+        <template #end>
+          <div class="flex items-center gap-3">
+            <slot name="actions" />
+            <Button
+              data-testid="add-column-button"
+              label="Add Column"
+              icon="pi pi-plus"
+              severity="secondary"
+              outlined
+              class="h-fit shrink-0"
+              @click="openCreateColumnDialog"
+            />
+          </div>
+        </template>
+      </Toolbar>
     </template>
     <template #content>
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
-        class="flex w-full items-start gap-4 overflow-x-auto overflow-y-hidden pb-2"
+        class="flex gap-4 overflow-x-auto overflow-y-hidden pb-2"
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">
@@ -90,6 +97,7 @@ const props = defineProps<{
 defineSlots<{
   column?: (props: { column: KanbanColumnDto }) => any
   task?: (props: { task: KanbanTaskDto }) => any
+  actions?: () => any
 }>()
 
 const localColumns = ref<KanbanColumnDto[]>([])

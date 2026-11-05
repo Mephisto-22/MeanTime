@@ -2,7 +2,7 @@
   <div
     v-if="hasTimer"
     data-testid="task-timer-dock"
-    class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col justify-between border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none transition-colors"
+    class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col justify-between border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none"
     @click.stop
     @pointerdown.stop
     @mousedown.stop
