@@ -43,7 +43,12 @@ describe('Consistent required fields', () => {
     await vi.waitFor(() => expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined())
     expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('submit')?.[0]).toEqual([{ display_name: 'Name', email: 'user@example.com', password: 'StrongPassword982!' }])
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{
+      display_name: 'Name',
+      email: 'user@example.com',
+      password: 'StrongPassword982!',
+      timezone: expect.any(String),
+    }])
     wrapper.unmount()
   })
 
