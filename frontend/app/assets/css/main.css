@@ -9,6 +9,48 @@
   @tailwind utilities;
 }
 
+/* Base Theme Tokens: Precision Blue Accent & Monochromatic Grey/Black Void */
+:root,
+.dark {
+  --p-primary-50: #eff6ff;
+  --p-primary-100: #dbeafe;
+  --p-primary-200: #bfdbfe;
+  --p-primary-300: #93c5fd;
+  --p-primary-400: #60a5fa;
+  --p-primary-500: #3b82f6;
+  --p-primary-600: #2563eb;
+  --p-primary-700: #1d4ed8;
+  --p-primary-800: #1e40af;
+  --p-primary-900: #1e3a8a;
+  --p-primary-950: #172554;
+  --p-primary-color: #3b82f6;
+  --p-primary-contrast-color: #ffffff;
+  --p-primary-hover-color: #60a5fa;
+  --p-primary-active-color: #2563eb;
+
+  --p-surface-0: #ffffff;
+  --p-surface-50: #fafafa;
+  --p-surface-100: #f4f4f5;
+  --p-surface-200: #e4e4e7;
+  --p-surface-300: #d4d4d8;
+  --p-surface-400: #a1a1aa;
+  --p-surface-500: #71717a;
+  --p-surface-600: #52525b;
+  --p-surface-700: #3f3f46;
+  --p-surface-800: #27272a;
+  --p-surface-900: #18181b;
+  --p-surface-950: #09090b;
+
+  --p-content-background: #18181b;
+  --p-content-hover-background: #27272a;
+  --p-content-border-color: #27272a;
+  --p-content-color: #ffffff;
+  --p-text-color: #ffffff;
+  --p-text-muted-color: #a1a1aa;
+  --p-text-hover-color: #ffffff;
+  --p-text-hover-muted-color: #d4d4d8;
+}
+
 /* Kanban Drag and Drop Styles */
 .kanban-task-ghost {
   opacity: 0.4 !important;
@@ -20,14 +62,15 @@
 
 .kanban-task-chosen {
   cursor: grabbing !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 0.5rem !important;
 }
 
 .kanban-task-drag {
-  cursor: grabbing !important;
-  transform: rotate(2deg) scale(1.02) !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
-  opacity: 0.95 !important;
-  transition: transform 0.1s ease;
+  opacity: 1 !important;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 0.5rem !important;
 }
 
 /* Hovered column active drop-target highlight */
@@ -43,4 +86,69 @@
 [data-testid="kanban-tasks-container"]:has(.kanban-task-ghost) [data-testid="column-empty-placeholder"],
 [data-testid="kanban-tasks-container"]:has(.sortable-ghost) [data-testid="column-empty-placeholder"] {
   display: none !important;
+}
+
+/* Navigation item interactive hover states delegated to PrimeVue menubar tokens */
+.p-menubar .p-menubar-item a:hover:not([aria-current="page"]) {
+  background-color: var(--p-menubar-item-focus-background);
+  color: var(--p-menubar-item-focus-color);
+}
+
+/* Domain Typography, High-Legibility Foundation & Line-Length Restraint */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Restrain line lengths for readability under 80 characters */
+p, .prose {
+  max-width: 75ch;
+}
+
+/* Restrained motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Base Body Application Shell */
+html,
+body {
+  background-color: var(--p-surface-950);
+  color: var(--p-text-color);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Subtle border on Card components for depth against black canvas */
+.p-card {
+  border: 1px solid var(--p-surface-800);
+}
+
+/* Scrollbar Styling for Dark Theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--p-surface-950);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--p-surface-800);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-700);
 }
