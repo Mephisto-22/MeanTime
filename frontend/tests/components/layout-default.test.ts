@@ -95,7 +95,9 @@ describe('Default Layout Header Suite', () => {
       expect(wrapper.find('nav').exists()).toBe(false)
     })
 
-    it('renders static, non-clickable MeanTime brand in header', async () => {
+    it('renders clickable MeanTime brand in header navigating to main homepage /', async () => {
+      const router = useRouter()
+      await router.push('/friends')
       const wrapper = mountLayout()
       await flushPromises()
 
@@ -103,8 +105,14 @@ describe('Default Layout Header Suite', () => {
       expect(clockIcon.exists()).toBe(true)
       expect(wrapper.text()).toContain('MeanTime')
 
-      expect(clockIcon.element.closest('a')).toBeNull()
-      expect(clockIcon.element.closest('button')).toBeNull()
+      const brandLink = clockIcon.element.closest('a')
+      expect(brandLink).not.toBeNull()
+      expect(brandLink?.getAttribute('href') || brandLink?.getAttribute('to')).toBe('/')
+
+      const brandWrapper = wrapper.find('[data-testid="brand-link"]')
+      expect(brandWrapper.exists()).toBe(true)
+      await brandWrapper.trigger('click')
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
     })
 
     it('renders boards navigation button when authenticated pointing to /', async () => {
@@ -220,13 +228,14 @@ describe('Default Layout Header Suite', () => {
       expect(inactiveFriendsLink.classes()).toContain('text-surface-700')
     })
 
-    it('renders profile button with user display name', async () => {
+    it('renders profile button with user display name matching standard button size', async () => {
       const wrapper = mountLayout()
       await flushPromises()
 
       const button = wrapper.find('[data-testid="user-profile-button"]')
       expect(button.exists()).toBe(true)
       expect(button.text()).toContain('Alex Engineer')
+      expect(button.classes()).not.toContain('p-button-sm')
     })
 
     it('renders display name button in top right when authenticated', async () => {

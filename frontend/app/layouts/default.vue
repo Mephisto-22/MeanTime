@@ -1,13 +1,18 @@
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="border-b border-surface bg-[var(--p-content-background)] px-6 py-2 shadow-sm">
+    <header class="border-b border-surface bg-[var(--p-content-background)] px-6 py-3.5 shadow-sm">
       <div class="mx-auto max-w-7xl">
         <Menubar :model="menuItems" class="border-none bg-transparent p-0">
           <template #start>
-            <div class="mr-6 flex items-center gap-3">
+            <NuxtLink
+              to="/"
+              data-testid="brand-link"
+              class="mr-6 flex items-center gap-3 no-underline"
+              aria-label="MeanTime Home"
+            >
               <i class="pi pi-clock text-2xl text-primary" />
               <span class="text-xl font-bold tracking-tight text-[var(--p-text-color)]">MeanTime</span>
-            </div>
+            </NuxtLink>
           </template>
 
           <template #item="{ item }">
@@ -15,7 +20,7 @@
               :to="item.route"
               :data-testid="item.testId"
               :aria-current="item.active ? 'page' : undefined"
-              class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium"
+              class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
               :class="[
                 item.active
                   ? 'bg-surface-100 text-primary dark:bg-surface-800 font-semibold'
@@ -42,7 +47,6 @@
                 icon="pi pi-user"
                 text
                 severity="secondary"
-                size="small"
                 @click="goToProfile"
               />
 
