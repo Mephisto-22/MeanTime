@@ -9,9 +9,6 @@
           <Message v-if="route.query.logout === 'unconfirmed'" severity="warn" role="alert">
             You are signed out on this device, but server token revocation could not be confirmed.
           </Message>
-          <Message v-if="route.query.registered === '1'" severity="success" role="status">
-            Account created. Please log in.
-          </Message>
           <LoginForm :loading="loading" @submit="login" />
           <GoogleSignInButton />
           <div class="flex flex-col gap-2 pt-2 text-sm text-surface-600 dark:text-surface-400">
@@ -50,6 +47,9 @@ const oauthError = route.query.oauth_error
 onMounted(async () => {
   // Let the client-only toast host mount before announcing a redirect error.
   await nextTick()
+  if (route.query.registered === '1') {
+    notify.success('Account created. Please log in.')
+  }
   if (typeof oauthError === 'string') notify.error(new Error(googleErrors[oauthError] ?? 'Google sign-in failed. Please try again.'), 'Unable to sign in with Google')
 })
 

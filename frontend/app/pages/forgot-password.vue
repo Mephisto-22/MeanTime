@@ -22,6 +22,7 @@
 import { authApi } from '~/api/auth'
 
 definePageMeta({ public: true, layout: 'headless' })
+const notify = useNotifications()
 const loading = ref(false)
 const message = ref('')
 const error = ref('')
@@ -32,8 +33,10 @@ async function requestReset(email: string) {
   error.value = ''
   try {
     message.value = (await authApi.requestPasswordReset(email)).detail
+    notify.success(message.value)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to request a reset. Please try again.'
+    notify.error(err, 'Unable to request a reset')
   } finally {
     loading.value = false
   }

@@ -28,6 +28,7 @@ definePageMeta({ public: true, layout: 'headless' })
 // Never send this page's address, tokens included, to another site.
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] })
 const auth = useAuthStore()
+const notify = useNotifications()
 const error = ref('')
 
 onMounted(async () => {
@@ -38,13 +39,16 @@ onMounted(async () => {
   const refreshToken = fragment.get('refresh_token')
   if (!accessToken || !refreshToken) {
     error.value = 'This sign-in link is incomplete. Try signing in with Google again.'
+    notify.error(new Error(error.value), 'Google sign-in failed')
     return
   }
   try {
     await auth.loginWithTokens({ access_token: accessToken, refresh_token: refreshToken })
+    notify.success('Signed in with Google.')
     await navigateTo('/', { replace: true })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to finish signing in. Please try again.'
+    notify.error(err, 'Unable to finish signing in')
   }
 })
 </script>

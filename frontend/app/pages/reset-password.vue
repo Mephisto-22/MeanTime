@@ -29,6 +29,7 @@ import { useAuthStore } from '~/stores/auth'
 definePageMeta({ public: true, layout: 'headless' })
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] })
 const auth = useAuthStore()
+const notify = useNotifications()
 const checking = ref(true)
 const valid = ref(false)
 const loading = ref(false)
@@ -63,12 +64,14 @@ async function resetPassword(passwords: { password: string; password_confirm: st
   error.value = ''
   try {
     success.value = (await authApi.confirmPasswordReset({ ...link, ...passwords })).detail
+    notify.success(success.value)
     auth.clearTokens()
     valid.value = false
     link = null
     window.history.replaceState(null, '', window.location.pathname)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to reset your password. Please try again.'
+    notify.error(err, 'Unable to reset your password')
   } finally {
     loading.value = false
   }
