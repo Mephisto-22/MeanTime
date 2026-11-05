@@ -2,7 +2,7 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex min-h-[520px] h-[calc(100vh-13.5rem)] flex-1 min-w-72 max-w-xs flex-col gap-3 rounded-xl bg-surface-100 p-3.5 dark:bg-surface-900 border border-surface-200 dark:border-surface-800"
+    class="flex flex-1 min-w-72 h-full min-h-0 flex-col gap-2.5 rounded-xl bg-surface-100 p-3 dark:bg-surface-900 border border-surface-200 dark:border-surface-800"
   >
     <!-- Column Header -->
     <div class="flex shrink-0 items-center justify-between">

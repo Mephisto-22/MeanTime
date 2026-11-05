@@ -1,8 +1,8 @@
 <template>
   <Card
     data-testid="kanban-board"
-    class="flex flex-col flex-1 border border-surface-200 dark:border-surface-800 shadow-sm"
-    :pt="{ body: 'flex flex-col flex-1 p-5 gap-4', content: 'flex flex-col flex-1 min-h-0' }"
+    class="flex flex-col flex-1 min-h-0 border border-surface-200 dark:border-surface-800 shadow-sm"
+    :pt="{ body: 'flex flex-col flex-1 min-h-0 p-4 gap-3', content: 'flex flex-col flex-1 min-h-0' }"
   >
     <template #title>
       <Toolbar class="border-none bg-transparent p-0">
@@ -38,7 +38,7 @@
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
-        class="flex gap-4 overflow-x-auto overflow-y-hidden pb-2"
+        class="flex gap-4 overflow-x-auto flex-1 min-h-0 pb-1"
       >
         <template v-for="column in sortedColumns" :key="column.id">
           <slot name="column" :column="column">

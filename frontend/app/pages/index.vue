@@ -1,19 +1,12 @@
 <template>
   <div class="mx-auto max-w-7xl px-4 sm:px-6 py-8 flex flex-col gap-8">
+    <!-- Header Toolbar -->
     <Toolbar class="border-none bg-transparent p-0">
       <template #start>
-        <div class="flex flex-col gap-1.5">
-          <div class="flex items-center gap-3">
-            <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-              Your boards
-            </h1>
-            <Badge
-              v-if="boards.length > 0"
-              :value="boards.length"
-              severity="secondary"
-              class="font-mono text-xs"
-            />
-          </div>
+        <div class="flex flex-col gap-1">
+          <h1 class="text-3xl font-extrabold tracking-tight text-surface-900 dark:text-surface-0">
+            Your boards
+          </h1>
           <p class="text-sm text-surface-600 dark:text-surface-400">
             Pick a board to open, or create a new one.
           </p>
@@ -25,7 +18,6 @@
           data-testid="new-board-button"
           label="New board"
           icon="pi pi-plus"
-          size="small"
           @click="openCreateDialog"
         />
       </template>
@@ -40,8 +32,8 @@
       <Skeleton
         v-for="n in 3"
         :key="n"
-        height="10rem"
-        border-radius="12px"
+        height="14rem"
+        border-radius="16px"
       />
     </div>
 
@@ -70,23 +62,22 @@
       data-testid="boards-empty"
       class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
     >
-      <div class="flex flex-col items-center justify-center gap-4 py-16 text-center">
-        <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50">
-          <i class="pi pi-th-large text-3xl" />
+      <div class="flex flex-col items-center justify-center gap-5 py-20 text-center">
+        <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50 shadow-sm">
+          <i class="pi pi-th-large text-4xl" />
         </div>
-        <div class="flex flex-col gap-1 max-w-sm">
-          <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-0">
+        <div class="flex flex-col gap-1.5 max-w-sm">
+          <h2 class="text-xl font-bold text-surface-900 dark:text-surface-0">
             You have no boards yet
           </h2>
-          <p class="text-sm text-surface-600 dark:text-surface-400">
-            Create your first board to start tracking tasks.
+          <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+            Create your first board to start tracking tasks and recording focused time sessions.
           </p>
         </div>
         <Button
           label="New board"
           icon="pi pi-plus"
-          size="small"
-          class="mt-1"
+          class="mt-2"
           @click="openCreateDialog"
         />
       </div>

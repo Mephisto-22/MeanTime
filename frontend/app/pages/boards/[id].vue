@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-6 flex flex-col gap-4 flex-1 min-h-[calc(100vh-6rem)]">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-col gap-3 flex-1 h-[calc(100vh-4.25rem)] overflow-hidden">
     <!-- Loading -->
     <div
       v-if="status === 'pending' && !board"
@@ -10,7 +10,7 @@
         v-for="n in 3"
         :key="n"
         width="18rem"
-        height="75vh"
+        height="100%"
         border-radius="12px"
         class="shrink-0"
       />
@@ -45,7 +45,7 @@
     </div>
 
     <template v-else-if="board">
-      <KanbanBoard :board="board">
+      <KanbanBoard :board="board" class="flex-1 min-h-0">
         <template #actions>
           <div
             v-if="board.collaborators && board.collaborators.length > 0"
@@ -70,9 +70,6 @@
           <Button
             label="Share"
             icon="pi pi-users"
-            severity="secondary"
-            outlined
-            size="small"
             data-testid="board-share-button"
             class="h-fit shrink-0"
             @click="isShareDialogOpen = true"
