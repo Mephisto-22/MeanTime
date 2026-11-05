@@ -16,8 +16,8 @@
     <template #content>
       <div class="flex justify-between gap-3">
         <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-          <h4 class="text-sm font-semibold text-surface-900 leading-snug break-words dark:text-surface-100">
+        <div class="flex-1 min-w-0 flex flex-col">
+          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100">
             {{ task.title }}
           </h4>
           <p
@@ -39,7 +39,7 @@
           <span
             v-if="task.priority"
             data-testid="task-priority-indicator"
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            class="kanban-priority-pip"
             :class="priorityBadgeClass"
           >
             <span
@@ -60,7 +60,7 @@
               v-for="tag in visibleTags"
               :key="tag.id"
               data-testid="task-tag-chip"
-              class="inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+              class="kanban-tag-chip"
             >
               <span class="text-surface-400">&bull;</span>
               {{ tag.name }}
@@ -68,7 +68,7 @@
             <span
               v-if="overflowTagCount > 0"
               data-testid="task-tag-overflow-badge"
-              class="inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+              class="kanban-tag-overflow"
             >
               +{{ overflowTagCount }}
             </span>
