@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="flex flex-col gap-6">
     <!-- Skeleton Loaders for Loading State -->
     <div
       v-if="loading"
@@ -30,23 +30,25 @@
     <div
       v-else-if="incoming.length === 0 && outgoing.length === 0"
       data-testid="requests-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl"
+      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
     >
-      <div class="w-16 h-16 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center mb-4 text-surface-400 dark:text-surface-500">
+      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
         <i class="pi pi-inbox text-3xl" />
       </div>
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0 mb-1">
-        No pending friend requests
-      </h3>
-      <p class="text-sm text-surface-500 dark:text-surface-400 max-w-sm">
-        You have no pending incoming or outgoing friend requests. Head over to the "Add Friend" tab to find people to connect with!
-      </p>
+      <div class="flex flex-col gap-1 max-w-sm">
+        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+          No pending friend requests
+        </h3>
+        <p class="text-sm text-surface-500 dark:text-surface-400">
+          You have no pending incoming or outgoing friend requests. Head over to the "Add Friend" tab to find people to connect with!
+        </p>
+      </div>
     </div>
 
     <!-- Requests Lists -->
     <div
       v-else
-      class="space-y-6"
+      class="flex flex-col gap-6"
     >
       <!-- Incoming Requests Section -->
       <section
@@ -70,7 +72,7 @@
             v-for="req in incoming"
             :key="req.id"
             data-testid="incoming-request-card"
-            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4 transition-colors"
+            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
           >
             <!-- Requester Details -->
             <div class="flex items-center gap-3">
@@ -81,7 +83,7 @@
                 data-testid="incoming-user-avatar"
                 class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
               />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span
                   data-testid="incoming-user-name"
                   class="font-semibold text-surface-900 dark:text-surface-0 text-base"
@@ -94,7 +96,7 @@
                 >
                   {{ req.user.email }}
                 </span>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-surface-500 dark:text-surface-400">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-surface-500 dark:text-surface-400">
                   <span
                     data-testid="incoming-user-timezone"
                     class="flex items-center gap-1"
@@ -168,7 +170,7 @@
             v-for="req in outgoing"
             :key="req.id"
             data-testid="outgoing-request-card"
-            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4 transition-colors"
+            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
           >
             <!-- Recipient Details -->
             <div class="flex items-center gap-3">
@@ -179,7 +181,7 @@
                 data-testid="outgoing-user-avatar"
                 class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 font-semibold shrink-0"
               />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span
                   data-testid="outgoing-user-name"
                   class="font-semibold text-surface-900 dark:text-surface-0 text-base"
@@ -192,7 +194,7 @@
                 >
                   {{ req.user.email }}
                 </span>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-surface-500 dark:text-surface-400">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-surface-500 dark:text-surface-400">
                   <span
                     data-testid="outgoing-user-timezone"
                     class="flex items-center gap-1"

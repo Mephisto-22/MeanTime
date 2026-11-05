@@ -13,7 +13,7 @@
       </p>
     </div>
 
-    <div class="mt-4 flex justify-end gap-2">
+    <template #footer>
       <Button
         type="button"
         label="Cancel"
@@ -30,7 +30,7 @@
         :loading="loading"
         @click="emit('confirm')"
       />
-    </div>
+    </template>
   </Dialog>
 </template>
 

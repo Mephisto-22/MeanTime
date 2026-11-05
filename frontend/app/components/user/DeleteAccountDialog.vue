@@ -13,9 +13,9 @@
       </p>
 
       <div class="flex flex-col gap-2">
-        <Label for="delete-password-input">
+        <label for="delete-password-input" class="text-sm font-medium">
           Enter your password to confirm:
-        </Label>
+        </label>
         <InputText
           id="delete-password-input"
           v-model="password"
@@ -44,27 +44,27 @@
       >
         {{ errorMessage }}
       </Message>
-
-      <div class="mt-2 flex justify-end gap-2">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          text
-          data-testid="delete-cancel-button"
-          :disabled="loading"
-          @click="handleCancel"
-        />
-        <Button
-          type="button"
-          label="Confirm Delete"
-          severity="danger"
-          data-testid="delete-confirm-button"
-          :loading="loading"
-          @click="handleConfirm"
-        />
-      </div>
     </div>
+
+    <template #footer>
+      <Button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        text
+        data-testid="delete-cancel-button"
+        :disabled="loading"
+        @click="handleCancel"
+      />
+      <Button
+        type="button"
+        label="Confirm Delete"
+        severity="danger"
+        data-testid="delete-confirm-button"
+        :loading="loading"
+        @click="handleConfirm"
+      />
+    </template>
   </Dialog>
 </template>
 

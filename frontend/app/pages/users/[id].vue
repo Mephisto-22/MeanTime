@@ -1,53 +1,49 @@
 <template>
-  <div class="mx-auto max-w-4xl px-6 py-10">
-    <!-- Error Banner -->
-    <Message
-      v-if="saveError"
-      data-testid="profile-save-error"
-      severity="error"
-      class="mb-6"
-      :closable="true"
-      @close="saveError = null"
-    >
-      {{ saveError }}
-    </Message>
+  <div class="mx-auto max-w-3xl px-4 py-4 sm:py-6 sm:px-6 flex flex-col gap-4 sm:gap-5">
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-0.5">
+        <h1 class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-0 sm:text-3xl">
+          Account Settings
+        </h1>
+        <p class="text-sm text-surface-500 dark:text-surface-400">
+          Manage your personal details, workspace preferences, and security credentials.
+        </p>
+      </div>
+      <Avatar
+        :label="getInitials(currentUser?.display_name, currentUser?.email)"
+        shape="circle"
+        size="large"
+        class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
+      />
+    </div>
 
-    <!-- Success Banner -->
-    <Message
-      v-if="saveSuccess"
-      data-testid="profile-save-success"
-      severity="success"
-      class="mb-6"
-      :closable="true"
-      @close="saveSuccess = false"
-    >
-      Account information saved successfully.
-    </Message>
-
-    <!-- Account Details Card -->
-    <Card class="mb-8">
-      <template #title>
-        <h2 class="text-2xl font-bold">Account Information</h2>
-      </template>
-      <template #subtitle>
-        View and manage your account details and profile preferences.
-      </template>
+    <!-- Main Settings Card -->
+    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
       <template #content>
-        <div class="flex flex-col gap-4">
-          <!-- Username / Email (Read-Only: No Edit Button) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Label class="sm:w-1/3">Username / Email</Label>
+        <div class="flex flex-col gap-3.5">
+          <!-- Row 1: Username / Email (Read-Only) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
+              <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Username / Email</span>
+              <span class="text-xs text-surface-500 dark:text-surface-400">Primary account identifier</span>
+            </div>
             <div class="flex flex-1 items-center justify-between gap-4">
-              <span data-testid="field-email">{{ currentUser?.email || 'N/A' }}</span>
-              <Tag value="Read-only" severity="secondary" />
+              <span data-testid="field-email" class="text-sm font-medium text-surface-700 dark:text-surface-200">
+                {{ currentUser?.email || 'N/A' }}
+              </span>
+              <Tag value="Read-only" severity="secondary" size="small" />
             </div>
           </div>
 
           <Divider />
 
-          <!-- Display Name (Editable) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Label for="input-display-name" class="sm:w-1/3">Display Name</Label>
+          <!-- Row 2: Display Name (Editable) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
+              <label for="input-display-name" class="text-sm font-medium text-surface-900 dark:text-surface-100">Display Name</label>
+              <span class="text-xs text-surface-500 dark:text-surface-400">Public name on boards and tasks</span>
+            </div>
             <div class="flex flex-1 items-center justify-between gap-4">
               <div class="flex-1">
                 <InputText
@@ -57,8 +53,11 @@
                   data-testid="input-display-name"
                   fluid
                   autofocus
+                  size="small"
                 />
-                <span v-else data-testid="field-display-name">{{ currentUser?.display_name || 'N/A' }}</span>
+                <span v-else data-testid="field-display-name" class="text-sm font-medium text-surface-900 dark:text-surface-0">
+                  {{ currentUser?.display_name || 'N/A' }}
+                </span>
               </div>
               <Button
                 v-if="!isEditingDisplayName"
@@ -74,9 +73,12 @@
 
           <Divider />
 
-          <!-- Timezone (Editable) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Label for="input-timezone" class="sm:w-1/3">Timezone</Label>
+          <!-- Row 3: Timezone (Editable) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
+              <label for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
+              <span class="text-xs text-surface-500 dark:text-surface-400">Used for timer logs and daily summaries</span>
+            </div>
             <div class="flex flex-1 items-center justify-between gap-4">
               <div class="flex-1">
                 <InputText
@@ -85,8 +87,12 @@
                   v-model="draftTimezone"
                   data-testid="input-timezone"
                   fluid
+                  size="small"
                 />
-                <span v-else data-testid="field-timezone">{{ currentUser?.timezone || 'UTC' }}</span>
+                <span v-else data-testid="field-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-0 flex items-center gap-1.5">
+                  <i class="pi pi-globe text-xs text-surface-400" />
+                  {{ currentUser?.timezone || 'UTC' }}
+                </span>
               </div>
               <Button
                 v-if="!isEditingTimezone"
@@ -102,11 +108,16 @@
 
           <Divider />
 
-          <!-- Password (Has Edit Button, but No-Op) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Label class="sm:w-1/3">Password</Label>
+          <!-- Row 4: Password (Read-only representation with edit action) -->
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+            <div class="flex flex-col sm:w-1/3">
+              <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Password</span>
+              <span class="text-xs text-surface-500 dark:text-surface-400">Account login credentials</span>
+            </div>
             <div class="flex flex-1 items-center justify-between gap-4">
-              <span data-testid="field-password" class="tracking-widest">••••••••</span>
+              <span data-testid="field-password" class="tracking-widest font-mono text-sm text-surface-900 dark:text-surface-0">
+                ••••••••
+              </span>
               <Button
                 data-testid="edit-password-button"
                 label="Edit"
@@ -120,20 +131,22 @@
         </div>
       </template>
 
-      <!-- Save / Cancel Editing Actions -->
+      <!-- Save / Cancel Inline Action Bar -->
       <template v-if="isEditing" #footer>
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-end gap-2 pt-1">
           <Button
             data-testid="cancel-edit-button"
             label="Cancel"
             severity="secondary"
             text
+            size="small"
             @click="cancelEditing"
           />
           <Button
             data-testid="save-profile-button"
-            label="Save"
+            label="Save Changes"
             icon="pi pi-check"
+            size="small"
             @click="openSaveDialog"
           />
         </div>
@@ -141,27 +154,24 @@
     </Card>
 
     <!-- Danger Zone: Delete Account -->
-    <Card class="border border-red-200 dark:border-red-950">
-      <template #title>
-        <span class="text-red-700 dark:text-red-400">Delete Account</span>
-      </template>
-      <template #content>
-        <p class="text-sm text-surface-600 dark:text-surface-400">
-          Deactivate your user account. This action cannot be undone.
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-red-200 dark:border-red-950/80 bg-red-50/30 dark:bg-red-950/20 gap-3">
+      <div class="flex flex-col gap-0.5">
+        <span class="text-sm font-semibold text-red-700 dark:text-red-400">Delete Account</span>
+        <p class="text-xs text-surface-600 dark:text-surface-400">
+          Deactivate your user account and revoke active sessions. This action cannot be undone.
         </p>
-      </template>
-      <template #footer>
-        <div class="flex justify-end">
-          <Button
-            data-testid="delete-account-button"
-            label="Delete Account"
-            severity="danger"
-            icon="pi pi-trash"
-            @click="openDeleteDialog"
-          />
-        </div>
-      </template>
-    </Card>
+      </div>
+      <Button
+        data-testid="delete-account-button"
+        label="Delete Account"
+        severity="danger"
+        variant="outlined"
+        size="small"
+        icon="pi pi-trash"
+        class="shrink-0"
+        @click="openDeleteDialog"
+      />
+    </div>
 
     <!-- Confirmation Modal for Saving Changes -->
     <SaveConfirmDialog
@@ -187,6 +197,7 @@ import SaveConfirmDialog from '~/components/user/SaveConfirmDialog.vue'
 import DeleteAccountDialog from '~/components/user/DeleteAccountDialog.vue'
 
 const authStore = useAuthStore()
+const notify = useNotifications()
 
 const currentUser = computed(() => authStore.user)
 
@@ -199,12 +210,30 @@ const draftTimezone = ref('UTC')
 
 const isSaveDialogOpen = ref(false)
 const isSaving = ref(false)
-const saveError = ref<string | null>(null)
-const saveSuccess = ref(false)
 
 const isDeleteDialogOpen = ref(false)
 const isDeleting = ref(false)
 const deleteError = ref<string | null>(null)
+
+function getInitials(name?: string, email?: string): string {
+  const trimmed = name?.trim()
+  if (trimmed) {
+    const parts = trimmed.split(/\s+/)
+    const first = parts[0]
+    const last = parts[parts.length - 1]
+    if (parts.length >= 2 && first && last && first[0] && last[0]) {
+      return (first[0] + last[0]).toUpperCase()
+    }
+    if (first) {
+      return first.slice(0, 1).toUpperCase()
+    }
+  }
+  const emailTrimmed = email?.trim()
+  if (emailTrimmed) {
+    return emailTrimmed.slice(0, 1).toUpperCase()
+  }
+  return '?'
+}
 
 function syncDraft() {
   draftDisplayName.value = currentUser.value?.display_name || ''
@@ -228,18 +257,14 @@ function cancelEditing() {
   syncDraft()
   isEditingDisplayName.value = false
   isEditingTimezone.value = false
-  saveError.value = null
 }
 
 function openSaveDialog() {
-  saveError.value = null
   isSaveDialogOpen.value = true
 }
 
 async function saveChanges() {
   isSaving.value = true
-  saveError.value = null
-  saveSuccess.value = false
 
   try {
     const updated = await usersApi.updateMe({
@@ -250,9 +275,9 @@ async function saveChanges() {
     isEditingDisplayName.value = false
     isEditingTimezone.value = false
     isSaveDialogOpen.value = false
-    saveSuccess.value = true
+    notify.success('Account information saved successfully.')
   } catch (err: any) {
-    saveError.value = err?.message || 'Failed to save account changes.'
+    notify.error(err, 'Failed to save account changes.')
     isSaveDialogOpen.value = false
   } finally {
     isSaving.value = false
@@ -275,6 +300,7 @@ async function deleteAccount(password: string) {
     await navigateTo('/login')
   } catch (err: any) {
     deleteError.value = err?.message || 'Failed to delete account.'
+    notify.error(err, 'Failed to delete account.')
   } finally {
     isDeleting.value = false
   }

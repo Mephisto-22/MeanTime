@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-4">
+  <div class="flex flex-col gap-4">
     <!-- Skeleton Loaders for Loading State -->
     <div
       v-if="loading"
@@ -30,17 +30,19 @@
     <div
       v-else-if="friends.length === 0"
       data-testid="friends-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl"
+      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
     >
-      <div class="w-16 h-16 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center mb-4 text-surface-400 dark:text-surface-500">
+      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
         <i class="pi pi-users text-3xl" />
       </div>
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0 mb-1">
-        No friends yet
-      </h3>
-      <p class="text-sm text-surface-500 dark:text-surface-400 max-w-sm">
-        Head over to the "Add Friend" tab to connect with other users and schedule together!
-      </p>
+      <div class="flex flex-col gap-1 max-w-sm">
+        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+          No friends yet
+        </h3>
+        <p class="text-sm text-surface-500 dark:text-surface-400">
+          Head over to the "Add Friend" tab to connect with other users and schedule together!
+        </p>
+      </div>
     </div>
 
     <!-- Friends List -->
@@ -52,7 +54,7 @@
         v-for="friend in friends"
         :key="friend.id"
         data-testid="friend-card"
-        class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4 transition-colors"
+        class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
       >
         <!-- Friend Details -->
         <div class="flex items-center gap-3">
@@ -63,7 +65,7 @@
             data-testid="friend-avatar"
             class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
           />
-          <div class="flex flex-col">
+          <div class="flex flex-col gap-0.5">
             <span
               data-testid="friend-name"
               class="font-semibold text-surface-900 dark:text-surface-0 text-base"
@@ -78,7 +80,7 @@
             </span>
             <span
               data-testid="friend-timezone"
-              class="text-xs text-surface-500 dark:text-surface-400 flex items-center gap-1 mt-0.5"
+              class="text-xs text-surface-500 dark:text-surface-400 flex items-center gap-1"
             >
               <i class="pi pi-globe text-[11px]" />
               {{ friend.timezone }}
