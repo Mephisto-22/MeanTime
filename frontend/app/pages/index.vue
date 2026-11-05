@@ -1,12 +1,20 @@
 <template>
-  <div class="mx-auto max-w-7xl px-6 py-10 flex flex-col gap-8">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-8 flex flex-col gap-8">
     <Toolbar class="border-none bg-transparent p-0">
       <template #start>
-        <div class="flex flex-col gap-1">
-          <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-            Your boards
-          </h1>
-          <p class="text-surface-600 dark:text-surface-400">
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center gap-3">
+            <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+              Your boards
+            </h1>
+            <Badge
+              v-if="boards.length > 0"
+              :value="boards.length"
+              severity="secondary"
+              class="font-mono text-xs"
+            />
+          </div>
+          <p class="text-sm text-surface-600 dark:text-surface-400">
             Pick a board to open, or create a new one.
           </p>
         </div>
@@ -17,6 +25,7 @@
           data-testid="new-board-button"
           label="New board"
           icon="pi pi-plus"
+          size="small"
           @click="openCreateDialog"
         />
       </template>
@@ -31,7 +40,7 @@
       <Skeleton
         v-for="n in 3"
         :key="n"
-        height="9rem"
+        height="10rem"
         border-radius="12px"
       />
     </div>
@@ -40,7 +49,7 @@
     <div
       v-else-if="error"
       data-testid="boards-error"
-      class="rounded-lg border border-surface-300 p-4 dark:border-surface-700"
+      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load your boards.</span>
@@ -59,10 +68,10 @@
     <Panel
       v-else-if="boards.length === 0"
       data-testid="boards-empty"
-      class="border-dashed"
+      class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
     >
-      <div class="flex flex-col items-center justify-center gap-4 py-12 text-center">
-        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500">
+      <div class="flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50">
           <i class="pi pi-th-large text-3xl" />
         </div>
         <div class="flex flex-col gap-1 max-w-sm">
@@ -76,6 +85,8 @@
         <Button
           label="New board"
           icon="pi pi-plus"
+          size="small"
+          class="mt-1"
           @click="openCreateDialog"
         />
       </div>

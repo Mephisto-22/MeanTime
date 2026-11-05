@@ -1,16 +1,16 @@
 <template>
-  <div class="mx-auto max-w-7xl px-6 py-8 flex flex-col gap-6">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-6 flex flex-col gap-4 flex-1 min-h-[calc(100vh-6rem)]">
     <!-- Loading -->
     <div
       v-if="status === 'pending' && !board"
       data-testid="board-loading"
-      class="flex gap-4 overflow-hidden"
+      class="flex gap-4 overflow-hidden flex-1"
     >
       <Skeleton
         v-for="n in 3"
         :key="n"
-        width="16rem"
-        height="50vh"
+        width="18rem"
+        height="75vh"
         border-radius="12px"
         class="shrink-0"
       />
@@ -20,7 +20,7 @@
     <div
       v-else-if="isNotFound"
       data-testid="board-not-found"
-      class="rounded-lg border border-surface-300 p-4 dark:border-surface-700"
+      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
     >
       This board doesn't exist, or it isn't yours.
     </div>
@@ -29,7 +29,7 @@
     <div
       v-else-if="error"
       data-testid="board-error"
-      class="rounded-lg border border-surface-300 p-4 dark:border-surface-700"
+      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load this board.</span>
@@ -70,8 +70,11 @@
           <Button
             label="Share"
             icon="pi pi-users"
+            severity="secondary"
+            outlined
             size="small"
             data-testid="board-share-button"
+            class="h-fit shrink-0"
             @click="isShareDialogOpen = true"
           />
         </template>
@@ -79,7 +82,7 @@
       <p
         v-if="board.columns.length === 0"
         data-testid="board-no-columns"
-        class="rounded-xl border border-dashed border-surface-300 px-6 py-10 text-center text-surface-600 dark:border-surface-700 dark:text-surface-300"
+        class="rounded-xl border border-dashed border-surface-300 px-6 py-12 text-center text-surface-600 dark:border-surface-700 dark:text-surface-400"
       >
         This board has no columns yet.
       </p>

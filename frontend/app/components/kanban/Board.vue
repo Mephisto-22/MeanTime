@@ -1,5 +1,9 @@
 <template>
-  <Card data-testid="kanban-board">
+  <Card
+    data-testid="kanban-board"
+    class="flex flex-col flex-1 border border-surface-200 dark:border-surface-800 shadow-sm"
+    :pt="{ body: 'flex flex-col flex-1 p-5 gap-4', content: 'flex flex-col flex-1 min-h-0' }"
+  >
     <template #title>
       <Toolbar class="border-none bg-transparent p-0">
         <template #start>
