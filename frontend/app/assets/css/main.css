@@ -114,7 +114,7 @@
 }
 
 .kanban-timer-dock {
-  @apply -mx-2.5 -mb-2.5 mt-2.5 flex flex-col gap-1.5 border-t border-surface-200 bg-surface-50 px-2.5 py-1.5 dark:border-surface-700 dark:bg-surface-800 rounded-b-[inherit] select-none;
+  @apply -mx-2.5 -mb-2.5 mt-2.5 flex flex-col gap-1.5 border-t border-surface-200 bg-surface-50 px-2.5 py-1.5 dark:border-surface-700 dark:bg-surface-800 rounded-b-xl select-none;
 }
 
 .timer-progress-track {

@@ -3,7 +3,7 @@
     data-testid="kanban-task"
     :data-task-id="task.id"
     :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="cursor-grab active:cursor-grabbing select-none border border-surface-200 dark:border-surface-800"
+    class="cursor-grab active:cursor-grabbing select-none border border-surface-200 dark:border-surface-800 rounded-xl overflow-hidden"
     :class="priorityBorderClass"
     @click="handleClick"
     @pointerdown="handlePointerDown"
