@@ -2,12 +2,25 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
-import Fieldset from 'primevue/fieldset'
+import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UserProfilePage from '~/pages/users/[id].vue'
 import { usersApi } from '~/api/users'
 import { useAuthStore } from '~/stores/auth'
+
+const mockToast = {
+  add: vi.fn(),
+  remove: vi.fn(),
+}
+
+vi.mock('primevue/usetoast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('primevue/usetoast')>()
+  return {
+    ...actual,
+    useToast: () => mockToast,
+  }
+})
 
 let wrappers: VueWrapper[] = []
 
@@ -17,7 +30,7 @@ async function mountPage() {
     global: {
       plugins: [PrimeVue, ToastService],
       components: {
-        Fieldset,
+        Card,
         Divider,
       },
     },
@@ -27,8 +40,11 @@ async function mountPage() {
   return wrapper
 }
 
-describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
+describe('UserProfilePage Redesign Suite', () => {
   beforeEach(() => {
+    mockToast.add.mockClear()
+    mockToast.remove.mockClear()
+
     const authStore = useAuthStore()
     authStore.setUser({
       id: 42,
@@ -46,44 +62,29 @@ describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders semantic Fieldset containers for all four sections with canonical legends', async () => {
+  it('renders header with page title and user initials avatar', async () => {
     const wrapper = await mountPage()
 
-    const fieldsets = wrapper.findAllComponents(Fieldset)
-    expect(fieldsets.length).toBe(4)
-
-    const legends = fieldsets.map((f) => f.props('legend'))
-    expect(legends).toEqual([
-      'Account Information',
-      'Preferences',
-      'Security',
-      'Danger Zone',
-    ])
+    expect(wrapper.text()).toContain('Account Settings')
+    expect(wrapper.text()).toContain('AJ')
   })
 
-  it('renders email as read-only with a Read-only tag in Account Information', async () => {
+  it('renders email as read-only with a Read-only tag', async () => {
     const wrapper = await mountPage()
 
     const emailField = wrapper.find('[data-testid="field-email"]')
     expect(emailField.exists()).toBe(true)
     expect(emailField.text()).toBe('alex@example.com')
-
-    const fieldsets = wrapper.findAllComponents(Fieldset)
-    const accountInfoFieldset = fieldsets[0]
-    expect(accountInfoFieldset.text()).toContain('Read-only')
-    expect(accountInfoFieldset.find('[data-testid="edit-display-name-button"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Read-only')
   })
 
-  it('renders editable display name and timezone in Preferences with Divider separation', async () => {
+  it('renders editable display name and timezone with Divider separation', async () => {
     const wrapper = await mountPage()
 
-    const fieldsets = wrapper.findAllComponents(Fieldset)
-    const preferencesFieldset = fieldsets[1]
+    expect(wrapper.find('[data-testid="field-display-name"]').text()).toBe('Alex Johnson')
+    expect(wrapper.find('[data-testid="field-timezone"]').text()).toBe('America/New_York')
 
-    expect(preferencesFieldset.find('[data-testid="field-display-name"]').text()).toBe('Alex Johnson')
-    expect(preferencesFieldset.find('[data-testid="field-timezone"]').text()).toBe('America/New_York')
-
-    const dividers = preferencesFieldset.findAllComponents(Divider)
+    const dividers = wrapper.findAllComponents(Divider)
     expect(dividers.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -107,7 +108,7 @@ describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
     expect(wrapper.find('[data-testid="input-display-name"]').exists()).toBe(false)
   })
 
-  it('handles save confirmation flow and updates user store upon success', async () => {
+  it('handles save confirmation flow, updates user store, and triggers success toast notification', async () => {
     const updateSpy = vi.spyOn(usersApi, 'updateMe').mockResolvedValue({
       id: 42,
       email: 'alex@example.com',
@@ -136,29 +137,48 @@ describe('UserProfilePage Semantic Decomposition & Fieldsets Suite', () => {
       timezone: 'America/New_York',
     })
 
-    const successMessage = wrapper.find('[data-testid="profile-save-success"]')
-    expect(successMessage.exists()).toBe(true)
-    expect(successMessage.text()).toContain('saved successfully')
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'success',
+        detail: 'Account information saved successfully.',
+      }),
+    )
   })
 
-  it('renders Security fieldset with password dot display and edit button', async () => {
+  it('shows error toast when saving changes fails', async () => {
+    vi.spyOn(usersApi, 'updateMe').mockRejectedValue(new Error('Network error'))
+
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="edit-display-name-button"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="save-profile-button"]').trigger('click')
+    await flushPromises()
+
+    const confirmSaveBtn = document.body.querySelector('[data-testid="save-confirm-save-button"]') as HTMLButtonElement
+    expect(confirmSaveBtn).not.toBeNull()
+    confirmSaveBtn.click()
+    await flushPromises()
+
+    expect(mockToast.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'error',
+      }),
+    )
+  })
+
+  it('renders Security section with password dot display and edit button', async () => {
     const wrapper = await mountPage()
 
-    const fieldsets = wrapper.findAllComponents(Fieldset)
-    const securityFieldset = fieldsets[2]
-
-    const passwordField = securityFieldset.find('[data-testid="field-password"]')
+    const passwordField = wrapper.find('[data-testid="field-password"]')
     expect(passwordField.exists()).toBe(true)
-    expect(securityFieldset.find('[data-testid="edit-password-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="edit-password-button"]').exists()).toBe(true)
   })
 
-  it('renders Danger Zone fieldset and triggers DeleteAccountDialog', async () => {
+  it('renders Danger Zone and triggers DeleteAccountDialog', async () => {
     const wrapper = await mountPage()
 
-    const fieldsets = wrapper.findAllComponents(Fieldset)
-    const dangerFieldset = fieldsets[3]
-
-    const deleteBtn = dangerFieldset.find('[data-testid="delete-account-button"]')
+    const deleteBtn = wrapper.find('[data-testid="delete-account-button"]')
     expect(deleteBtn.exists()).toBe(true)
 
     await deleteBtn.trigger('click')
