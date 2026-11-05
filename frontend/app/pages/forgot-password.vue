@@ -2,7 +2,7 @@
   <div class="auth-card-container">
     <Card class="auth-card">
       <template #title>
-        <h2 class="auth-title">Forgot password</h2>
+        <h1 class="auth-title">Forgot password</h1>
       </template>
       <template #content>
         <div class="flex flex-col gap-4">
