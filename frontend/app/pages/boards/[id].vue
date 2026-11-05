@@ -20,7 +20,7 @@
     <div
       v-else-if="isNotFound"
       data-testid="board-not-found"
-      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
+      class="error-state-card"
     >
       This board doesn't exist, or it isn't yours.
     </div>
@@ -29,7 +29,7 @@
     <div
       v-else-if="error"
       data-testid="board-error"
-      class="rounded-xl border border-surface-300 p-6 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
+      class="error-state-card"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load this board.</span>
@@ -57,11 +57,11 @@
               :key="c.id"
               :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
               shape="circle"
-              class="border-2 border-surface-0 bg-primary-100 text-xs font-semibold text-primary-700 dark:border-surface-900 dark:bg-primary-950 dark:text-primary-300"
+              class="border-2 border-surface-0 user-avatar-primary text-xs font-semibold dark:border-surface-900"
             />
             <span
               v-if="board.collaborators.length > 3"
-              class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+              class="avatar-overflow-badge"
             >
               +{{ board.collaborators.length - 3 }}
             </span>

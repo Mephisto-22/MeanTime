@@ -5,7 +5,7 @@
     modal
     header="Save Changes"
     :draggable="false"
-    class="w-[min(26rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <div class="py-2">
       <p class="text-surface-700 dark:text-surface-200">

@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-6">
     <!-- Search Bar Form -->
-    <div class="p-6 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-2xl shadow-sm">
+    <div class="search-panel-card">
       <div class="max-w-2xl flex flex-col gap-4">
         <div class="flex flex-col gap-1">
           <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
@@ -71,9 +71,9 @@
     <div
       v-if="hasSearched && !isSearching && searchResults && searchResults.length === 0"
       data-testid="search-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
+      class="social-empty-state"
     >
-      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
+      <div class="empty-state-icon-circle">
         <i class="pi pi-search text-3xl" />
       </div>
       <div class="flex flex-col gap-1 max-w-md">
@@ -104,7 +104,7 @@
           :key="user.id"
           data-testid="search-result-card"
           :data-testid-user="user.id"
-          class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
+          class="user-item-card"
         >
           <!-- User Details -->
           <div class="flex items-center gap-3">
@@ -113,7 +113,7 @@
               shape="circle"
               size="large"
               data-testid="user-avatar"
-              class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
+              class="user-avatar-primary"
             />
             <div class="flex flex-col gap-0.5">
               <span
@@ -246,7 +246,7 @@
       modal
       :draggable="false"
       header="Unfriend Confirmation"
-      class="w-[min(28rem,calc(100vw-2rem))]"
+      class="dialog-sm"
     >
       <div class="flex flex-col gap-3 py-2">
         <p class="text-surface-600 dark:text-surface-300">
@@ -283,7 +283,7 @@
       modal
       :draggable="false"
       header="Block User Confirmation"
-      class="w-[min(28rem,calc(100vw-2rem))]"
+      class="dialog-sm"
     >
       <div class="flex flex-col gap-3 py-2">
         <p class="text-surface-600 dark:text-surface-300">

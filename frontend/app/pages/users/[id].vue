@@ -14,7 +14,7 @@
         :label="getInitials(currentUser?.display_name, currentUser?.email)"
         shape="circle"
         size="large"
-        class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
+        class="user-avatar-primary"
       />
     </div>
 
@@ -23,8 +23,8 @@
       <template #content>
         <div class="flex flex-col gap-3.5">
           <!-- Row 1: Username / Email (Read-Only) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
-            <div class="flex flex-col sm:w-1/3">
+          <div class="profile-field-row">
+            <div class="profile-field-meta">
               <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Username / Email</span>
               <span class="text-xs text-surface-500 dark:text-surface-400">Primary account identifier</span>
             </div>
@@ -39,8 +39,8 @@
           <Divider />
 
           <!-- Row 2: Display Name (Editable) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
-            <div class="flex flex-col sm:w-1/3">
+          <div class="profile-field-row">
+            <div class="profile-field-meta">
               <label for="input-display-name" class="text-sm font-medium text-surface-900 dark:text-surface-100">Display Name</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Public name on boards and tasks</span>
             </div>
@@ -74,8 +74,8 @@
           <Divider />
 
           <!-- Row 3: Timezone (Editable) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
-            <div class="flex flex-col sm:w-1/3">
+          <div class="profile-field-row">
+            <div class="profile-field-meta">
               <label for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Used for timer logs and daily summaries</span>
             </div>
@@ -109,8 +109,8 @@
           <Divider />
 
           <!-- Row 4: Password (Read-only representation with edit action) -->
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
-            <div class="flex flex-col sm:w-1/3">
+          <div class="profile-field-row">
+            <div class="profile-field-meta">
               <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Password</span>
               <span class="text-xs text-surface-500 dark:text-surface-400">Account login credentials</span>
             </div>
@@ -154,7 +154,7 @@
     </Card>
 
     <!-- Danger Zone: Delete Account -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-red-200 dark:border-red-950/80 bg-red-50/30 dark:bg-red-950/20 gap-3">
+    <div class="danger-zone-card">
       <div class="flex flex-col gap-0.5">
         <span class="text-sm font-semibold text-red-700 dark:text-red-400">Delete Account</span>
         <p class="text-xs text-surface-600 dark:text-surface-400">

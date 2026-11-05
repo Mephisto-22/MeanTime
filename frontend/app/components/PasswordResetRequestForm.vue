@@ -1,6 +1,6 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" @submit.prevent="submit">
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="reset-email">Email</Label>
       <InputText id="reset-email" v-model="email" name="email" type="email" autocomplete="email" maxlength="254" required :invalid="email.length > 0 && !isValid" />
     </div>

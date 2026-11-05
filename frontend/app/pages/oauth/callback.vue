@@ -1,8 +1,8 @@
 <template>
-  <div class="mx-auto w-full max-w-md px-4 py-8">
-    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+  <div class="auth-card-container">
+    <Card class="auth-card">
       <template #title>
-        <h2 class="text-2xl font-bold tracking-tight">Signing in with Google</h2>
+        <h2 class="auth-title">Signing in with Google</h2>
       </template>
       <template #content>
         <div class="flex flex-col gap-4">
@@ -10,7 +10,7 @@
           <template v-else>
             <Message severity="error" role="alert">{{ error }}</Message>
             <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
-              <NuxtLink to="/login" class="text-primary hover:underline">Back to login</NuxtLink>
+              <NuxtLink to="/login" class="auth-link">Back to login</NuxtLink>
             </div>
           </template>
         </div>

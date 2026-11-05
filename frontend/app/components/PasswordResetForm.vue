@@ -1,10 +1,10 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" @submit.prevent="submit">
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="reset-password">New password</Label>
       <InputText id="reset-password" v-model="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required />
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="reset-password-confirm">Confirm new password</Label>
       <InputText id="reset-password-confirm" v-model="passwordConfirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required />
     </div>

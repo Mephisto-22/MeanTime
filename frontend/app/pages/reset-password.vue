@@ -1,8 +1,8 @@
 <template>
-  <div class="mx-auto w-full max-w-md px-4 py-8">
-    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+  <div class="auth-card-container">
+    <Card class="auth-card">
       <template #title>
-        <h2 class="text-2xl font-bold tracking-tight">Reset password</h2>
+        <h2 class="auth-title">Reset password</h2>
       </template>
       <template #content>
         <div class="flex flex-col gap-4">
@@ -11,10 +11,10 @@
           <PasswordResetForm v-if="valid && !success" :loading="loading" @submit="resetPassword" />
           <Message v-if="error" severity="error" role="alert">{{ error }}</Message>
           <div v-if="!checking && !valid && !success" class="pt-2 text-sm text-surface-600 dark:text-surface-400">
-            <NuxtLink to="/forgot-password" class="text-primary hover:underline">Request a new reset link</NuxtLink>
+            <NuxtLink to="/forgot-password" class="auth-link">Request a new reset link</NuxtLink>
           </div>
           <div class="text-sm text-surface-600 dark:text-surface-400">
-            <NuxtLink to="/login" class="text-primary hover:underline">Back to login</NuxtLink>
+            <NuxtLink to="/login" class="auth-link">Back to login</NuxtLink>
           </div>
         </div>
       </template>

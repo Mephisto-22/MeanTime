@@ -1,8 +1,8 @@
 <template>
-  <div class="mx-auto w-full max-w-md px-4 py-8">
-    <Card class="border border-surface-200 dark:border-surface-800 shadow-sm">
+  <div class="auth-card-container">
+    <Card class="auth-card">
       <template #title>
-        <h2 class="text-2xl font-bold tracking-tight">Log in</h2>
+        <h2 class="auth-title">Log in</h2>
       </template>
       <template #content>
         <div class="flex flex-col gap-4">
@@ -12,10 +12,10 @@
           <LoginForm :loading="loading" @submit="login" />
           <GoogleSignInButton />
           <div class="flex flex-col gap-2 pt-2 text-sm text-surface-600 dark:text-surface-400">
-            <NuxtLink to="/forgot-password" class="text-primary hover:underline">Forgot your password?</NuxtLink>
+            <NuxtLink to="/forgot-password" class="auth-link">Forgot your password?</NuxtLink>
             <p>
               Need an account?
-              <NuxtLink to="/register" class="text-primary hover:underline">Register</NuxtLink>
+              <NuxtLink to="/register" class="auth-link">Register</NuxtLink>
             </p>
           </div>
         </div>

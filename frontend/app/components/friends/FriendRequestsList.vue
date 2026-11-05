@@ -9,7 +9,7 @@
       <div
         v-for="i in 3"
         :key="i"
-        class="flex items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl"
+        class="user-item-skeleton"
       >
         <div class="flex items-center gap-3 w-full">
           <Skeleton shape="circle" size="3rem" class="shrink-0" />
@@ -30,9 +30,9 @@
     <div
       v-else-if="incoming.length === 0 && outgoing.length === 0"
       data-testid="requests-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
+      class="social-empty-state"
     >
-      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
+      <div class="empty-state-icon-circle">
         <i class="pi pi-inbox text-3xl" />
       </div>
       <div class="flex flex-col gap-1 max-w-sm">
@@ -72,7 +72,7 @@
             v-for="req in incoming"
             :key="req.id"
             data-testid="incoming-request-card"
-            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
+            class="user-item-card"
           >
             <!-- Requester Details -->
             <div class="flex items-center gap-3">
@@ -81,7 +81,7 @@
                 shape="circle"
                 size="large"
                 data-testid="incoming-user-avatar"
-                class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold shrink-0"
+                class="user-avatar-primary"
               />
               <div class="flex flex-col gap-0.5">
                 <span
@@ -170,7 +170,7 @@
             v-for="req in outgoing"
             :key="req.id"
             data-testid="outgoing-request-card"
-            class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
+            class="user-item-card"
           >
             <!-- Recipient Details -->
             <div class="flex items-center gap-3">
@@ -179,7 +179,7 @@
                 shape="circle"
                 size="large"
                 data-testid="outgoing-user-avatar"
-                class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 font-semibold shrink-0"
+                class="user-avatar-secondary"
               />
               <div class="flex flex-col gap-0.5">
                 <span
@@ -237,7 +237,7 @@
       modal
       :draggable="false"
       header="Block User Confirmation"
-      class="w-[min(28rem,calc(100vw-2rem))]"
+      class="dialog-sm"
     >
       <div class="flex flex-col gap-3 py-2">
         <p class="text-surface-600 dark:text-surface-300">

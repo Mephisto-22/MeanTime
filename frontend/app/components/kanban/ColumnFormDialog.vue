@@ -3,12 +3,12 @@
     v-model:visible="visible"
     :header="column ? 'Edit Column' : 'Create Column'"
     modal
-    :style="{ width: '25rem' }"
+    class="dialog-sm"
     :closable="!busy"
     :draggable="false"
   >
     <form @submit.prevent="handleSave" class="flex flex-col gap-4">
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="column-title" class="font-medium">
           Column Title
         </Label>
@@ -65,7 +65,7 @@
 
       <div
         v-if="confirmingDelete"
-        class="rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950"
+        class="danger-callout-box"
       >
         <p class="mb-3 text-sm">
           Are you sure you want to delete this column? Tasks in this column

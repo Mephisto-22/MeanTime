@@ -5,7 +5,7 @@
     modal
     :draggable="false"
     :header="dialogTitle"
-    class="w-[min(30rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <div class="flex flex-col gap-4 py-2">
       <p class="text-sm text-surface-600 dark:text-surface-300">
@@ -13,7 +13,7 @@
         <strong class="text-surface-900 dark:text-surface-0">{{ friend?.display_name }}</strong>.
       </p>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <label for="share-board-select" class="text-sm font-medium">
           Select Board
         </label>

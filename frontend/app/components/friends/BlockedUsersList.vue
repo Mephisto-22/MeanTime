@@ -9,7 +9,7 @@
       <div
         v-for="i in 3"
         :key="i"
-        class="flex items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl"
+        class="user-item-skeleton"
       >
         <div class="flex items-center gap-3 w-full">
           <Skeleton shape="circle" size="3rem" class="shrink-0" />
@@ -28,9 +28,9 @@
     <div
       v-else-if="blockedUsers.length === 0"
       data-testid="blocked-users-empty-state"
-      class="flex flex-col items-center justify-center p-12 text-center bg-surface-0 dark:bg-surface-900 border border-dashed border-surface-300 dark:border-surface-700 rounded-2xl gap-3"
+      class="social-empty-state"
     >
-      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500">
+      <div class="empty-state-icon-circle">
         <i class="pi pi-ban text-3xl" />
       </div>
       <div class="flex flex-col gap-1 max-w-sm">
@@ -53,7 +53,7 @@
         v-for="user in blockedUsers"
         :key="user.id"
         data-testid="blocked-user-card"
-        class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl shadow-sm gap-4"
+        class="user-item-card"
       >
         <!-- User Details -->
         <div class="flex items-center gap-3">
@@ -62,7 +62,7 @@
             shape="circle"
             size="large"
             data-testid="blocked-user-avatar"
-            class="bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-300 font-semibold shrink-0"
+            class="user-avatar-secondary"
           />
           <div class="flex flex-col gap-0.5">
             <span

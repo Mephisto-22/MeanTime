@@ -5,14 +5,14 @@
     modal
     header="Delete Account"
     :draggable="false"
-    class="w-[min(28rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <div class="flex flex-col gap-4 py-2">
       <p class="text-surface-700 dark:text-surface-200">
         Are you sure you want to delete your account?
       </p>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <label for="delete-password-input" class="text-sm font-medium">
           Enter your password to confirm:
         </label>
