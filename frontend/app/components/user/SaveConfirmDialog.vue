@@ -5,7 +5,7 @@
     modal
     header="Save Changes"
     :draggable="false"
-    class="w-[min(26rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <div class="py-2">
       <p class="text-surface-700 dark:text-surface-200">
@@ -13,7 +13,7 @@
       </p>
     </div>
 
-    <div class="mt-4 flex justify-end gap-2">
+    <template #footer>
       <Button
         type="button"
         label="Cancel"
@@ -30,7 +30,7 @@
         :loading="loading"
         @click="emit('confirm')"
       />
-    </div>
+    </template>
   </Dialog>
 </template>
 

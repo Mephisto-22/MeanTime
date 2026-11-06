@@ -1,13 +1,19 @@
 <template>
-  <div class="mx-auto max-w-md px-6 py-8">
-    <Card>
-      <template #title><h2 class="text-2xl font-bold">Signing in with Google</h2></template>
+  <div class="auth-card-container">
+    <Card class="auth-card">
+      <template #title>
+        <h2 class="auth-title">Signing in with Google</h2>
+      </template>
       <template #content>
-        <p v-if="!error" role="status">Signing you in...</p>
-        <template v-else>
-          <p role="alert">{{ error }}</p>
-          <NuxtLink to="/login" class="mt-4 block text-primary underline">Back to login</NuxtLink>
-        </template>
+        <div class="flex flex-col gap-4">
+          <Message v-if="!error" severity="info" role="status">Signing you in...</Message>
+          <template v-else>
+            <Message severity="error" role="alert">{{ error }}</Message>
+            <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
+              <NuxtLink to="/login" class="auth-link">Back to login</NuxtLink>
+            </div>
+          </template>
+        </div>
       </template>
     </Card>
   </div>
@@ -22,6 +28,7 @@ definePageMeta({ public: true, layout: 'headless' })
 // Never send this page's address, tokens included, to another site.
 useHead({ meta: [{ name: 'referrer', content: 'no-referrer' }] })
 const auth = useAuthStore()
+const notify = useNotifications()
 const error = ref('')
 
 onMounted(async () => {
@@ -32,13 +39,16 @@ onMounted(async () => {
   const refreshToken = fragment.get('refresh_token')
   if (!accessToken || !refreshToken) {
     error.value = 'This sign-in link is incomplete. Try signing in with Google again.'
+    notify.error(new Error(error.value), 'Google sign-in failed')
     return
   }
   try {
     await auth.loginWithTokens({ access_token: accessToken, refresh_token: refreshToken })
+    notify.success('Signed in with Google.')
     await navigateTo('/', { replace: true })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to finish signing in. Please try again.'
+    notify.error(err, 'Unable to finish signing in')
   }
 })
 </script>

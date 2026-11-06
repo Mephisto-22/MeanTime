@@ -254,6 +254,24 @@ describe('Task Component DOM Suite', () => {
       expect(badge5.exists()).toBe(true)
       expect(badge5.text()).toBe('+2')
     })
+
+    it('aligns tags from right to left with justify-end and keeps overflow badge on the right side', () => {
+      const { wrapper } = mountTask({
+        task: createTaskFixture({
+          tags: [
+            createTagFixture({ name: 'Tag1' }),
+            createTagFixture({ name: 'Tag2' }),
+            createTagFixture({ name: 'Tag3' }),
+            createTagFixture({ name: 'Tag4' }),
+          ],
+        }),
+      })
+      const tagsRow = wrapper.find('[data-testid="task-tags-row"]')
+      expect(tagsRow.classes()).toContain('justify-end')
+      const children = tagsRow.findAll('[data-testid="task-tag-chip"], [data-testid="task-tag-overflow-badge"]')
+      expect(children).toHaveLength(4)
+      expect(children[3].attributes('data-testid')).toBe('task-tag-overflow-badge')
+    })
   })
 
   describe('Interaction & Drag Disambiguation', () => {

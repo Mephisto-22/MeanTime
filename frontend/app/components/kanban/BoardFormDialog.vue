@@ -5,7 +5,7 @@
     modal
     :header="isEditing ? 'Edit board' : 'New board'"
     :draggable="false"
-    class="w-[min(28rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <form
       id="board-form"
@@ -13,7 +13,7 @@
       novalidate
       @submit.prevent="save"
     >
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="board-title-input">Name</Label>
         <InputText
           id="board-title-input"
@@ -39,7 +39,7 @@
         </Message>
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="board-description-input">Description (optional)</Label>
         <Textarea
           id="board-description-input"

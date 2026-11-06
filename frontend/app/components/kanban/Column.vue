@@ -2,12 +2,12 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex h-[50vh] flex-1 min-w-64 flex-col rounded-lg bg-surface-100 p-3 transition-colors duration-200 dark:bg-surface-800"
+    class="kanban-column flex flex-1 min-w-72 h-full min-h-0 flex-col gap-2.5 rounded-xl bg-surface-100 p-3 dark:bg-surface-950/70 border border-surface-200 dark:border-surface-800/80"
   >
     <!-- Column Header -->
-    <div class="mb-3 flex shrink-0 items-center justify-between">
+    <div class="flex shrink-0 items-center justify-between">
       <div class="flex min-w-0 items-center gap-2">
-        <h3 class="truncate text-sm font-semibold">
+        <h3 class="truncate text-sm font-semibold text-surface-900 dark:text-surface-0">
           {{ column.title }}
         </h3>
 
@@ -37,7 +37,7 @@
       <div
         v-if="tasks.length === 0"
         data-testid="column-empty-placeholder"
-        class="absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-600"
+        class="kanban-column-empty absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-700"
       >
         No tasks
       </div>
@@ -68,17 +68,15 @@
     </div>
 
     <!-- Add Task Button -->
-    <div class="mt-2 shrink-0 pt-1">
-      <Button
-        data-testid="add-task-button"
-        label="Add Task"
-        severity="secondary"
-        icon="pi pi-plus"
-        size="small"
-        class="w-full justify-center bg-surface-200 hover:bg-surface-300 dark:bg-surface-700 dark:hover:bg-surface-600"
-        @click="handleAddTask"
-      />
-    </div>
+    <Button
+      data-testid="add-task-button"
+      label="Add Task"
+      severity="secondary"
+      icon="pi pi-plus"
+      size="small"
+      class="kanban-add-task-btn shrink-0 w-full bg-surface-200 hover:bg-surface-300 dark:bg-surface-800 dark:hover:bg-surface-700"
+      @click="handleAddTask"
+    />
   </div>
 </template>
 
@@ -158,3 +156,4 @@ defineExpose({
   handleEditColumn,
 })
 </script>
+

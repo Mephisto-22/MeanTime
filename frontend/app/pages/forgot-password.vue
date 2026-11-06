@@ -1,12 +1,18 @@
 <template>
-  <div class="mx-auto max-w-md px-6 py-8">
-    <Card>
-      <template #title><h2 class="text-2xl font-bold">Forgot password</h2></template>
+  <div class="auth-card-container">
+    <Card class="auth-card">
+      <template #title>
+        <h1 class="auth-title">Forgot password</h1>
+      </template>
       <template #content>
-        <PasswordResetRequestForm v-if="!message" :loading="loading" @submit="requestReset" />
-        <p v-if="message" role="status">{{ message }}</p>
-        <p v-if="error" role="alert" class="mt-4">{{ error }}</p>
-        <NuxtLink to="/login" class="mt-4 block text-primary underline">Back to login</NuxtLink>
+        <div class="flex flex-col gap-4">
+          <PasswordResetRequestForm v-if="!message" :loading="loading" @submit="requestReset" />
+          <Message v-if="message" severity="success" role="status">{{ message }}</Message>
+          <Message v-if="error" severity="error" role="alert">{{ error }}</Message>
+          <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
+            <NuxtLink to="/login" class="auth-link">Back to login</NuxtLink>
+          </div>
+        </div>
       </template>
     </Card>
   </div>
@@ -16,6 +22,7 @@
 import { authApi } from '~/api/auth'
 
 definePageMeta({ public: true, layout: 'headless' })
+const notify = useNotifications()
 const loading = ref(false)
 const message = ref('')
 const error = ref('')
@@ -26,8 +33,10 @@ async function requestReset(email: string) {
   error.value = ''
   try {
     message.value = (await authApi.requestPasswordReset(email)).detail
+    notify.success(message.value)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to request a reset. Please try again.'
+    notify.error(err, 'Unable to request a reset')
   } finally {
     loading.value = false
   }

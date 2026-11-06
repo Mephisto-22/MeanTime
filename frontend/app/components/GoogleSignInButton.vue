@@ -1,10 +1,8 @@
 <template>
   <div v-if="enabled" class="flex flex-col gap-4">
-    <div class="flex items-center gap-3 text-sm text-surface-500 dark:text-surface-400" aria-hidden="true">
-      <span class="flex-1 border-t border-surface-300 dark:border-surface-700" />
-      or
-      <span class="flex-1 border-t border-surface-300 dark:border-surface-700" />
-    </div>
+    <Divider align="center" class="!my-0">
+      <span class="text-xs text-surface-500 dark:text-surface-400">or</span>
+    </Divider>
     <!-- A plain link, not NuxtLink: the browser leaves the app for Google's sign-in page.
          Colors and logo follow Google's sign-in branding guidelines. -->
     <a

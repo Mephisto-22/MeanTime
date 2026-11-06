@@ -1,36 +1,36 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" novalidate @submit.prevent="submit">
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="register-display-name">Display name</Label>
       <InputText :invalid="!requiredText(displayName)" :aria-invalid="!requiredText(displayName)" :aria-describedby="!requiredText(displayName) ? 'register-display-name-error' : undefined" id="register-display-name" v-model="displayName" name="display_name" maxlength="50" autocomplete="nickname" required />
-      <small v-if="!requiredText(displayName)" id="register-display-name-error" class="text-red-600 dark:text-red-400">Enter a display name.</small>
+      <small v-if="!requiredText(displayName)" id="register-display-name-error" class="field-error-text">Enter a display name.</small>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="register-email">Email</Label>
       <InputText :invalid="!validEmail(email)" :aria-invalid="!validEmail(email)" :aria-describedby="!validEmail(email) ? 'register-email-error' : undefined" id="register-email" v-model="email" name="email" type="email" maxlength="254" autocomplete="email" required />
-      <small v-if="!validEmail(email)" id="register-email-error" class="text-red-600 dark:text-red-400">Enter a valid email address.</small>
+      <small v-if="!validEmail(email)" id="register-email-error" class="field-error-text">Enter a valid email address.</small>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="register-password">Password</Label>
       <InputText :invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" :aria-invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" id="register-password" v-model="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-requirements" required />
-      <section id="password-requirements" aria-labelledby="password-requirements-title" :aria-busy="checking">
+      <section id="password-requirements" aria-labelledby="password-requirements-title" :aria-busy="checking" class="flex flex-col gap-2">
         <h3 id="password-requirements-title" class="text-sm font-semibold">Password requirements</h3>
-        <ul class="mt-2 space-y-1 text-sm" aria-live="polite">
+        <ul class="flex flex-col gap-1.5 text-sm" aria-live="polite">
           <li v-for="requirement in requirements" :key="requirement.id" :data-requirement="requirement.id" :data-met="requirement.met" :class="requirement.met ? 'text-green-700 dark:text-green-400' : 'text-surface-600 dark:text-surface-400'">
             <i :class="requirement.met ? 'pi pi-check-circle' : 'pi pi-circle'" aria-hidden="true" />
             <span class="sr-only">{{ requirement.met ? 'Met:' : 'Not met:' }}</span>
             {{ requirement.description }}
           </li>
         </ul>
-        <p v-if="checking" role="status" class="mt-2 text-sm">Checking password requirements...</p>
-        <p v-if="checkError" role="alert" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ checkError }}</p>
+        <Message v-if="checking" severity="info" size="small" role="status">Checking password requirements...</Message>
+        <Message v-if="checkError" severity="error" size="small" role="alert">{{ checkError }}</Message>
         <Button v-if="checkError" type="button" label="Retry password check" severity="secondary" size="small" @click="checkRequirements" />
       </section>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="register-password-confirm">Confirm password</Label>
       <InputText id="register-password-confirm" v-model="passwordConfirm" name="password_confirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required :invalid="!passwordsMatch" :aria-invalid="!passwordsMatch" aria-describedby="register-password-match" />
-      <small id="register-password-match" :class="passwordsMatch ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'" aria-live="polite">
+      <small id="register-password-match" :class="passwordsMatch ? 'text-green-700 dark:text-green-400' : 'field-error-text'" aria-live="polite">
         {{ passwordsMatch ? 'Passwords match.' : passwordConfirm ? 'Passwords do not match.' : 'Re-enter your password to confirm it.' }}
       </small>
     </div>

@@ -1,5 +1,5 @@
 export const useTheme = () => {
-  const isDark = useState('theme-dark', () => false)
+  const isDark = useState('theme-dark', () => true)
 
   const toggleTheme = () => {
     isDark.value = !isDark.value

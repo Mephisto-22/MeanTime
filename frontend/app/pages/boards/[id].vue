@@ -1,47 +1,16 @@
 <template>
-  <div class="mx-auto max-w-7xl px-6 py-8">
-    <!-- Board Share Action & Collaborators Preview -->
-    <div v-if="board" class="mb-6 flex flex-wrap items-center justify-end gap-3">
-      <div
-        v-if="board.collaborators && board.collaborators.length > 0"
-        data-testid="collaborators-preview"
-        class="flex -space-x-2 overflow-hidden"
-      >
-        <Avatar
-          v-for="c in board.collaborators.slice(0, 3)"
-          :key="c.id"
-          :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
-          shape="circle"
-          class="border-2 border-surface-0 bg-primary-100 text-xs font-semibold text-primary-700 dark:border-surface-900 dark:bg-primary-950 dark:text-primary-300"
-        />
-        <span
-          v-if="board.collaborators.length > 3"
-          class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold text-surface-600 dark:bg-surface-700 dark:text-surface-300"
-        >
-          +{{ board.collaborators.length - 3 }}
-        </span>
-      </div>
-
-      <Button
-        label="Share"
-        icon="pi pi-users"
-        size="small"
-        data-testid="board-share-button"
-        @click="isShareDialogOpen = true"
-      />
-    </div>
-
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-col gap-3 flex-1 h-[calc(100vh-4.25rem)] overflow-hidden">
     <!-- Loading -->
     <div
       v-if="status === 'pending' && !board"
       data-testid="board-loading"
-      class="flex gap-4 overflow-hidden"
+      class="flex gap-4 overflow-hidden flex-1"
     >
       <Skeleton
         v-for="n in 3"
         :key="n"
-        width="16rem"
-        height="50vh"
+        width="18rem"
+        height="100%"
         border-radius="12px"
         class="shrink-0"
       />
@@ -51,7 +20,7 @@
     <div
       v-else-if="isNotFound"
       data-testid="board-not-found"
-      class="rounded-lg border border-surface-300 p-4"
+      class="error-state-card"
     >
       This board doesn't exist, or it isn't yours.
     </div>
@@ -60,7 +29,7 @@
     <div
       v-else-if="error"
       data-testid="board-error"
-      class="rounded-lg border border-surface-300 p-4"
+      class="error-state-card"
     >
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load this board.</span>
@@ -76,11 +45,41 @@
     </div>
 
     <template v-else-if="board">
-      <KanbanBoard :board="board" />
+      <KanbanBoard :board="board" class="flex-1 min-h-0">
+        <template #actions>
+          <div
+            v-if="board.collaborators && board.collaborators.length > 0"
+            data-testid="collaborators-preview"
+            class="avatar-stack"
+          >
+            <Avatar
+              v-for="c in board.collaborators.slice(0, 3)"
+              :key="c.id"
+              :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
+              shape="circle"
+              class="border-2 border-surface-0 user-avatar-primary text-xs font-semibold dark:border-surface-900"
+            />
+            <span
+              v-if="board.collaborators.length > 3"
+              class="avatar-overflow-badge"
+            >
+              +{{ board.collaborators.length - 3 }}
+            </span>
+          </div>
+
+          <Button
+            label="Share"
+            icon="pi pi-users"
+            data-testid="board-share-button"
+            class="h-fit shrink-0"
+            @click="isShareDialogOpen = true"
+          />
+        </template>
+      </KanbanBoard>
       <p
         v-if="board.columns.length === 0"
         data-testid="board-no-columns"
-        class="mt-4 rounded-xl border border-dashed border-surface-300 px-6 py-10 text-center text-surface-600 dark:border-surface-700 dark:text-surface-300"
+        class="rounded-xl border border-dashed border-surface-300 px-6 py-12 text-center text-surface-600 dark:border-surface-700 dark:text-surface-400"
       >
         This board has no columns yet.
       </p>

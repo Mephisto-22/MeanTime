@@ -5,7 +5,7 @@
     modal
     :draggable="false"
     :header="dialogTitle"
-    class="w-[min(34rem,calc(100vw-2rem))]"
+    class="dialog-md"
   >
     <div class="flex flex-col gap-5 py-2">
       <!-- Owner Invite Section -->
@@ -67,7 +67,7 @@
                 <Avatar
                   :label="getInitials(board.owner.display_name, board.owner.email)"
                   shape="circle"
-                  class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 text-xs font-bold"
+                  class="user-avatar-primary text-xs font-bold"
                 />
                 <div class="flex flex-col">
                   <span class="text-sm font-medium">
@@ -94,7 +94,7 @@
                   <Avatar
                     :label="getInitials(collaborator.display_name, collaborator.email)"
                     shape="circle"
-                    class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 text-xs font-bold"
+                    class="user-avatar-secondary text-xs font-bold"
                   />
                   <div class="flex flex-col">
                     <span class="text-sm font-medium">
