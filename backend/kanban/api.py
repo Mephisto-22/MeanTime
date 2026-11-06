@@ -1,9 +1,14 @@
+import asyncio
+import json
+import redis.asyncio as redis
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.http import StreamingHttpResponse
 from ninja.errors import HttpError
 from ninja import Router
 from users.models import UserBlock
@@ -26,6 +31,12 @@ from .schemas import (
     TaskTimeEntryIn,
     TaskTimeEntryUpdateIn,
     TaskTimeEntryOut,
+)
+from .sse import (
+    SSE_RESPONSE_HEADERS,
+    format_sse_comment,
+    format_sse_event,
+    format_sse_retry,
 )
 
 router = Router(tags=["Kanban"])
@@ -222,6 +233,58 @@ def get_board(request, board_id: int):
     """Retrieve a board with its columns and tasks."""
     reconcile_expired_countdowns(request.auth)
     return get_accessible_board(request.auth, board_id)
+
+@router.get("/boards/{board_id}/events")
+def board_events(request, board_id: int):
+    # Only allow board owners and collaborators to subscribe
+    board = get_accessible_board(request.auth, board_id)
+
+    # Redis subscription
+    async def event_stream():
+        client = redis.Redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True
+        )
+
+        pubsub = client.pubsub()
+        channel = f"kanban:board:{board.id}"
+        try:
+            await pubsub.subscribe(channel)
+
+            # Tell the browser when to retry after a disconnection
+            yield format_sse_retry()
+
+            while True:
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=15.0
+                )
+
+                if message is None:
+                    # SSE keeps the connection alive
+                    yield format_sse_comment()
+                    continue
+
+                event = json.loads(message["data"])
+
+                # convert the Redis message into SSE format
+                yield format_sse_event(event)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            await pubsub.aclose()
+            await client.aclose()
+
+    response = StreamingHttpResponse(
+        event_stream(),
+        content_type="text/event-stream"
+    )
+
+    for header, value in SSE_RESPONSE_HEADERS.items():
+        response[header] = value
+
+    return response
+                
 
 @router.patch("/boards/{board_id}", response=BoardOut)
 def update_board(request, board_id: int, payload: BoardIn):

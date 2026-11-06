@@ -20,7 +20,7 @@ services:
     networks:
       - meantime-network
 
-    redis:
+  redis:
     image: redis:alpine
     container_name: meantime-redis
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_healty
+        condition: service_healthy
     networks:
       - meantime-network
 
