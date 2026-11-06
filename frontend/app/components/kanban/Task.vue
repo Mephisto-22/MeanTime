@@ -53,7 +53,7 @@
       <div
         v-if="task.tags && task.tags.length > 0"
         data-testid="task-tags-row"
-        class="flex flex-wrap items-center gap-1 mt-auto pt-1"
+        class="flex flex-wrap items-center justify-end gap-1 mt-auto pt-1"
       >
         <span
           v-for="tag in visibleTags"
