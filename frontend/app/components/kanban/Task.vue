@@ -2,8 +2,11 @@
   <Card
     data-testid="kanban-task"
     :data-task-id="task.id"
-    :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm"
+    :pt="{
+      body: 'p-2.5 flex flex-col justify-between h-full flex-1',
+      content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
+    }"
+    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm h-32 shrink-0"
     :class="priorityBorderClass"
     @click="handleClick"
     @pointerdown="handlePointerDown"
@@ -14,32 +17,18 @@
     @dragend="handleDragEnd"
   >
     <template #content>
-      <div class="flex justify-between gap-3">
-        <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0 flex flex-col">
-          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100">
+      <!-- Top Section: Header (Title + Priority micro-pip) & Description -->
+      <div class="flex flex-col min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100 line-clamp-2 flex-1 min-w-0">
             {{ task.title }}
           </h4>
-          <p
-            v-if="hasDescription"
-            data-testid="task-description"
-            class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
-          >
-            {{ task.description }}
-          </p>
-        </div>
 
-        <!-- Right Column: Priority Micro-Pip and Tags -->
-        <div
-          v-if="task.priority || (task.tags && task.tags.length > 0)"
-          data-testid="task-card-indicators"
-          class="shrink-0 flex flex-col items-end gap-1.5 pt-0.5"
-        >
           <!-- Priority micro-pip (omitted completely if null) -->
           <span
             v-if="task.priority"
             data-testid="task-priority-indicator"
-            class="kanban-priority-pip inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            class="kanban-priority-pip shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
             :class="priorityBadgeClass"
           >
             <span
@@ -49,31 +38,39 @@
             />
             {{ priorityLabel }}
           </span>
-
-          <!-- Tags row: compact dot-prefixed pills capped at 3 with overflow badge -->
-          <div
-            v-if="task.tags && task.tags.length > 0"
-            data-testid="task-tags-row"
-            class="flex flex-wrap items-center justify-end gap-1"
-          >
-            <span
-              v-for="tag in visibleTags"
-              :key="tag.id"
-              data-testid="task-tag-chip"
-              class="kanban-tag-chip inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
-            >
-              <span class="text-surface-400">&bull;</span>
-              {{ tag.name }}
-            </span>
-            <span
-              v-if="overflowTagCount > 0"
-              data-testid="task-tag-overflow-badge"
-              class="kanban-tag-overflow inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
-            >
-              +{{ overflowTagCount }}
-            </span>
-          </div>
         </div>
+
+        <p
+          v-if="hasDescription"
+          data-testid="task-description"
+          class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
+        >
+          {{ task.description }}
+        </p>
+      </div>
+
+      <!-- Lower Section: Tags row stabilized at bottom content area -->
+      <div
+        v-if="task.tags && task.tags.length > 0"
+        data-testid="task-tags-row"
+        class="flex flex-wrap items-center gap-1 mt-auto pt-1"
+      >
+        <span
+          v-for="tag in visibleTags"
+          :key="tag.id"
+          data-testid="task-tag-chip"
+          class="kanban-tag-chip inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+        >
+          <span class="text-surface-400">&bull;</span>
+          {{ tag.name }}
+        </span>
+        <span
+          v-if="overflowTagCount > 0"
+          data-testid="task-tag-overflow-badge"
+          class="kanban-tag-overflow inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+        >
+          +{{ overflowTagCount }}
+        </span>
       </div>
 
       <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
@@ -190,4 +187,3 @@ defineExpose({
   handleTimerStop,
 })
 </script>
-
