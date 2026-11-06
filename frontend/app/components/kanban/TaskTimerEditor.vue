@@ -879,7 +879,7 @@ const toggleManualLog = () => {
   if (isManualLogOpen.value) {
     const now = new Date()
     const twentyFiveMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
-    manualDate.value = toLocalDateString(now.toISOString())
+    manualDate.value = toLocalDateString(twentyFiveMinsAgo.toISOString())
     manualStartTime.value = toLocalTimeString(twentyFiveMinsAgo.toISOString())
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
@@ -936,7 +936,12 @@ const submitManualEntry = async () => {
   }
 
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
-  const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  let ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  if (endTotalMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
@@ -1027,7 +1032,12 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   }
 
   const started = combineDateAndTime(editDate.value, editStartTime.value)
-  const ended = combineDateAndTime(editDate.value, editEndTime.value)
+  let ended = combineDateAndTime(editDate.value, editEndTime.value)
+  if (endMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
