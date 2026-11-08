@@ -96,6 +96,8 @@ export interface KanbanTaskDto {
   columnId: string | number
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
+  /** Sum of the task's time entry durations, in seconds. */
+  totalSeconds?: number
   priority?: TaskPriorityType
   tags?: TagDto[]
   tagIds?: Array<string | number>

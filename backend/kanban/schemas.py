@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
+from django.db.models import Sum
 from ninja import Schema
 from users.schemas import UserOut
 from .models import TaskPriority, TimerMode, TimerState
@@ -69,6 +70,7 @@ class TaskOut(Schema):
     column_id: int
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
+    total_seconds: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -78,6 +80,18 @@ class TaskOut(Schema):
             return obj.timer
         except Exception:
             return None
+
+    @staticmethod
+    def resolve_total_seconds(obj):
+        """Return the sum of the task's time entry durations.
+
+        The board query annotates this total; tasks loaded any other way
+        (create, update, move) fall back to one aggregate query.
+        """
+        total = getattr(obj, "total_seconds", None)
+        if total is None:
+            total = obj.time_entries.aggregate(total=Sum("duration_seconds"))["total"]
+        return total or 0
 
 # Allows us to update only part of a task without having to send a full TaskIn Schema
 class TaskUpdateIn(Schema):
