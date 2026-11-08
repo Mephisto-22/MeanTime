@@ -1,14 +1,14 @@
 <template>
   <form class="flex flex-col gap-4" :aria-busy="loading" novalidate @submit.prevent="submit">
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="login-email">Email</Label>
       <InputText id="login-email" v-model="email" name="email" type="email" autocomplete="username" required :invalid="!(validEmail(email))" :aria-invalid="!(validEmail(email))" :aria-describedby="!(validEmail(email)) ? 'login-email-error' : undefined" />
-      <small v-if="!(validEmail(email))" id="login-email-error" class="text-red-600 dark:text-red-400">Enter a valid email address.</small>
+      <small v-if="!(validEmail(email))" id="login-email-error" class="field-error-text">Enter a valid email address.</small>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="field-group">
       <Label for="login-password">Password</Label>
       <InputText id="login-password" v-model="password" name="password" type="password" autocomplete="current-password" required :invalid="!(requiredText(password))" :aria-invalid="!(requiredText(password))" :aria-describedby="!(requiredText(password)) ? 'login-password-error' : undefined" />
-      <small v-if="!(requiredText(password))" id="login-password-error" class="text-red-600 dark:text-red-400">Enter your password.</small>
+      <small v-if="!(requiredText(password))" id="login-password-error" class="field-error-text">Enter your password.</small>
     </div>
     <Button type="submit" label="Log in" :loading="loading" :disabled="loading || !isValid" />
   </form>

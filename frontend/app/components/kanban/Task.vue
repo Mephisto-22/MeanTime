@@ -2,8 +2,11 @@
   <Card
     data-testid="kanban-task"
     :data-task-id="task.id"
-    :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="cursor-grab active:cursor-grabbing select-none transition-shadow duration-150"
+    :pt="{
+      body: 'p-2.5 flex flex-col justify-between h-full flex-1',
+      content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
+    }"
+    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm h-32 shrink-0"
     :class="priorityBorderClass"
     @click="handleClick"
     @pointerdown="handlePointerDown"
@@ -14,32 +17,18 @@
     @dragend="handleDragEnd"
   >
     <template #content>
-      <div class="flex items-start justify-between gap-3">
-        <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0">
-          <h4 class="text-sm font-semibold text-surface-900 leading-snug break-words dark:text-surface-100">
+      <!-- Top Section: Header (Title + Priority micro-pip) & Description -->
+      <div class="flex flex-col min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100 line-clamp-2 flex-1 min-w-0">
             {{ task.title }}
           </h4>
-          <p
-            v-if="hasDescription"
-            data-testid="task-description"
-            class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
-          >
-            {{ task.description }}
-          </p>
-        </div>
 
-        <!-- Right Column: Priority Micro-Pip and Tags -->
-        <div
-          v-if="task.priority || (task.tags && task.tags.length > 0)"
-          data-testid="task-card-indicators"
-          class="shrink-0 flex flex-col items-end gap-1.5 pt-0.5"
-        >
           <!-- Priority micro-pip (omitted completely if null) -->
           <span
             v-if="task.priority"
             data-testid="task-priority-indicator"
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            class="kanban-priority-pip shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
             :class="priorityBadgeClass"
           >
             <span
@@ -49,31 +38,39 @@
             />
             {{ priorityLabel }}
           </span>
-
-          <!-- Tags row: compact dot-prefixed pills capped at 3 with overflow badge -->
-          <div
-            v-if="task.tags && task.tags.length > 0"
-            data-testid="task-tags-row"
-            class="flex flex-wrap items-center justify-end gap-1"
-          >
-            <span
-              v-for="tag in visibleTags"
-              :key="tag.id"
-              data-testid="task-tag-chip"
-              class="inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
-            >
-              <span class="text-surface-400">&bull;</span>
-              {{ tag.name }}
-            </span>
-            <span
-              v-if="overflowTagCount > 0"
-              data-testid="task-tag-overflow-badge"
-              class="inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
-            >
-              +{{ overflowTagCount }}
-            </span>
-          </div>
         </div>
+
+        <p
+          v-if="hasDescription"
+          data-testid="task-description"
+          class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
+        >
+          {{ task.description }}
+        </p>
+      </div>
+
+      <!-- Lower Section: Tags row stabilized at bottom content area -->
+      <div
+        v-if="task.tags && task.tags.length > 0"
+        data-testid="task-tags-row"
+        class="flex flex-wrap items-center justify-end gap-1 mt-auto pt-1"
+      >
+        <span
+          v-for="tag in visibleTags"
+          :key="tag.id"
+          data-testid="task-tag-chip"
+          class="kanban-tag-chip inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+        >
+          <span class="text-surface-400">&bull;</span>
+          {{ tag.name }}
+        </span>
+        <span
+          v-if="overflowTagCount > 0"
+          data-testid="task-tag-overflow-badge"
+          class="kanban-tag-overflow inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+        >
+          +{{ overflowTagCount }}
+        </span>
       </div>
 
       <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
@@ -92,7 +89,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
-import { kanbanContextKey } from '~/api/kanban'
+import { kanbanContextKey, TASK_PRIORITY_CONFIG, DEFAULT_TASK_PRIORITY_BORDER_CLASS } from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
@@ -138,60 +135,25 @@ const hasDescription = computed(() => {
   return Boolean(props.task.description && props.task.description.trim().length > 0)
 })
 
+const priorityConfig = computed(() => {
+  const p = props.task.priority
+  return (p && p in TASK_PRIORITY_CONFIG) ? TASK_PRIORITY_CONFIG[p] : null
+})
+
 const priorityBorderClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'border-l-4 border-l-red-500 dark:border-l-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'border-l-4 border-l-amber-500 dark:border-l-amber-500'
-    case 'LOW':
-      return 'border-l-4 border-l-sky-500 dark:border-l-sky-500'
-    default:
-      return 'border-l-4 border-l-transparent'
-  }
+  return priorityConfig.value?.borderClass ?? DEFAULT_TASK_PRIORITY_BORDER_CLASS
 })
 
 const priorityLabel = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'HIGH'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'MED'
-    case 'LOW':
-      return 'LOW'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.shortLabel ?? ''
 })
 
 const priorityBadgeClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-    case 'LOW':
-      return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.badgeClass ?? ''
 })
 
 const priorityDotClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-500'
-    case 'LOW':
-      return 'bg-sky-500'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.dotClass ?? ''
 })
 
 const MAX_VISIBLE_TAGS = 3

@@ -30,10 +30,30 @@ export interface TaskTimeEntryDto {
 }
 
 export const TASK_PRIORITY_CONFIG = {
-  HIGH: { label: 'High', dotClass: 'bg-red-500', badgeClass: 'border-red-500 text-red-600 bg-red-50 dark:bg-red-950/40' },
-  MEDIUM: { label: 'Medium', dotClass: 'bg-amber-500', badgeClass: 'border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
-  LOW: { label: 'Low', dotClass: 'bg-sky-500', badgeClass: 'border-sky-500 text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+  HIGH: {
+    label: 'High',
+    shortLabel: 'HIGH',
+    dotClass: 'bg-red-500',
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+    borderClass: 'border-l-4 border-l-red-500',
+  },
+  MEDIUM: {
+    label: 'Medium',
+    shortLabel: 'MED',
+    dotClass: 'bg-amber-500',
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    borderClass: 'border-l-4 border-l-amber-500',
+  },
+  LOW: {
+    label: 'Low',
+    shortLabel: 'LOW',
+    dotClass: 'bg-sky-500',
+    badgeClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
+    borderClass: 'border-l-4 border-l-sky-500',
+  },
 } as const
+
+export const DEFAULT_TASK_PRIORITY_BORDER_CLASS = 'border-l-4 border-l-transparent'
 
 export const TIMER_MODE_CONFIG = {
   NONE: { label: 'None' },
@@ -42,9 +62,24 @@ export const TIMER_MODE_CONFIG = {
 } as const
 
 export const TIMER_STATE_CONFIG = {
-  IDLE: { label: 'Idle', dotClass: 'bg-surface-400', badgeClass: 'text-surface-500' },
-  RUNNING: { label: 'Live session', dotClass: 'bg-emerald-500 animate-pulse', badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' },
-  PAUSED: { label: 'Paused', dotClass: 'bg-amber-500', badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
+  IDLE: {
+    label: 'Idle',
+    dotClass: 'bg-surface-400',
+    badgeClass: 'text-surface-500',
+    progressClass: 'bg-emerald-500 dark:bg-emerald-400',
+  },
+  RUNNING: {
+    label: 'Live session',
+    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    progressClass: 'bg-emerald-500 dark:bg-emerald-400',
+  },
+  PAUSED: {
+    label: 'Paused',
+    dotClass: 'bg-amber-500',
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    progressClass: 'bg-amber-500 dark:bg-amber-400',
+  },
 } as const
 
 export interface TagDto {

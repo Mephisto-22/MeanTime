@@ -89,7 +89,7 @@
 
             <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
             <Card
-              class="group text-center transition-all border border-surface-200/80 dark:border-surface-700/60 bg-surface-50 dark:bg-surface-800/60 shadow-none"
+              class="group text-center border border-surface-200/80 dark:border-surface-700/60 bg-surface-50 dark:bg-surface-800/60 shadow-none"
               :class="{ 'ring-2 ring-primary-500/50 bg-primary-50/20 dark:bg-primary-950/20': isEditingTarget }"
               :pt="{ body: 'p-4 flex flex-col items-center justify-center gap-1', content: 'p-0 w-full flex flex-col items-center gap-1' }"
             >
@@ -109,7 +109,7 @@
                 <div
                   v-if="!isEditingTarget"
                   data-testid="timer-digital-readout"
-                  class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none transition-transform"
+                  class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none"
                   :class="{
                     'cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 hover:scale-[1.02]': !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'
                   }"
@@ -126,7 +126,7 @@
                     v-model="targetInputText"
                     type="text"
                     maxlength="8"
-                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 !focus:outline-none !w-36 !py-0 !shadow-none"
+                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 focus:!outline-none !w-36 !py-0 !shadow-none"
                     data-testid="timer-inline-target-input"
                     placeholder="25:00"
                     @keydown.enter="commitTargetInput"
@@ -168,7 +168,7 @@
                 type="button"
                 severity="primary"
                 :disabled="isRunning"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 :title="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
                 :aria-label="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
@@ -183,7 +183,7 @@
                 type="button"
                 severity="warn"
                 :disabled="!isRunning"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 title="Pause Focus Session"
                 aria-label="Pause Focus Session"
@@ -199,7 +199,7 @@
                 severity="danger"
                 outlined
                 :disabled="isIdle"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 title="Stop & Save Session"
                 aria-label="Stop & Save Session"
@@ -257,7 +257,7 @@
               <div class="flex items-center gap-3">
                 <!-- Date (takes natural expanded space) -->
                 <div class="flex-1 min-w-0 flex flex-col gap-1">
-                  <Label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</Label>
+                  <Label for="manual-date" class="text-[10px] font-semibold text-surface-500">Date</Label>
                   <InputText
                     id="manual-date"
                     v-model="manualDate"
@@ -270,7 +270,7 @@
 
                 <!-- Duration (compact dedicated stepper) -->
                 <div class="w-28 shrink-0 flex flex-col gap-1">
-                  <Label for="manual-duration-mins" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Duration</Label>
+                  <Label for="manual-duration-mins" class="text-[10px] font-semibold text-surface-500">Duration</Label>
                   <InputNumber
                     id="manual-duration-mins"
                     v-model="manualDurationMinutes"
@@ -289,7 +289,7 @@
               <div class="grid grid-cols-2 gap-3">
                 <!-- Start Time -->
                 <div class="flex flex-col gap-1">
-                  <Label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</Label>
+                  <Label for="manual-start-time" class="text-[10px] font-semibold text-surface-500">Start Time</Label>
                   <InputText
                     id="manual-start-time"
                     v-model="manualStartTime"
@@ -303,7 +303,7 @@
 
                 <!-- End Time -->
                 <div class="flex flex-col gap-1">
-                  <Label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</Label>
+                  <Label for="manual-end-time" class="text-[10px] font-semibold text-surface-500">End Time</Label>
                   <InputText
                     id="manual-end-time"
                     v-model="manualEndTime"
@@ -318,7 +318,7 @@
 
               <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
               <div class="flex flex-col gap-1">
-                <Label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</Label>
+                <Label for="manual-session-note" class="text-[10px] font-semibold text-surface-500">Session Note</Label>
                 <InputText
                   id="manual-session-note"
                   v-model="manualNote"
@@ -358,7 +358,7 @@
               v-for="entry in entries"
               :key="entry.id"
               :data-testid="`session-entry-${entry.id}`"
-              class="group relative border border-surface-200/90 bg-surface-50/50 transition-all hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80 shadow-none"
+              class="group relative border border-surface-200/90 bg-surface-50/50 hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80 shadow-none"
               :pt="{ body: 'p-3 flex flex-col gap-2 text-xs', content: 'p-0 flex flex-col gap-2' }"
             >
               <template #content>
@@ -437,7 +437,7 @@
                     <!-- Row 1: Date + Duration Stepper -->
                     <div class="flex items-center gap-2.5">
                       <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Date</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Date</Label>
                         <InputText
                           v-model="editDate"
                           type="date"
@@ -446,7 +446,7 @@
                         />
                       </div>
                       <div class="w-28 shrink-0 flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Duration</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Duration</Label>
                         <InputNumber
                           v-model="editDurationMinutes"
                           suffix=" min"
@@ -463,7 +463,7 @@
                     <!-- Row 2: Start Time & End Time -->
                     <div class="grid grid-cols-2 gap-2.5">
                       <div class="flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Start Time</Label>
                         <InputText
                           v-model="editStartTime"
                           type="time"
@@ -474,7 +474,7 @@
                         />
                       </div>
                       <div class="flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">End Time</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">End Time</Label>
                         <InputText
                           v-model="editEndTime"
                           type="time"
@@ -488,7 +488,7 @@
 
                     <!-- Editable Note -->
                     <div class="flex flex-col gap-0.5">
-                      <Label class="text-[10px] uppercase font-semibold text-surface-400">Note</Label>
+                      <Label class="text-[10px] font-semibold text-surface-500">Note</Label>
                       <InputText
                         v-model="editNoteText"
                         placeholder="Session notes..."
@@ -879,7 +879,7 @@ const toggleManualLog = () => {
   if (isManualLogOpen.value) {
     const now = new Date()
     const twentyFiveMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
-    manualDate.value = toLocalDateString(now.toISOString())
+    manualDate.value = toLocalDateString(twentyFiveMinsAgo.toISOString())
     manualStartTime.value = toLocalTimeString(twentyFiveMinsAgo.toISOString())
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
@@ -936,7 +936,12 @@ const submitManualEntry = async () => {
   }
 
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
-  const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  let ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  if (endTotalMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
@@ -1027,7 +1032,12 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   }
 
   const started = combineDateAndTime(editDate.value, editStartTime.value)
-  const ended = combineDateAndTime(editDate.value, editEndTime.value)
+  let ended = combineDateAndTime(editDate.value, editEndTime.value)
+  if (endMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
@@ -1074,3 +1084,4 @@ const deleteEntry = async (id: string | number) => {
   }
 }
 </script>
+

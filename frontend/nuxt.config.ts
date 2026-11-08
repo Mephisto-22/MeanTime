@@ -1,4 +1,4 @@
-import Aura from '@primeuix/themes/aura'
+import { MeanTimePreset } from './app/theme/index'
 
 declare module 'primevue/config' {
   interface PrimeVueConfiguration {
@@ -8,6 +8,19 @@ declare module 'primevue/config' {
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-10-01',
+  app: {
+    head: {
+      title: 'MeanTime',
+      htmlAttrs: {
+        class: 'dark',
+        lang: 'en',
+      },
+      meta: [
+        { charset: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      ],
+    },
+  },
   modules: [
     '@primevue/nuxt-module',
     '@nuxtjs/tailwindcss',
@@ -34,10 +47,21 @@ export default defineNuxtConfig({
     },
   },
   primevue: {
+    importTheme: {
+      from: '~/theme',
+      as: 'MeanTimeTheme',
+    },
     options: {
       licenseKey: process.env.PRIMEVUE_LICENSE_KEY || '',
       theme: {
-        preset: Aura,
+        preset: MeanTimePreset,
+        options: {
+          darkModeSelector: '.dark',
+          cssLayer: {
+            name: 'primevue',
+            order: 'tailwind-base, primevue, tailwind-utilities',
+          },
+        },
       },
     },
     components: {
