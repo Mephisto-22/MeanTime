@@ -1,7 +1,8 @@
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField
+from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField, Sum
+from django.db.models.functions import Coalesce
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
@@ -116,7 +117,15 @@ def reconcile_expired_countdowns(user):
                 timer.save()
 
 def get_board_queryset(user):
-    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
+    # Each task's tracked time is summed in the same query that loads the tasks,
+    # so a board's totals don't cost one extra query per task. Django skips
+    # Meta.ordering on aggregated queries, so the order is restated here.
+    task_qs = (
+        Task.objects.select_related("timer")
+        .prefetch_related("tags")
+        .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+        .order_by(*Task._meta.ordering)
+    )
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
     return (
         get_accessible_boards(user)
