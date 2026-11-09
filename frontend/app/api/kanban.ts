@@ -168,6 +168,7 @@ export interface KanbanContext {
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
   pauseTimer?: (taskId: string | number) => void
   stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+  setTaskTotal?: (taskId: string | number, totalSeconds: number) => void
   onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
 }
 

@@ -90,6 +90,7 @@ import type {
   TaskTimeEntryDto,
 } from '~/api/kanban'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
+import { sumEntryDurations } from '~/composables/useTaskTimer'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 
 const notify = useNotifications()
@@ -666,6 +667,27 @@ const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto
     }
   } catch (err) {
     notify.error(err, 'Unable to stop timer')
+    return
+  }
+
+  // Stopping saves the session as a time entry on the server.
+  await refreshTaskTotal(taskId)
+}
+
+const handleSetTaskTotal = (taskId: string | number, totalSeconds: number): void => {
+  const task = findTaskById(taskId)
+  if (task) {
+    task.totalSeconds = totalSeconds
+  }
+}
+
+/** Reload a task's time entries and update the total shown on its card. */
+const refreshTaskTotal = async (taskId: string | number): Promise<void> => {
+  try {
+    const entries = await kanbanApi.listTimeEntries(taskId)
+    handleSetTaskTotal(taskId, sumEntryDurations(entries))
+  } catch {
+    // Keep the previous total; the next board load corrects it.
   }
 }
 
@@ -750,6 +772,7 @@ provide(kanbanContextKey, {
   startTimer: handleStartTimer,
   pauseTimer: handlePauseTimer,
   stopTimer: handleStopTimer,
+  setTaskTotal: handleSetTaskTotal,
   onTimerExpired: handleTimerExpired,
 })
 
