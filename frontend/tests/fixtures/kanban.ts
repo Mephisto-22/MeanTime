@@ -24,6 +24,8 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     description: overrides.description,
     priority: overrides.priority,
     tags: overrides.tags,
+    timer: overrides.timer,
+    totalSeconds: overrides.totalSeconds,
   }
 }
 
