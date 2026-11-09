@@ -49,12 +49,21 @@
         </p>
       </div>
 
-      <!-- Lower Section: Tags row stabilized at bottom content area -->
+      <!-- Lower Section: Total tracked time (left) and tags row (right) stabilized at bottom content area -->
       <div
-        v-if="task.tags && task.tags.length > 0"
+        v-if="hasTotal || (task.tags && task.tags.length > 0)"
         data-testid="task-tags-row"
         class="flex flex-wrap items-center justify-end gap-1 mt-auto pt-1"
       >
+        <span
+          v-if="hasTotal"
+          data-testid="task-total-time"
+          class="mr-auto inline-flex items-center gap-1 text-[10px] font-medium text-surface-500 dark:text-surface-400"
+          :title="`${formattedTotal} tracked`"
+        >
+          <i class="pi pi-clock text-[10px]" aria-hidden="true" />
+          {{ formattedTotal }}
+        </span>
         <span
           v-for="tag in visibleTags"
           :key="tag.id"
@@ -91,6 +100,7 @@ import { computed, inject } from 'vue'
 import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
 import { kanbanContextKey, TASK_PRIORITY_CONFIG, DEFAULT_TASK_PRIORITY_BORDER_CLASS } from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
+import { formatDurationBadge } from '~/composables/useTaskTimer'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
 const props = defineProps<{
@@ -156,6 +166,11 @@ const priorityDotClass = computed(() => {
   return priorityConfig.value?.dotClass ?? ''
 })
 
+// Total tracked time is hidden until the task has any recorded time.
+const hasTotal = computed(() => (props.task.totalSeconds ?? 0) > 0)
+
+const formattedTotal = computed(() => formatDurationBadge(props.task.totalSeconds))
+
 const MAX_VISIBLE_TAGS = 3
 
 const visibleTags = computed(() => {
@@ -180,6 +195,8 @@ defineExpose({
   priorityBadgeClass,
   priorityDotClass,
   hasDescription,
+  hasTotal,
+  formattedTotal,
   visibleTags,
   overflowTagCount,
   handleTimerStart,
