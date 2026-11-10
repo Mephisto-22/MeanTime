@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getClientTimezone } from '~/utils/timezone'
+import { getClientTimezone } from '~/components/RegistrationForm.vue'
 
 describe('getClientTimezone', () => {
   afterEach(() => {

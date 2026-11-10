@@ -38,10 +38,20 @@
   </form>
 </template>
 
+<script lang="ts">
+export function getClientTimezone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return typeof tz === 'string' && tz.trim() ? tz.trim() : 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+</script>
+
 <script setup lang="ts">
 import { requiredText, validEmail, validPassword } from '~/utils/validation'
 import { authApi, type PasswordRequirement, type RegistrationRequest } from '~/api/auth'
-import { getClientTimezone } from '~/utils/timezone'
 
 const props = defineProps<{ loading?: boolean }>()
 const displayName = ref('')
