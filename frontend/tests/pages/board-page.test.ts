@@ -3,7 +3,7 @@ import { flushPromises } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import BoardPage from '~/pages/boards/[id].vue'
+import BoardPage from '~/pages/boards/[id]/index.vue'
 import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
 
 const mockBoard: KanbanBoardDto = {
