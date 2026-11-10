@@ -167,11 +167,11 @@ def get_owned_task(user, task_id: int) -> Task:
     )
 
 def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
-    """Retrieve a time entry belonging to the authenticated user's task or created by the user."""
+    """Retrieve a time entry belonging to the user, created by the user, or on a board accessible to the user."""
     return get_object_or_404(
         TaskTimeEntry.objects.select_related("task__column__board").filter(
-            Q(user=user) | Q(task__column__board__owner=user)
-        ),
+            Q(user=user) | Q(task__column__board__in=get_accessible_boards(user))
+        ).distinct(),
         id=entry_id
     )
 
@@ -586,6 +586,21 @@ def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
                 raise HttpError(400, "End time cannot precede start time")
             if duration is not None and duration > int((end - start).total_seconds()):
                 raise HttpError(400, "Duration cannot exceed elapsed time range")
+
+        if "user_id" in updates:
+            new_user_id = updates.pop("user_id")
+            if new_user_id is not None:
+                board = entry.task.column.board
+                is_owner = (board.owner_id == new_user_id)
+                is_collab = board.collaborators.filter(id=new_user_id).exists()
+                if not (is_owner or is_collab):
+                    raise HttpError(400, "Selected user is not a member of this board")
+                if new_user_id == request.auth.id:
+                    entry.user = request.auth
+                else:
+                    entry.user = get_object_or_404(User, id=new_user_id)
+            else:
+                entry.user = None
 
         for field, val in updates.items():
             setattr(entry, field, val)

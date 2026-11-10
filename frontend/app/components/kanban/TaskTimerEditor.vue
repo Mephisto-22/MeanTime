@@ -540,6 +540,46 @@
                       </div>
                     </div>
 
+                    <!-- Editable Recorded by Dropdown (When on Shared Board) -->
+                    <div v-if="isShared" class="flex flex-col gap-0.5">
+                      <Label for="edit-session-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                      <Select
+                        id="edit-session-recorded-by"
+                        v-model="editUserId"
+                        :options="members"
+                        option-label="display_name"
+                        option-value="id"
+                        placeholder="Select contributor"
+                        fluid
+                        class="!text-xs"
+                        data-testid="edit-session-recorded-by"
+                      >
+                        <template #value="slotProps">
+                          <div v-if="slotProps.value" class="flex items-center gap-2">
+                            <Avatar
+                              :label="getUserInitials(getMemberById(slotProps.value))"
+                              shape="circle"
+                              size="small"
+                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                            />
+                            <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                          </div>
+                          <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                        </template>
+                        <template #option="slotProps">
+                          <div class="flex items-center gap-2 py-0.5">
+                            <Avatar
+                              :label="getUserInitials(slotProps.option)"
+                              shape="circle"
+                              size="small"
+                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                            />
+                            <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                          </div>
+                        </template>
+                      </Select>
+                    </div>
+
                     <!-- Editable Note -->
                     <div class="flex flex-col gap-0.5">
                       <Label class="text-[10px] font-semibold text-surface-500">Note</Label>
@@ -1170,6 +1210,7 @@ const editStartTime = ref('')
 const editEndTime = ref('')
 const editDurationMinutes = ref<number | null>(0)
 const editNoteText = ref('')
+const editUserId = ref<number | string | null>(null)
 
 const startEditingSession = (entry: TaskTimeEntryDto) => {
   editingEntryId.value = entry.id
@@ -1178,6 +1219,7 @@ const startEditingSession = (entry: TaskTimeEntryDto) => {
   editEndTime.value = toLocalTimeString(entry.endedAt)
   editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
   editNoteText.value = entry.note
+  editUserId.value = entry.userId ?? entry.user?.id ?? effectiveCurrentUserId.value ?? null
 }
 
 const onEditTimeChanged = () => {
@@ -1220,16 +1262,24 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   const durationSec = durationMins * 60
   const note = editNoteText.value
 
+  const selectedUserId = isShared.value ? (editUserId.value != null ? Number(editUserId.value) : undefined) : entry.userId
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   entry.startedAt = started
   entry.endedAt = ended
   entry.durationSeconds = durationSec
   entry.note = note
+  if (isShared.value) {
+    entry.userId = selectedUserId
+    entry.user = selectedMember ?? entry.user
+  }
   editingEntryId.value = null
   syncEntriesOut()
 
   if (isPersistedTaskId.value && !String(entry.id).startsWith('manual') && !String(entry.id).startsWith('entry')) {
     try {
       const updated = await kanbanApi.updateTimeEntry(entry.id, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,

@@ -307,3 +307,75 @@ class TaskTimeEntryApiTests(TestCase):
         omitted_data = omitted_res.json()
         self.assertEqual(omitted_data["user_id"], self.user.id)
         self.assertEqual(omitted_data["user"]["id"], self.user.id)
+
+    def test_reassign_time_entry_by_owner_and_collaborator(self):
+        """PATCH /time-entries/{id} allows owner and collaborator to reassign among board members."""
+        collab_a = User.objects.create_user(
+            email="collab_a@example.com",
+            password=PASSWORD,
+            display_name="Collab A",
+        )
+        collab_b = User.objects.create_user(
+            email="collab_b@example.com",
+            password=PASSWORD,
+            display_name="Collab B",
+        )
+        non_member = User.objects.create_user(
+            email="outsider@example.com",
+            password=PASSWORD,
+            display_name="Outsider",
+        )
+
+        board = Board.objects.get(id=self.board_id)
+        board.collaborators.add(collab_a, collab_b)
+
+        # Login as collab_a
+        login_a = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({"email": "collab_a@example.com", "password": PASSWORD}),
+            content_type="application/json",
+        )
+        auth_a = {"HTTP_AUTHORIZATION": f"Bearer {login_a.json()['access_token']}"}
+
+        now = timezone.now()
+        entry = TaskTimeEntry.objects.create(
+            task_id=self.task_id,
+            user=self.user,
+            started_at=now - timedelta(minutes=30),
+            ended_at=now,
+            duration_seconds=1800,
+            note="Original session by owner",
+        )
+
+        # 1. Reassign by owner to collab_a -> 200
+        patch_res1 = self.client.patch(
+            f"/api/kanban/time-entries/{entry.id}",
+            data=json.dumps({"user_id": collab_a.id}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(patch_res1.status_code, 200)
+        data1 = patch_res1.json()
+        self.assertEqual(data1["user_id"], collab_a.id)
+        self.assertEqual(data1["user"]["id"], collab_a.id)
+
+        # 2. Reassign by collab_a to collab_b -> 200
+        patch_res2 = self.client.patch(
+            f"/api/kanban/time-entries/{entry.id}",
+            data=json.dumps({"user_id": collab_b.id}),
+            content_type="application/json",
+            **auth_a,
+        )
+        self.assertEqual(patch_res2.status_code, 200)
+        data2 = patch_res2.json()
+        self.assertEqual(data2["user_id"], collab_b.id)
+        self.assertEqual(data2["user"]["id"], collab_b.id)
+
+        # 3. Reassign to non-member -> 400
+        patch_res3 = self.client.patch(
+            f"/api/kanban/time-entries/{entry.id}",
+            data=json.dumps({"user_id": non_member.id}),
+            content_type="application/json",
+            **auth_a,
+        )
+        self.assertEqual(patch_res3.status_code, 400)
