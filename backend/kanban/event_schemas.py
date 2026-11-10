@@ -9,6 +9,7 @@ class BoardEventType(StrEnum):
     """Event types broadcast to Kanban board subscribers."""
 
     BOARD_UPDATED = "board.updated"
+    BOARD_DELETED = "board.deleted"
 
     COLUMN_CREATED = "column.created"
     COLUMN_UPDATED = "column.updated"
@@ -18,6 +19,8 @@ class BoardEventType(StrEnum):
     TASK_UPDATED = "task.updated"
     TASK_DELETED = "task.deleted"
     TASK_MOVED = "task.moved"
+
+    TASK_TIMER_UPDATED = "task.timer_updated"
 
 class BoardEvent(BaseModel):
     """Common structure for all Kanban board events."""

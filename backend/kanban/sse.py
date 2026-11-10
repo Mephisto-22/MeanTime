@@ -36,11 +36,15 @@ def format_sse_event(event: dict[str, Any]) -> str:
     event_type = event.get("type", "message")
 
     if event_id:
-        lines.append(f"id: {_validate_sse_field(str(event_type))}")
+        lines.append(f"id: {_validate_sse_field(str(event_id))}")
+    if event_type:
+        lines.append(f"event: {_validate_sse_field(str(event_type))}")
 
     # JSON serialization keeps the payload on one line
     data = json.dumps(event, separators=(",", ":"), ensure_ascii=False)
     lines.append(f"data: {data}")
+
+    return "\n".join(lines) + "\n\n"
 
 def format_sse_retry(interval_ms: int = SSE_RETRY_INTERVAL_MS) -> str:
     """Tell the browser how long to wait before reconnecting."""
