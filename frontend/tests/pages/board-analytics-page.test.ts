@@ -70,8 +70,13 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
     expect(columns).toHaveLength(2)
     expect(columns[0]!.text()).toContain('To Do')
     expect(columns[0]!.text()).toContain('30m')
-    expect(columns[0]!.text()).toContain('33%')
-    expect(columns[1]!.text()).toContain('67%')
+    expect(columns[0]!.text()).not.toContain('%')
+
+    const shares = wrapper.findAll('[data-testid="column-share-legend-item"]')
+    expect(shares.map(share => share.text())).toEqual([
+      expect.stringContaining('33%'),
+      expect.stringContaining('67%'),
+    ])
 
     const tasks = wrapper.findAll('[data-testid="analytics-top-task"]')
     expect(tasks.map(task => task.text())).toEqual([

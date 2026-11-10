@@ -10,37 +10,36 @@
       </template>
     </Card>
 
-    <!-- Time per column, as one-hue bars scaled to the board total -->
+    <!-- Time per column, in board order -->
     <Card data-testid="analytics-columns" class="md:col-span-2">
       <template #title>Time per column</template>
       <template #content>
-        <ul class="flex flex-col gap-3">
+        <ul class="flex flex-col divide-y divide-surface-200 dark:divide-surface-700">
           <li
             v-for="column in analytics.columns"
             :key="column.columnId"
             data-testid="analytics-column-row"
-            :title="`${column.title}: ${formatDurationBadge(column.totalSeconds)} (${shareOfTotal(column.totalSeconds)}%)`"
+            class="flex items-baseline justify-between gap-3 py-2 text-sm"
           >
-            <div class="mb-1 flex items-baseline justify-between gap-3 text-sm">
-              <span class="truncate font-medium text-surface-800 dark:text-surface-100">{{ column.title }}</span>
-              <span class="shrink-0 tabular-nums text-surface-600 dark:text-surface-300">
-                {{ formatDurationBadge(column.totalSeconds) }}
-                <span class="text-surface-400">· {{ shareOfTotal(column.totalSeconds) }}%</span>
-              </span>
-            </div>
-            <ProgressBar
-              :value="shareOfTotal(column.totalSeconds)"
-              :show-value="false"
-              :aria-label="`${column.title} share of tracked time`"
-              :pt="{ root: 'h-1.5 rounded-full', value: 'rounded-full' }"
-            />
+            <span class="truncate font-medium text-surface-800 dark:text-surface-100">{{ column.title }}</span>
+            <span class="shrink-0 tabular-nums text-surface-600 dark:text-surface-300">
+              {{ formatDurationBadge(column.totalSeconds) }}
+            </span>
           </li>
         </ul>
       </template>
     </Card>
 
+    <!-- Each column's share of the board total -->
+    <Card data-testid="analytics-share" class="md:col-span-1">
+      <template #title>Share of time</template>
+      <template #content>
+        <ColumnTimeShareChart :columns="analytics.columns" :total-seconds="analytics.totalSeconds" />
+      </template>
+    </Card>
+
     <!-- The tasks that took the most time -->
-    <Card data-testid="analytics-top-tasks" class="md:col-span-3">
+    <Card data-testid="analytics-top-tasks" class="md:col-span-2">
       <template #title>Top tasks by time</template>
       <template #content>
         <ol class="flex flex-col divide-y divide-surface-200 dark:divide-surface-700">
@@ -65,15 +64,10 @@
 
 <script setup lang="ts">
 import type { BoardAnalyticsDto } from '~/api/analytics'
+import ColumnTimeShareChart from '~/components/analytics/ColumnTimeShareChart.vue'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 
-const props = defineProps<{
+defineProps<{
   analytics: BoardAnalyticsDto
 }>()
-
-/** Percentage of the board's total time, rounded to a whole number. */
-const shareOfTotal = (seconds: number): number => {
-  const total = props.analytics.totalSeconds
-  return total > 0 ? Math.round((seconds / total) * 100) : 0
-}
 </script>
