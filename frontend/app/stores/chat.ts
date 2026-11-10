@@ -17,6 +17,7 @@ export interface ChatState {
   activeMessages: MessageOut[]
   isSidebarOpen: boolean
   loading: boolean
+  isPolling: boolean
   pollingTimer: ReturnType<typeof setInterval> | null
 }
 
@@ -29,6 +30,7 @@ export const useChatStore = defineStore('chat', {
     activeMessages: [],
     isSidebarOpen: false,
     loading: false,
+    isPolling: false,
     pollingTimer: null,
   }),
 
@@ -63,6 +65,10 @@ export const useChatStore = defineStore('chat', {
           chatApi.getConversation(id),
           chatApi.getMessages(id),
         ])
+
+        // Guard against race conditions if active conversation was switched while awaiting
+        if (this.activeConversationId !== id) return
+
         this.activeConversation = detail
         this.activeMessages = messages || []
 
@@ -77,7 +83,8 @@ export const useChatStore = defineStore('chat', {
           this.startPolling()
         }
       } catch (err) {
-        // Keep state consistent if fetch failed
+        // Reset active id on failure to avoid inconsistent state
+        this.activeConversationId = null
         throw err
       }
     },
@@ -117,17 +124,25 @@ export const useChatStore = defineStore('chat', {
     },
 
     async acceptInvite(id: number): Promise<void> {
-      await chatApi.acceptInvite(id)
+      const invite = this.pendingInvites.find(
+        (i) => i.id === id || i.conversation_id === id,
+      )
+      const convId = invite ? invite.conversation_id : id
+      await chatApi.acceptInvite(convId)
       this.pendingInvites = this.pendingInvites.filter(
-        (i) => i.id !== id && i.conversation_id !== id,
+        (i) => i.id !== id && i.conversation_id !== convId,
       )
       await this.loadConversations()
     },
 
     async declineInvite(id: number): Promise<void> {
-      await chatApi.declineInvite(id)
+      const invite = this.pendingInvites.find(
+        (i) => i.id === id || i.conversation_id === id,
+      )
+      const convId = invite ? invite.conversation_id : id
+      await chatApi.declineInvite(convId)
       this.pendingInvites = this.pendingInvites.filter(
-        (i) => i.id !== id && i.conversation_id !== id,
+        (i) => i.id !== id && i.conversation_id !== convId,
       )
     },
 
@@ -142,6 +157,10 @@ export const useChatStore = defineStore('chat', {
 
     async openDirectChat(friendId: number): Promise<void> {
       this.openSidebar()
+
+      if (this.conversations.length === 0) {
+        await this.loadConversations()
+      }
 
       const existing = this.conversations.find(
         (c) =>
@@ -197,7 +216,8 @@ export const useChatStore = defineStore('chat', {
     },
 
     async pollMessages(): Promise<void> {
-      if (!this.activeConversationId || !this.isSidebarOpen) return
+      if (!this.activeConversationId || !this.isSidebarOpen || this.isPolling) return
+      this.isPolling = true
 
       const convId = this.activeConversationId
       const lastMsg = this.activeMessages[this.activeMessages.length - 1]
@@ -228,6 +248,8 @@ export const useChatStore = defineStore('chat', {
         }
       } catch {
         // Polling errors are suppressed to prevent spamming UI
+      } finally {
+        this.isPolling = false
       }
     },
 
@@ -245,6 +267,7 @@ export const useChatStore = defineStore('chat', {
         clearInterval(this.pollingTimer)
         this.pollingTimer = null
       }
+      this.isPolling = false
     },
 
     openSidebar(): void {

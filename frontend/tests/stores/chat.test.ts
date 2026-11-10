@@ -127,7 +127,7 @@ describe('Chat Store & ChatApi Contracts', () => {
       expect(store.loading).toBe(false)
     })
 
-    it('acceptInvite calls API, removes invite from list, and reloads conversations', async () => {
+    it('acceptInvite resolves conversation_id when passed invite.id or conversation_id', async () => {
       const acceptSpy = vi.spyOn(chatApi, 'acceptInvite').mockResolvedValue(mockConversationDetail)
       const loadSpy = vi.spyOn(chatApi, 'getConversations').mockResolvedValue({
         conversations: [mockConversationOut, mockGroupConversationOut],
@@ -135,25 +135,36 @@ describe('Chat Store & ChatApi Contracts', () => {
       })
 
       const store = useChatStore()
-      store.pendingInvites = [mockPendingInvite]
 
+      // Case 1: Pass invite.id (201), should call API with conversation_id (102)
+      store.pendingInvites = [{ ...mockPendingInvite }]
       await store.acceptInvite(mockPendingInvite.id)
-
-      expect(acceptSpy).toHaveBeenCalledWith(mockPendingInvite.id)
+      expect(acceptSpy).toHaveBeenLastCalledWith(102)
       expect(store.pendingInvites).toEqual([])
       expect(loadSpy).toHaveBeenCalled()
-      expect(store.conversations.length).toBe(2)
+
+      // Case 2: Pass conversation_id (102) directly
+      store.pendingInvites = [{ ...mockPendingInvite }]
+      await store.acceptInvite(mockPendingInvite.conversation_id)
+      expect(acceptSpy).toHaveBeenLastCalledWith(102)
+      expect(store.pendingInvites).toEqual([])
     })
 
-    it('declineInvite calls API and removes invite from pending list', async () => {
+    it('declineInvite resolves conversation_id when passed invite.id or conversation_id', async () => {
       const declineSpy = vi.spyOn(chatApi, 'declineInvite').mockResolvedValue({ success: true })
 
       const store = useChatStore()
-      store.pendingInvites = [mockPendingInvite]
 
+      // Case 1: Pass invite.id (201), should call API with conversation_id (102)
+      store.pendingInvites = [{ ...mockPendingInvite }]
       await store.declineInvite(mockPendingInvite.id)
+      expect(declineSpy).toHaveBeenLastCalledWith(102)
+      expect(store.pendingInvites).toEqual([])
 
-      expect(declineSpy).toHaveBeenCalledWith(mockPendingInvite.id)
+      // Case 2: Pass conversation_id (102) directly
+      store.pendingInvites = [{ ...mockPendingInvite }]
+      await store.declineInvite(mockPendingInvite.conversation_id)
+      expect(declineSpy).toHaveBeenLastCalledWith(102)
       expect(store.pendingInvites).toEqual([])
     })
   })
@@ -179,6 +190,45 @@ describe('Chat Store & ChatApi Contracts', () => {
       expect(getMsgsSpy).toHaveBeenCalledWith(101)
       expect(markReadSpy).toHaveBeenCalledWith(101)
       expect(store.conversations[0].unread_count).toBe(0)
+    })
+
+    it('selectConversation discards stale response if active conversation switched while awaiting', async () => {
+      let resolveFirst!: (val: ConversationDetailOut) => void
+      const firstPromise = new Promise<ConversationDetailOut>((resolve) => {
+        resolveFirst = resolve
+      })
+
+      vi.spyOn(chatApi, 'getConversation').mockImplementation(async (id) => {
+        if (id === 101) return firstPromise
+        return { ...mockConversationDetail, id: 102, title: 'Second Conv' }
+      })
+      vi.spyOn(chatApi, 'getMessages').mockResolvedValue([])
+      vi.spyOn(chatApi, 'markAsRead').mockResolvedValue({ success: true, last_read_at: '2026-11-10T12:00:00Z' })
+
+      const store = useChatStore()
+      const select1 = store.selectConversation(101)
+      const select2 = store.selectConversation(102)
+
+      await select2
+      expect(store.activeConversationId).toBe(102)
+      expect(store.activeConversation?.id).toBe(102)
+
+      // Resolve the stale first request
+      resolveFirst(mockConversationDetail)
+      await select1
+
+      // Should still be conversation 102, not overwritten by stale 101
+      expect(store.activeConversationId).toBe(102)
+      expect(store.activeConversation?.id).toBe(102)
+    })
+
+    it('selectConversation resets activeConversationId to null on failure', async () => {
+      vi.spyOn(chatApi, 'getConversation').mockRejectedValue(new Error('Network error'))
+      vi.spyOn(chatApi, 'getMessages').mockResolvedValue([])
+
+      const store = useChatStore()
+      await expect(store.selectConversation(101)).rejects.toThrow('Network error')
+      expect(store.activeConversationId).toBeNull()
     })
 
     it('sendMessage posts message and appends to activeMessages', async () => {
@@ -226,11 +276,40 @@ describe('Chat Store & ChatApi Contracts', () => {
       expect(selectSpy).toHaveBeenCalledWith(101)
     })
 
-    it('openDirectChat creates direct conversation and selects it when none exists', async () => {
-      const createSpy = vi.spyOn(chatApi, 'createConversation').mockResolvedValue(mockConversationDetail)
-      vi.spyOn(chatApi, 'getConversations').mockResolvedValue({
-        conversations: [mockConversationOut],
+    it('openDirectChat awaits loadConversations when conversations list is empty', async () => {
+      const loadSpy = vi.spyOn(chatApi, 'getConversations').mockResolvedValue({
+        conversations: [mockConversationOut], // Friend 2 exists in returned list
         pending_invites: [],
+      })
+      const createSpy = vi.spyOn(chatApi, 'createConversation')
+      vi.spyOn(chatApi, 'getConversation').mockResolvedValue(mockConversationDetail)
+      vi.spyOn(chatApi, 'getMessages').mockResolvedValue([])
+      vi.spyOn(chatApi, 'markAsRead').mockResolvedValue({ success: true, last_read_at: '2026-11-10T12:00:00Z' })
+
+      const store = useChatStore()
+      store.conversations = []
+
+      await store.openDirectChat(2)
+
+      expect(loadSpy).toHaveBeenCalled()
+      expect(createSpy).not.toHaveBeenCalled()
+      expect(store.activeConversationId).toBe(101)
+    })
+
+    it('openDirectChat creates direct conversation and selects it when none exists', async () => {
+      let created = false
+      const createSpy = vi.spyOn(chatApi, 'createConversation').mockImplementation(async () => {
+        created = true
+        return mockConversationDetail
+      })
+      vi.spyOn(chatApi, 'getConversations').mockImplementation(async () => {
+        if (!created) {
+          return { conversations: [], pending_invites: [] }
+        }
+        return {
+          conversations: [mockConversationOut],
+          pending_invites: [],
+        }
       })
       vi.spyOn(chatApi, 'getConversation').mockResolvedValue(mockConversationDetail)
       vi.spyOn(chatApi, 'getMessages').mockResolvedValue([])
@@ -315,6 +394,32 @@ describe('Chat Store & ChatApi Contracts', () => {
       expect(store.activeMessages).toEqual([mockMessage1, mockMessage2])
 
       store.stopPolling()
+    })
+
+    it('pollMessages prevents overlapping concurrent polls using isPolling flag', async () => {
+      let resolvePoll!: (val: MessageOut[]) => void
+      const pollPromise = new Promise<MessageOut[]>((resolve) => {
+        resolvePoll = resolve
+      })
+
+      const getMsgsSpy = vi.spyOn(chatApi, 'getMessages').mockReturnValue(pollPromise)
+
+      const store = useChatStore()
+      store.isSidebarOpen = true
+      store.activeConversationId = 101
+      store.activeMessages = [mockMessage1]
+
+      // Start first poll (in flight)
+      const firstPoll = store.pollMessages()
+      expect(store.isPolling).toBe(true)
+
+      // Second poll triggered while first is in flight
+      const secondPoll = store.pollMessages()
+      expect(getMsgsSpy).toHaveBeenCalledTimes(1)
+
+      resolvePoll([mockMessage2])
+      await Promise.all([firstPoll, secondPoll])
+      expect(store.isPolling).toBe(false)
     })
   })
 
