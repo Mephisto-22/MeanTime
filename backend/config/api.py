@@ -6,6 +6,7 @@ from users.authentication import AppJWTAuth
 from users.api import auth_router, users_router
 from users.oauth import oauth_router
 
+from kanban.analytics import router as analytics_router
 from kanban.api import router as kanban_router
 
 
@@ -18,6 +19,7 @@ api = NinjaAPI(
 
 # router registrations (import above)
 api.add_router("/kanban", kanban_router)
+api.add_router("/kanban", analytics_router)
 
 @api.exception_handler(APIException)
 def api_exception_handler(request, exc):
