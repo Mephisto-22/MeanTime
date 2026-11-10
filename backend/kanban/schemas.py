@@ -40,6 +40,7 @@ class TaskTimeEntryUpdateIn(Schema):
     ended_at: datetime | None = None
     duration_seconds: int | None = None
     note: str | None = None
+    user_id: int | None = None
 
 class TaskTimeEntryOut(Schema):
     """Shape of recorded time entry returned to clients."""
