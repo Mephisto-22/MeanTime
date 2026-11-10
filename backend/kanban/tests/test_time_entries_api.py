@@ -235,3 +235,75 @@ class TaskTimeEntryApiTests(TestCase):
         del_res = self.client.delete(f"/api/kanban/time-entries/{entry.id}", **other_auth)
         self.assertEqual(del_res.status_code, 404)
         self.assertTrue(TaskTimeEntry.objects.filter(id=entry.id).exists())
+
+    def test_create_time_entry_with_valid_and_invalid_user_id(self):
+        """POST /tasks/{id}/time-entries accepts board member user_id and rejects non-member user_id."""
+        collaborator = User.objects.create_user(
+            email="collab_chronicle@example.com",
+            password=PASSWORD,
+            display_name="Collab User",
+        )
+        non_member = User.objects.create_user(
+            email="stranger@example.com",
+            password=PASSWORD,
+            display_name="Stranger",
+        )
+
+        # Add collaborator to board
+        board = Board.objects.get(id=self.board_id)
+        board.collaborators.add(collaborator)
+
+        now = timezone.now()
+        start = (now - timedelta(minutes=45)).isoformat()
+        end = now.isoformat()
+
+        # 1. Valid collaborator user_id -> 201 Created
+        valid_res = self.client.post(
+            f"/api/kanban/tasks/{self.task_id}/time-entries",
+            data=json.dumps({
+                "started_at": start,
+                "ended_at": end,
+                "duration_seconds": 2700,
+                "note": "Logged on behalf of collaborator",
+                "user_id": collaborator.id,
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(valid_res.status_code, 201)
+        data = valid_res.json()
+        self.assertEqual(data["user_id"], collaborator.id)
+        self.assertEqual(data["user"]["id"], collaborator.id)
+        self.assertEqual(data["user"]["display_name"], "Collab User")
+
+        # 2. Invalid non-member user_id -> 400 Bad Request
+        invalid_res = self.client.post(
+            f"/api/kanban/tasks/{self.task_id}/time-entries",
+            data=json.dumps({
+                "started_at": start,
+                "ended_at": end,
+                "duration_seconds": 2700,
+                "note": "Attributed to stranger",
+                "user_id": non_member.id,
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(invalid_res.status_code, 400)
+
+        # 3. Omitted user_id -> defaults to authenticated user
+        omitted_res = self.client.post(
+            f"/api/kanban/tasks/{self.task_id}/time-entries",
+            data=json.dumps({
+                "started_at": start,
+                "ended_at": end,
+                "duration_seconds": 2700,
+                "note": "Self logged work",
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(omitted_res.status_code, 201)
+        omitted_data = omitted_res.json()
+        self.assertEqual(omitted_data["user_id"], self.user.id)
+        self.assertEqual(omitted_data["user"]["id"], self.user.id)

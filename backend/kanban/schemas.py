@@ -32,6 +32,7 @@ class TaskTimeEntryIn(Schema):
     ended_at: datetime | None = None
     duration_seconds: int = 0
     note: str = ""
+    user_id: int | None = None
 
 class TaskTimeEntryUpdateIn(Schema):
     """Payload expected when updating a recorded time entry."""

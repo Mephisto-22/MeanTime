@@ -545,10 +545,24 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
     elif end is not None and duration > int((end - start).total_seconds()):
         raise HttpError(400, "Duration cannot exceed elapsed time range")
 
+    board = task.column.board
+    target_user = request.auth
+    target_user_id = data.get("user_id")
+
+    if target_user_id is not None:
+        is_owner = (board.owner_id == target_user_id)
+        is_collab = board.collaborators.filter(id=target_user_id).exists()
+        if not (is_owner or is_collab):
+            raise HttpError(400, "Selected user is not a member of this board")
+        if target_user_id == request.auth.id:
+            target_user = request.auth
+        else:
+            target_user = get_object_or_404(User, id=target_user_id)
+
     with transaction.atomic():
         entry = TaskTimeEntry.objects.create(
             task=task,
-            user=request.auth,
+            user=target_user,
             started_at=start,
             ended_at=end,
             duration_seconds=duration,
