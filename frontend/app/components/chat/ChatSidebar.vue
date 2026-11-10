@@ -5,7 +5,7 @@
       v-if="!chatStore.isSidebarOpen"
       severity="primary"
       rounded
-      class="chat-dock-toggle fixed bottom-6 right-6 shadow-lg z-50 flex items-center gap-2"
+      class="chat-dock-toggle !fixed !bottom-6 !right-6 !z-50 shadow-2xl flex items-center gap-2"
       data-testid="chat-dock-button"
       @click="chatStore.openSidebar()"
     >

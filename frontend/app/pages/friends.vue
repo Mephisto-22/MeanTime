@@ -1,12 +1,25 @@
 <template>
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 flex flex-col gap-6">
-    <div class="flex flex-col gap-1">
-      <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-        Friends & Social
-      </h1>
-      <p class="text-surface-600 dark:text-surface-400">
-        Manage your friends list, accept pending requests, find new connections, and view blocked users.
-      </p>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex flex-col gap-1">
+        <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+          Friends & Social
+        </h1>
+        <p class="text-surface-600 dark:text-surface-400">
+          Manage your friends list, accept pending requests, find new connections, and view blocked users.
+        </p>
+      </div>
+      <Button
+        label="Chats"
+        icon="pi pi-comments"
+        :badge="chatStore.badgeCount > 0 ? String(chatStore.badgeCount) : undefined"
+        badgeSeverity="warn"
+        severity="primary"
+        rounded
+        class="self-start sm:self-auto shrink-0 shadow-sm"
+        data-testid="open-chat-header-button"
+        @click="chatStore.openSidebar()"
+      />
     </div>
 
     <Tabs
@@ -126,6 +139,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Badge from 'primevue/badge'
+import Button from 'primevue/button'
 import FriendsList from '~/components/friends/FriendsList.vue'
 import FriendRequestsList from '~/components/friends/FriendRequestsList.vue'
 import UserSearch from '~/components/friends/UserSearch.vue'
