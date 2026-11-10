@@ -1,6 +1,7 @@
 import asyncio
 import json
 import redis.asyncio as redis
+from .events.subscribers import subscribe_to_board
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -260,47 +261,12 @@ def get_board(request, board_id: int):
 
 @router.get("/boards/{board_id}/events")
 def board_events(request, board_id: int):
+    """Subscribe to board update events."""
     # Only allow board owners and collaborators to subscribe
     board = get_accessible_board(request.auth, board_id)
 
-    # Redis subscription
-    async def event_stream():
-        client = redis.Redis.from_url(
-            settings.REDIS_URL,
-            decode_responses=True
-        )
-
-        pubsub = client.pubsub()
-        channel = f"kanban:board:{board.id}"
-        try:
-            await pubsub.subscribe(channel)
-
-            # Tell the browser when to retry after a disconnection
-            yield format_sse_retry()
-
-            while True:
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True,
-                    timeout=15.0
-                )
-
-                if message is None:
-                    # SSE keeps the connection alive
-                    yield format_sse_comment()
-                    continue
-
-                event = json.loads(message["data"])
-
-                # convert the Redis message into SSE format
-                yield format_sse_event(event)
-        except asyncio.CancelledError:
-            raise
-        finally:
-            await pubsub.aclose()
-            await client.aclose()
-
     response = StreamingHttpResponse(
-        event_stream(),
+        subscribe_to_board(board.id),
         content_type="text/event-stream"
     )
 
