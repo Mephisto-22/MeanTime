@@ -66,6 +66,29 @@ class UpdateConversationIn(Schema):
     title: str
 
 
+class MessageOut(Schema):
+    id: int
+    conversation_id: int
+    sender_id: int
+    sender_name: str
+    content: str
+    created_at: datetime
+
+
+class SendMessageIn(Schema):
+    content: str
+
+
+class ClearHistoryResponse(Schema):
+    success: bool = True
+    cleared_at: datetime
+
+
+class MarkReadResponse(Schema):
+    success: bool = True
+    last_read_at: datetime
+
+
 class ActionResponse(Schema):
     success: bool = True
     detail: Optional[str] = None

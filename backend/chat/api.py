@@ -1,5 +1,7 @@
+from typing import List, Optional
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from ninja import Router
 from ninja.errors import HttpError
 
@@ -9,18 +11,23 @@ from chat.models import (
     Conversation,
     ConversationParticipant,
     ConversationType,
+    Message,
     ParticipantStatus,
 )
 from chat.schemas import (
     ActionResponse,
+    ClearHistoryResponse,
     ConversationDetailOut,
     ConversationListResponse,
     ConversationOut,
     CreateConversationIn,
     InviteFriendsIn,
     LastMessageOut,
+    MarkReadResponse,
+    MessageOut,
     ParticipantOut,
     PendingInviteOut,
+    SendMessageIn,
     UpdateConversationIn,
 )
 
@@ -292,9 +299,6 @@ def update_conversation(request, conversation_id: int, data: UpdateConversationI
     user = request.auth
     conv = get_object_or_404(Conversation, id=conversation_id)
 
-    if conv.type != ConversationType.GROUP:
-        raise HttpError(400, "Only group conversations can be renamed.")
-
     participant = ConversationParticipant.objects.filter(
         conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
     ).first()
@@ -302,6 +306,9 @@ def update_conversation(request, conversation_id: int, data: UpdateConversationI
         raise HttpError(
             403, "Only accepted group participants can rename the conversation."
         )
+
+    if conv.type != ConversationType.GROUP:
+        raise HttpError(400, "Only group conversations can be renamed.")
 
     title = data.title.strip()
     if not title:
@@ -322,14 +329,14 @@ def invite_friends(request, conversation_id: int, data: InviteFriendsIn):
     user = request.auth
     conv = get_object_or_404(Conversation, id=conversation_id)
 
-    if conv.type != ConversationType.GROUP:
-        raise HttpError(400, "Invites can only be added to group conversations.")
-
     caller_p = ConversationParticipant.objects.filter(
         conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
     ).first()
     if not caller_p:
         raise HttpError(403, "Only accepted group participants can invite friends.")
+
+    if conv.type != ConversationType.GROUP:
+        raise HttpError(400, "Invites can only be added to group conversations.")
 
     invite_ids = [uid for uid in set(data.user_ids) if uid != user.id]
     if not invite_ids:
@@ -406,6 +413,9 @@ def decline_invitation(request, conversation_id: int):
     if not p:
         raise HttpError(404, "Invitation not found.")
 
+    if p.status != ParticipantStatus.PENDING:
+        raise HttpError(400, "Invitation is not pending.")
+
     p.status = ParticipantStatus.DECLINED
     p.save(update_fields=["status", "updated_at"])
     return 200, {"success": True, "detail": "Invitation declined."}
@@ -435,3 +445,153 @@ def leave_conversation(request, conversation_id: int):
         conv.save(update_fields=["is_active", "updated_at"])
 
     return 200, {"success": True, "detail": "Left conversation."}
+
+
+@chat_router.get(
+    "/conversations/{conversation_id}/messages",
+    response={200: List[MessageOut]},
+    summary="Get messages for a conversation",
+)
+def list_messages(
+    request,
+    conversation_id: int,
+    since_id: Optional[int] = None,
+    limit: int = 50,
+):
+    user = request.auth
+    conv = get_object_or_404(Conversation, id=conversation_id)
+
+    participant = ConversationParticipant.objects.filter(
+        conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
+    ).first()
+    if not participant:
+        raise HttpError(403, "You do not have access to this conversation.")
+
+    if conv.type == ConversationType.DIRECT:
+        other_p = conv.participants.exclude(user=user).first()
+        if other_p and (
+            user.is_blocking(other_p.user) or user.is_blocked_by(other_p.user)
+        ):
+            raise HttpError(403, "Access to this conversation is blocked.")
+
+    messages = conv.messages.all()
+
+    if participant.cleared_at:
+        messages = messages.filter(created_at__gt=participant.cleared_at)
+
+    if since_id is not None:
+        messages = messages.filter(id__gt=since_id)
+
+    blocked_ids = set(
+        UserBlock.objects.filter(blocker=user).values_list("blocked_id", flat=True)
+    ) | set(
+        UserBlock.objects.filter(blocked=user).values_list("blocker_id", flat=True)
+    )
+    if blocked_ids:
+        messages = messages.exclude(sender_id__in=blocked_ids)
+
+    messages = messages.select_related("sender").order_by("id")[:limit]
+
+    return 200, [
+        {
+            "id": msg.id,
+            "conversation_id": msg.conversation_id,
+            "sender_id": msg.sender_id,
+            "sender_name": msg.sender.display_name,
+            "content": msg.content,
+            "created_at": msg.created_at,
+        }
+        for msg in messages
+    ]
+
+
+@chat_router.post(
+    "/conversations/{conversation_id}/messages",
+    response={200: MessageOut},
+    summary="Send a message to a conversation",
+)
+def send_message(request, conversation_id: int, data: SendMessageIn):
+    user = request.auth
+    conv = get_object_or_404(Conversation, id=conversation_id)
+
+    participant = ConversationParticipant.objects.filter(
+        conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
+    ).first()
+    if not participant:
+        raise HttpError(403, "You do not have access to this conversation.")
+
+    content = data.content.strip()
+    if not content:
+        raise HttpError(400, "Message content cannot be empty.")
+
+    if conv.type == ConversationType.DIRECT:
+        other_p = conv.participants.exclude(user=user).first()
+        if other_p and (
+            user.is_blocking(other_p.user) or user.is_blocked_by(other_p.user)
+        ):
+            raise HttpError(403, "Cannot send message: user is blocked.")
+
+    msg = Message.objects.create(
+        conversation=conv,
+        sender=user,
+        content=content,
+    )
+
+    conv.save(update_fields=["updated_at"])
+
+    return 200, {
+        "id": msg.id,
+        "conversation_id": msg.conversation_id,
+        "sender_id": msg.sender_id,
+        "sender_name": user.display_name,
+        "content": msg.content,
+        "created_at": msg.created_at,
+    }
+
+
+@chat_router.post(
+    "/conversations/{conversation_id}/clear",
+    response={200: ClearHistoryResponse},
+    summary="Clear conversation history for the caller",
+)
+def clear_history(request, conversation_id: int):
+    user = request.auth
+    conv = get_object_or_404(Conversation, id=conversation_id)
+
+    participant = ConversationParticipant.objects.filter(
+        conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
+    ).first()
+    if not participant:
+        raise HttpError(403, "You do not have access to this conversation.")
+
+    participant.cleared_at = timezone.now()
+    participant.save(update_fields=["cleared_at", "updated_at"])
+
+    return 200, {
+        "success": True,
+        "cleared_at": participant.cleared_at,
+    }
+
+
+@chat_router.post(
+    "/conversations/{conversation_id}/read",
+    response={200: MarkReadResponse},
+    summary="Mark conversation as read for the caller",
+)
+def mark_as_read(request, conversation_id: int):
+    user = request.auth
+    conv = get_object_or_404(Conversation, id=conversation_id)
+
+    participant = ConversationParticipant.objects.filter(
+        conversation=conv, user=user, status=ParticipantStatus.ACCEPTED
+    ).first()
+    if not participant:
+        raise HttpError(403, "You do not have access to this conversation.")
+
+    participant.last_read_at = timezone.now()
+    participant.save(update_fields=["last_read_at", "updated_at"])
+
+    return 200, {
+        "success": True,
+        "last_read_at": participant.last_read_at,
+    }
