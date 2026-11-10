@@ -389,4 +389,87 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-solo-1"]')
     expect(avatar.exists()).toBe(false)
   })
+
+  it('displays Recorded by dropdown defaulting to current user and records manual entry with selected contributor on a shared board', async () => {
+    const member1 = {
+      id: 10,
+      display_name: 'Alice Cooper',
+      email: 'alice@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+    const member2 = {
+      id: 20,
+      display_name: 'Bob Dylan',
+      email: 'bob@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [],
+        isShared: true,
+        boardMembers: [member1, member2],
+        currentUserId: member2.id,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    // Toggle manual log form open
+    const toggleBtn = wrapper.find('[data-testid="btn-toggle-log-past-work"]')
+    await toggleBtn.trigger('click')
+
+    // Dropdown is present
+    const select = wrapper.find('[data-testid="manual-select-recorded-by"]')
+    expect(select.exists()).toBe(true)
+
+    // Option listing includes members
+    expect(wrapper.text()).toContain('Bob Dylan')
+
+    // Save manual session
+    const noteInput = wrapper.find('[data-testid="manual-input-note"]')
+    await noteInput.setValue('Pair programming with Bob')
+
+    const saveBtn = wrapper.find('[data-testid="manual-save-btn"]')
+    await saveBtn.trigger('click')
+
+    expect(wrapper.emitted('update:timeEntries')).toBeTruthy()
+    const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
+    expect(updated.length).toBe(1)
+    expect(updated[0].userId).toBe(member2.id)
+    expect(updated[0].user?.id).toBe(member2.id)
+    expect(updated[0].note).toBe('Pair programming with Bob')
+  })
+
+  it('omits Recorded by dropdown in manual log form on a private/solo board', async () => {
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [],
+        isShared: false,
+        boardMembers: [{
+          id: 1,
+          display_name: 'Solo User',
+          email: 'solo@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        }],
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const toggleBtn = wrapper.find('[data-testid="btn-toggle-log-past-work"]')
+    await toggleBtn.trigger('click')
+
+    expect(wrapper.find('[data-testid="manual-work-form"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="manual-select-recorded-by"]').exists()).toBe(false)
+  })
 })

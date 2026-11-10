@@ -316,6 +316,46 @@
                 </div>
               </div>
 
+              <!-- Row: Recorded by Dropdown (When on Shared Board) -->
+              <div v-if="isShared" class="flex flex-col gap-1">
+                <Label for="manual-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                <Select
+                  id="manual-recorded-by"
+                  v-model="manualUserId"
+                  :options="members"
+                  option-label="display_name"
+                  option-value="id"
+                  placeholder="Select contributor"
+                  fluid
+                  class="!text-xs"
+                  data-testid="manual-select-recorded-by"
+                >
+                  <template #value="slotProps">
+                    <div v-if="slotProps.value" class="flex items-center gap-2">
+                      <Avatar
+                        :label="getUserInitials(getMemberById(slotProps.value))"
+                        shape="circle"
+                        size="small"
+                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                      />
+                      <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                    </div>
+                    <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                  </template>
+                  <template #option="slotProps">
+                    <div class="flex items-center gap-2 py-0.5">
+                      <Avatar
+                        :label="getUserInitials(slotProps.option)"
+                        shape="circle"
+                        size="small"
+                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                      />
+                      <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
+
               <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
               <div class="flex flex-col gap-1">
                 <Label for="manual-session-note" class="text-[10px] font-semibold text-surface-500">Session Note</Label>
@@ -559,6 +599,8 @@ import {
 } from '~/api/kanban'
 import { toCamelCase } from '~/utils/case'
 import { useNotifications } from '~/composables/useNotifications'
+import { useAuthStore } from '~/stores/auth'
+import type { UserOut } from '~/api/friends'
 import {
   useTaskTimer,
   formatDigital,
@@ -576,10 +618,14 @@ interface Props {
   timeEntries?: TaskTimeEntryDto[]
   taskId: string | number
   isShared?: boolean
+  boardMembers?: UserOut[]
+  currentUserId?: number | string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isShared: undefined,
+  boardMembers: undefined,
+  currentUserId: undefined,
 })
 
 const emit = defineEmits<{
@@ -591,12 +637,61 @@ const emit = defineEmits<{
 const kanbanContext = inject(kanbanContextKey, null)
 const notify = useNotifications()
 
+let authStore: any
+try {
+  authStore = useAuthStore()
+} catch {
+  // Pinia not active
+}
+
 const isShared = computed<boolean>(() => {
   if (props.isShared !== undefined) {
     return props.isShared
   }
   return kanbanContext?.isShared?.value ?? false
 })
+
+const members = computed<UserOut[]>(() => {
+  if (props.boardMembers !== undefined) {
+    return props.boardMembers
+  }
+  return kanbanContext?.boardMembers?.value ?? []
+})
+
+const effectiveCurrentUserId = computed<number | string | null>(() => {
+  if (props.currentUserId !== undefined) {
+    return props.currentUserId
+  }
+  return authStore?.user?.id ?? null
+})
+
+const manualUserId = ref<number | string | null>(null)
+
+watch(
+  [effectiveCurrentUserId, members],
+  ([userId, mems]) => {
+    if (manualUserId.value == null) {
+      if (userId != null && mems.some(m => String(m.id) === String(userId))) {
+        manualUserId.value = userId
+      } else if (userId != null) {
+        manualUserId.value = userId
+      } else if (mems.length > 0 && mems[0]) {
+        manualUserId.value = mems[0].id
+      }
+    }
+  },
+  { immediate: true },
+)
+
+function getMemberById(id: number | string | null | undefined): UserOut | undefined {
+  if (id == null) return undefined
+  return members.value.find(m => String(m.id) === String(id))
+}
+
+function getMemberName(id: number | string | null | undefined): string {
+  const member = getMemberById(id)
+  return member ? getUserDisplayName(member) : ''
+}
 
 function getUserDisplayName(user?: any): string {
   if (!user) return ''
@@ -956,6 +1051,7 @@ const toggleManualLog = () => {
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
     manualNote.value = ''
+    manualUserId.value = effectiveCurrentUserId.value ?? (members.value[0]?.id ?? null)
   }
 }
 
@@ -1022,10 +1118,15 @@ const submitManualEntry = async () => {
   const durationSec = durationMins * 60
   const note = manualNote.value.trim() || 'Manual session'
 
+  const selectedUserId = isShared.value ? (manualUserId.value != null ? Number(manualUserId.value) : undefined) : undefined
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   const tempId = `manual-${Date.now()}`
   const newEntry: TaskTimeEntryDto = {
     id: tempId,
     taskId: props.taskId,
+    userId: selectedUserId,
+    user: selectedMember,
     startedAt: started,
     endedAt: ended,
     durationSeconds: durationSec,
@@ -1041,6 +1142,7 @@ const submitManualEntry = async () => {
   if (isPersistedTaskId.value) {
     try {
       const persisted = await kanbanApi.createTimeEntry(props.taskId, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,
