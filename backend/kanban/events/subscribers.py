@@ -5,6 +5,7 @@ import json
 import redis.asyncio as redis
 
 from django.conf import settings
+from ..event_schemas import BoardEventType
 
 from ..sse import (
     format_sse_comment,
@@ -13,8 +14,8 @@ from ..sse import (
 )
 
 
-async def subscribe_to_board(board_id: int):
-    """Sybscribe to Redis events fro a specific board."""
+async def subscribe_to_board(board_id: int, user_id: int):
+    """Subscribe to Redis events from a specific board."""
 
     client = redis.Redis.from_url(
         settings.REDIS_URL,
@@ -42,7 +43,25 @@ async def subscribe_to_board(board_id: int):
 
             event = json.loads(message["data"])
 
-            # convert the Redis message into SSE format
+            # ignore incorrectly scoped events
+            if event.get("board_id") != board_id:
+                continue
+
+            event_type = event.get("type")
+            event_data = event.get("data", {})
+
+            # A collaborator has lost access
+            if event_type == BoardEventType.BOARD_ACCESS_REVOKED:
+                if event_data.get("user_id") == user_id:
+                    yield format_sse_event(event)
+                    break
+
+            # The entire board has been deleted
+            if event_type == BoardEventType.BOARD_DELETED:
+                yield format_sse_event(event)
+                break
+
+            # in general, convert the Redis message into SSE format
             yield format_sse_event(event)
     except asyncio.CancelledError:
         raise
