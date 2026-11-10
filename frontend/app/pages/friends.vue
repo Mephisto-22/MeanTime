@@ -76,6 +76,7 @@
             :loading="loading"
             @unfriend="handleUnfriend"
             @block="handleBlock"
+            @chat="handleOpenChat"
           />
         </TabPanel>
 
@@ -112,11 +113,13 @@
         </TabPanel>
       </TabPanels>
     </Tabs>
+
+    <ChatSidebar :friends="friends" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -127,6 +130,8 @@ import FriendsList from '~/components/friends/FriendsList.vue'
 import FriendRequestsList from '~/components/friends/FriendRequestsList.vue'
 import UserSearch from '~/components/friends/UserSearch.vue'
 import BlockedUsersList from '~/components/friends/BlockedUsersList.vue'
+import ChatSidebar from '~/components/chat/ChatSidebar.vue'
+import { useChatStore } from '~/stores/chat'
 import {
   friendsApi,
   type FriendRequestOut,
@@ -134,6 +139,7 @@ import {
 } from '~/api/friends'
 
 const notify = useNotifications()
+const chatStore = useChatStore()
 const userSearchRef = ref<InstanceType<typeof UserSearch> | null>(null)
 
 const loading = ref(true)
@@ -154,6 +160,7 @@ async function loadData() {
     incomingRequests.value = requestsData.incoming
     outgoingRequests.value = requestsData.outgoing
     blockedUsers.value = blockedData
+    await chatStore.loadConversations().catch(() => {})
   } catch (err: unknown) {
     notify.error(err, 'Error')
   } finally {
@@ -274,7 +281,19 @@ async function handleSendRequest(userId: number) {
   }
 }
 
+async function handleOpenChat(friend: UserOut) {
+  try {
+    await chatStore.openDirectChat(friend.id)
+  } catch (err: unknown) {
+    notify.error(err, 'Error')
+  }
+}
+
 onMounted(() => {
   loadData()
+})
+
+onUnmounted(() => {
+  chatStore.closeSidebar()
 })
 </script>

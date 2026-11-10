@@ -93,12 +93,22 @@ describe('FriendsList Component Suite', () => {
     it('renders unfriend and block action buttons for each friend', () => {
       const wrapper = mountFriendsList({ loading: false, friends: mockFriends })
 
+      expect(wrapper.find('[data-testid="chat-button-1"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="unfriend-button-1"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="block-button-1"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="share-board-button-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="chat-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="unfriend-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="block-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="share-board-button-2"]').exists()).toBe(true)
+    })
+
+    it('clicking Chat button emits chat event with friend payload', async () => {
+      const wrapper = mountFriendsList({ loading: false, friends: mockFriends })
+
+      await wrapper.find('[data-testid="chat-button-1"]').trigger('click')
+      expect(wrapper.emitted('chat')).toBeTruthy()
+      expect(wrapper.emitted('chat')![0]).toEqual([mockFriends[0]])
     })
   })
 
