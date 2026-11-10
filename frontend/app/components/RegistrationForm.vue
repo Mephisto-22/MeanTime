@@ -38,6 +38,17 @@
   </form>
 </template>
 
+<script lang="ts">
+export function getClientTimezone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return typeof tz === 'string' && tz.trim() ? tz.trim() : 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+</script>
+
 <script setup lang="ts">
 import { requiredText, validEmail, validPassword } from '~/utils/validation'
 import { authApi, type PasswordRequirement, type RegistrationRequest } from '~/api/auth'
@@ -108,6 +119,6 @@ onBeforeUnmount(() => { clearTimeout(timer); requestId++ })
 function submit() {
   if (props.loading || !canSubmit.value) return
   // Confirmation is a local check; preserve the backend registration contract.
-  emit('submit', { display_name: displayName.value.trim(), email: email.value.trim(), password: password.value })
+  emit('submit', { display_name: displayName.value.trim(), email: email.value.trim(), password: password.value, timezone: getClientTimezone() })
 }
 </script>

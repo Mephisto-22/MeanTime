@@ -55,7 +55,12 @@ describe('Live registration requirements and confirmation', () => {
     expect(wrapper.text()).toContain('Passwords match.')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('submit')).toEqual([[{ display_name: 'Name', email: 'user@example.com', password: 'StrongPass!746xyz' }]])
+    expect(wrapper.emitted('submit')).toEqual([[{
+      display_name: 'Name',
+      email: 'user@example.com',
+      password: 'StrongPass!746xyz',
+      timezone: expect.any(String),
+    }]])
   })
 
   it('blocks mismatches and recomputes confirmation when the original password changes', async () => {
