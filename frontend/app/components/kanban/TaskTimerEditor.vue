@@ -411,14 +411,28 @@
                     </div>
                   </div>
 
-                  <!-- Note Display -->
-                  <p
-                    class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
-                    title="Click to edit session"
-                    @click="startEditingSession(entry)"
-                  >
-                    {{ entry.note || '(No session note recorded)' }}
-                  </p>
+                  <!-- Bottom Row: Session Note & Contributor Avatar on Shared Boards -->
+                  <div class="flex items-end justify-between gap-2">
+                    <p
+                      class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors flex-1"
+                      title="Click to edit session"
+                      @click="startEditingSession(entry)"
+                    >
+                      {{ entry.note || '(No session note recorded)' }}
+                    </p>
+                    <Avatar
+                      v-if="isShared"
+                      v-tooltip="getUserTooltip(entry.user)"
+                      :title="getUserTooltip(entry.user)"
+                      :label="entry.user ? getUserInitials(entry.user) : undefined"
+                      :icon="entry.user ? undefined : 'pi pi-user'"
+                      shape="circle"
+                      size="normal"
+                      class="shrink-0 text-[10px] font-bold"
+                      :class="entry.user ? 'user-avatar-primary' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300'"
+                      :data-testid="`time-entry-avatar-${entry.id}`"
+                    />
+                  </div>
                 </template>
 
                 <!-- Inline Session Editor (When Editing this Entry) -->
@@ -557,11 +571,16 @@ import {
   combineDateAndTime,
 } from '~/composables/useTaskTimer'
 
-const props = defineProps<{
+interface Props {
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
   taskId: string | number
-}>()
+  isShared?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isShared: undefined,
+})
 
 const emit = defineEmits<{
   (e: 'update:timer', timer: TaskTimerDto): void
@@ -571,6 +590,59 @@ const emit = defineEmits<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 const notify = useNotifications()
+
+const isShared = computed<boolean>(() => {
+  if (props.isShared !== undefined) {
+    return props.isShared
+  }
+  return kanbanContext?.isShared?.value ?? false
+})
+
+function getUserDisplayName(user?: any): string {
+  if (!user) return ''
+  return user.displayName || user.display_name || ''
+}
+
+function getUserEmail(user?: any): string {
+  if (!user) return ''
+  return user.email || ''
+}
+
+function getUserInitials(user?: any): string {
+  const name = getUserDisplayName(user).trim()
+  const email = getUserEmail(user).trim()
+  if (name) {
+    const parts = name.split(/\s+/)
+    const first = parts[0]
+    const last = parts[parts.length - 1]
+    if (parts.length >= 2 && first && last && first[0] && last[0]) {
+      return (first[0] + last[0]).toUpperCase()
+    }
+    if (first) {
+      return first.slice(0, 1).toUpperCase()
+    }
+  }
+  if (email) {
+    return email.slice(0, 1).toUpperCase()
+  }
+  return '?'
+}
+
+function getUserTooltip(user?: any): string {
+  if (!user) return 'Unknown user'
+  const name = getUserDisplayName(user).trim()
+  const email = getUserEmail(user).trim()
+  if (name && email) {
+    return `${name} <${email}>`
+  }
+  if (name) {
+    return name
+  }
+  if (email) {
+    return email
+  }
+  return 'Unknown user'
+}
 
 const modeOptions = [
   { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },

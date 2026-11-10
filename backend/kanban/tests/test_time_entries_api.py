@@ -65,6 +65,10 @@ class TaskTimeEntryApiTests(TestCase):
         self.assertEqual(data["duration_seconds"], 3600)
         self.assertEqual(data["note"], "Manual focus block")
         self.assertEqual(data["task_id"], self.task_id)
+        self.assertEqual(data["user_id"], self.user.id)
+        self.assertIsNotNone(data.get("user"))
+        self.assertEqual(data["user"]["id"], self.user.id)
+        self.assertEqual(data["user"]["display_name"], "Chronicle Tester")
 
         # GET /tasks/{id}/time-entries
         get_res = self.client.get(f"/api/kanban/tasks/{self.task_id}/time-entries", **self.auth)
@@ -72,6 +76,42 @@ class TaskTimeEntryApiTests(TestCase):
         entries = get_res.json()
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["id"], data["id"])
+        self.assertIsNotNone(entries[0].get("user"))
+        self.assertEqual(entries[0]["user"]["id"], self.user.id)
+
+    def test_time_entry_response_serializes_nested_user_profile(self):
+        """GET /tasks/{id}/time-entries returns nested UserOut profile metadata for user."""
+        entry_with_user = TaskTimeEntry.objects.create(
+            task_id=self.task_id,
+            user=self.user,
+            started_at=timezone.now() - timedelta(minutes=30),
+            ended_at=timezone.now(),
+            duration_seconds=1800,
+            note="With user",
+        )
+        entry_without_user = TaskTimeEntry.objects.create(
+            task_id=self.task_id,
+            user=None,
+            started_at=timezone.now() - timedelta(minutes=60),
+            ended_at=timezone.now() - timedelta(minutes=30),
+            duration_seconds=1800,
+            note="Without user",
+        )
+
+        res = self.client.get(f"/api/kanban/tasks/{self.task_id}/time-entries", **self.auth)
+        self.assertEqual(res.status_code, 200)
+        entries_by_id = {e["id"]: e for e in res.json()}
+
+        self.assertIn(entry_with_user.id, entries_by_id)
+        user_data = entries_by_id[entry_with_user.id]["user"]
+        self.assertIsNotNone(user_data)
+        self.assertEqual(user_data["id"], self.user.id)
+        self.assertEqual(user_data["display_name"], self.user.display_name)
+        self.assertEqual(user_data["email"], self.user.email)
+
+        self.assertIn(entry_without_user.id, entries_by_id)
+        self.assertIsNone(entries_by_id[entry_without_user.id]["user"])
+        self.assertIsNone(entries_by_id[entry_without_user.id]["user_id"])
 
     def test_patch_time_entry_duration_preserves_end_and_enforces_lte_span(self):
         """PATCHing duration_seconds preserves ended_at and enforces duration <= ended_at - started_at."""
