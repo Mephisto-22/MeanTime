@@ -89,6 +89,7 @@ import type {
   TaskTimerDto,
   TaskTimeEntryDto,
 } from '~/api/kanban'
+import type { UserOut } from '~/api/friends'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 
@@ -737,9 +738,32 @@ const handleColumnDeleted = (columnId: string | number) => {
   notify.success('Column deleted.')
 }
 
+const isShared = computed<boolean>(() => {
+  const hasCollaborators = (props.board.collaborators?.length ?? 0) > 0
+  const isNotOwner = props.board.isOwner === false
+  return hasCollaborators || isNotOwner
+})
+
+const boardMembers = computed<UserOut[]>(() => {
+  const members: UserOut[] = []
+  if (props.board.owner) {
+    members.push(props.board.owner)
+  }
+  if (props.board.collaborators) {
+    for (const collab of props.board.collaborators) {
+      if (!members.some(m => m.id === collab.id)) {
+        members.push(collab)
+      }
+    }
+  }
+  return members
+})
+
 provide(kanbanContextKey, {
   columns: columnRegistry,
   availableTags: computed(() => availableTags.value),
+  isShared,
+  boardMembers,
   createTag: handleCreateTag,
   moveTask: handleMoveTask,
   openCreateTaskDialog,

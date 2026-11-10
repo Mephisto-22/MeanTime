@@ -45,6 +45,7 @@ class TaskTimeEntryOut(Schema):
     id: int
     task_id: int
     user_id: int | None = None
+    user: UserOut | None = None
     started_at: datetime
     ended_at: datetime | None = None
     duration_seconds: int

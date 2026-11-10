@@ -286,4 +286,107 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
     expect(updated[0].durationSeconds).toBe(1200) // Preserved!
   })
+
+  it('renders contributor avatar with initials and tooltip on a shared board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-collab-1',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Collaboration session',
+        user: {
+          id: 42,
+          display_name: 'Sarah Connor',
+          email: 'sarah@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: true,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-1"]')
+    expect(avatar.exists()).toBe(true)
+    expect(avatar.text()).toBe('SC')
+    expect(avatar.attributes('title')).toBe('Sarah Connor <sarah@example.com>')
+  })
+
+  it('renders fallback avatar with user icon and Unknown user tooltip when user data is missing on a shared board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-collab-anonymous',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Anonymous session',
+        user: null,
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: true,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-anonymous"]')
+    expect(avatar.exists()).toBe(true)
+    expect(avatar.attributes('title')).toBe('Unknown user')
+    expect(avatar.find('.pi-user').exists()).toBe(true)
+  })
+
+  it('omits contributor avatars completely on an unshared/solo board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-solo-1',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Solo session',
+        user: {
+          id: 1,
+          display_name: 'Solo User',
+          email: 'solo@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: false,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-solo-1"]')
+    expect(avatar.exists()).toBe(false)
+  })
 })

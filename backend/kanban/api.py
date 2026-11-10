@@ -524,7 +524,7 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
 def list_time_entries(request, task_id: int):
     """List historical time entries recorded for a task."""
     task = get_accessible_task(request.auth, task_id)
-    return task.time_entries.all()
+    return task.time_entries.select_related("user").all()
 
 @router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
 def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):

@@ -22,6 +22,7 @@ export interface TaskTimeEntryDto {
   id: number | string
   taskId: number | string
   userId?: number | string
+  user?: UserOut | null
   startedAt: string
   endedAt?: string | null
   durationSeconds: number
@@ -156,6 +157,8 @@ export interface TaskDialogSavePayload {
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
+  isShared?: ComputedRef<boolean>
+  boardMembers?: ComputedRef<UserOut[]>
   createTag?: (payload: { name: string } | string) => Promise<TagDto>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
   openCreateTaskDialog: (columnId: string | number) => void
