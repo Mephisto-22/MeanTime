@@ -1,7 +1,5 @@
-import asyncio
-import json
-import redis.asyncio as redis
 from .events.subscribers import subscribe_to_board
+from .events.publisher import publish_board_event
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -34,6 +32,7 @@ from .schemas import (
     TaskTimeEntryUpdateIn,
     TaskTimeEntryOut,
 )
+from .event_schemas import BoardEventType
 from .sse import (
     SSE_RESPONSE_HEADERS,
     format_sse_comment,
@@ -140,6 +139,14 @@ def reconcile_expired_countdowns(user):
             timer.elapsed_seconds = 0
             timer.save()
 
+                # publish updated timer event to subscribers
+                publish_event_on_commit(
+                    board_id=timer.task.column.board_id,
+                    actor_id=user.id,
+                    event_type=BoardEventType.TASK_TIMER_UPDATED,
+                    data=get_timer_event_data(timer.task, timer),
+                )
+
 def get_board_queryset(user):
     # Each task's tracked time is summed in the same query that loads the tasks,
     # so a board's totals don't cost one extra query per task. Django skips
@@ -229,7 +236,41 @@ def _reindex(items):
         obj.position = i
         obj.save()
 
+def publish_event_on_commit(board_id: int, actor_id: int, event_type: BoardEventType, data: dict):
+    """Schedule a board event tobe published after transaction commit."""
 
+    transaction.on_commit(
+        lambda: publish_board_event(
+            board_id=board_id,
+            actor_id=actor_id,
+            event_type=event_type,
+            data=data,
+        ),
+        robust=True,
+    )
+
+def serialize_task(task: Task) -> dict:
+    """Serialize a task using the existing TaskOut schema."""
+
+    return TaskOut.model_validate(
+        task,
+        from_attributes=True
+    ).model_dump(mode="json")
+
+def get_timer_event_data(task, timer):
+    return {
+        "task_id": task.id,
+        "timer": {
+            "id": timer.id,
+            "mode": timer.mode,
+            "state": timer.state,
+            "target_duration_seconds": timer.target_duration_seconds,
+            "elapsed_seconds": timer.elapsed_seconds,
+            "started_at": timer.started_at,
+            "last_resumed_at": timer.last_resumed_at,
+            "last_paused_at": timer.last_paused_at,
+        },
+    }
 
 # -----------------
 # Board Endpoints
@@ -266,7 +307,7 @@ def board_events(request, board_id: int):
     board = get_accessible_board(request.auth, board_id)
 
     response = StreamingHttpResponse(
-        subscribe_to_board(board.id),
+        subscribe_to_board(board.id, request.auth.id),
         content_type="text/event-stream"
     )
 
@@ -283,12 +324,40 @@ def update_board(request, board_id: int, payload: BoardIn):
     board.title = payload.title
     board.description = payload.description
     board.save()
+
+    # publish update event to subscribers
+    publish_event_on_commit(
+        board_id=board.id,
+        actor_id=request.auth.id,
+        event_type=BoardEventType.BOARD_UPDATED,
+        data={
+            "board": {
+                "id": board.id,
+                "title": board.title,
+                "description": board.description
+            }
+        },
+    )
+
     return board
 
 @router.delete("/boards/{board_id}")
 def delete_board(request, board_id: int):
     """Delete a board and its related columns and tasks."""
-    get_owned_board(request.auth, board_id).delete()
+    board = get_owned_board(request.auth, board_id)
+
+    with transaction.atomic():
+        # publish deletion event to subscribers
+        publish_event_on_commit(
+            board_id=board.id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.BOARD_DELETED,
+            data={},
+        )
+
+        # actually delete the board
+        board.delete()
+
     return {"success": True}
 
 @router.post("/boards/{board_id}/collaborators")
@@ -318,10 +387,10 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     board = get_accessible_board(request.auth, board_id)
 
     # retrieve the collaborator
-    friend = get_object_or_404(User, id=collaborator_id)
+    collaborator = get_object_or_404(User, id=collaborator_id)
 
     # Verify that the user currently has access.
-    if not board.collaborators.filter(id=friend.id).exists():
+    if not board.collaborators.filter(id=collaborator.id).exists():
         raise HttpError(404, "User is not a collaborator on this board.")
 
     # only the owner can remove other collaborators
@@ -330,7 +399,20 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
         raise HttpError(403, "You can only remove yourself from a shared board.")
 
     # remove the relationship from the many-to-many table
-    board.collaborators.remove(friend)
+    board.collaborators.remove(collaborator)
+
+    # publish collaborator removal event. This goes to everyone subscribed to the board,
+    # but only the connection belonging to the removed user will be terminated. This is
+    # to catch the case that a collaborator is removed after they have already opened an
+    # authorized SSE connection
+    publish_event_on_commit(
+        board_id=board.id,
+        actor_id=request.auth.id,
+        event_type=BoardEventType.BOARD_ACCESS_REVOKED,
+        data={
+            "user_id": collaborator.id,
+        },
+)
 
     return {"success": True, "message": "Collaborator access successfully revoked."}
 
@@ -343,11 +425,28 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
     """Create a column on a board owned by the authenticated user."""
     board = get_accessible_board(request.auth, board_id)
     last = board.columns.aggregate(m=Max("position"))["m"]
-    return BoardColumn.objects.create(
+    column = BoardColumn.objects.create(
         board=board,
         title=payload.title,
         position=0 if last is None else last + 1,
     )
+
+    # publish the creation event to subscribers
+    publish_event_on_commit(
+        board_id=board.id,
+        actor_id=request.auth.id,
+        event_type=BoardEventType.COLUMN_CREATED,
+        data={
+            "column": {
+                "id": column.id,
+                "title": column.title,
+                "position": column.position,
+                "board_id": board.id,
+            }
+        },
+    )
+
+    return column
 
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
 def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
@@ -358,6 +457,7 @@ def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
     if not updates:
         raise HttpError(400, "No fields provided for update.")
 
+    # atomically handle updating the supplied fields
     with transaction.atomic():
         if "title" in updates:
             column.title = updates["title"]
@@ -369,6 +469,21 @@ def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
         else:
             column.save()
 
+    # publish the update event to subscribers
+    publish_event_on_commit(
+        board_id=column.board_id,
+        actor_id=request.auth.id,
+        event_type=BoardEventType.COLUMN_UPDATED,
+        data={
+            "column": {
+                "id": column.id,
+                "title": column.title,
+                "position": column.position,
+                "board_id": column.board_id,
+            }
+        },
+    )
+
     return column
 
 @router.delete("/columns/{column_id}")
@@ -376,9 +491,24 @@ def delete_column(request, column_id: int):
     """Delete a column and its tasks."""
     column = get_accessible_column(request.auth, column_id)
     board = column.board
+    board_id = column.board_id
+    column_id = column.id
+
+    # atomically 
     with transaction.atomic():
+        # delete column and reindex any other columns
         column.delete()
         _reindex(list(board.columns.all()))
+
+        # publish deletion event to subscribers
+        publish_event_on_commit(
+            board_id=board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.COLUMN_DELETED,
+            data={
+                "column_id": column_id,
+            },
+        )
     return {"success": True}
 
 
@@ -394,6 +524,7 @@ def create_task(request, column_id: int, payload: TaskIn):
     last = column.tasks.aggregate(m=Max("position"))["m"]
 
     with transaction.atomic():
+        # create task and assign tags
         task = Task.objects.create(
             column=column,
             title=payload.title,
@@ -402,6 +533,16 @@ def create_task(request, column_id: int, payload: TaskIn):
             position=0 if last is None else last + 1,
         )
         task.tags.set(tags)
+
+        # publish creation event to subscribers
+        publish_event_on_commit(
+            board_id=column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TASK_CREATED,
+            data={
+                "task": serialize_task(task),
+            },
+        )
 
     return task
 
@@ -420,6 +561,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
         tags = get_available_board_tags(request.auth, task.column.board, tag_ids)
 
     with transaction.atomic():
+        # update supplied fields and tags
         for field, value in updates.items():
             if field == "priority":
                 value = value.value if value is not None else None
@@ -433,6 +575,15 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
         if tags is not None:
             task.tags.set(tags)
 
+        # publish update event to subscribers
+        publish_event_on_commit(
+            board_id=task.column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TASK_UPDATED,
+            data={
+                "task": serialize_task(task),
+            },
+        )
     return task
 
 @router.delete("/tasks/{task_id}")
@@ -440,9 +591,24 @@ def delete_task(request, task_id: int):
     """Delete a task."""
     task = get_accessible_task(request.auth, task_id)
     column = task.column
+    board_id = task.column.board_id
+    column_id = task.column_id
+    task_id = task.id
     with transaction.atomic():
+        # delete task and reindex other tasks
         task.delete()
         _reindex(list(column.tasks.all()))
+
+        # publish deletion event to subscribers
+        publish_event_on_commit(
+            board_id=board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TASK_DELETED,
+            data={
+                "task_id": task_id,
+                "column_id": column_id,
+            },
+        )
     return {"success": True}
 
 @router.post("/tasks/{task_id}/move", response=TaskOut)
@@ -455,6 +621,7 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
         raise HttpError(400, "Column on different board")
 
     with transaction.atomic():
+        # move task, reindexing appropriately
         src_tasks = [t for t in src.tasks.all() if t.id != task.id]
         dest_tasks = src_tasks if dest.id == src.id else list(dest.tasks.all())
         idx = max(0, min(payload.target_position, len(dest_tasks)))
@@ -463,6 +630,19 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
         if dest.id != src.id:
             _reindex(src_tasks)
         _reindex(dest_tasks)
+
+        # publish the move event to subscribers
+        publish_event_on_commit(
+            board_id=task.column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TASK_MOVED,
+            data={
+                "task": serialize_task(task),
+                "source_column_id": src.id,
+                "destination_column_id": dest.id,
+                "position": task.position,
+            },
+        )
     return task
 
 # ------------------
@@ -521,6 +701,14 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
             if "target_duration_seconds" in data:
                 timer.target_duration_seconds = data["target_duration_seconds"]
             timer.save()
+            # publish timer update event to subscribers
+            publish_event_on_commit(
+                board_id=task.column.board_id,
+                actor_id=request.auth.id,
+                event_type=BoardEventType.TASK_TIMER_UPDATED,
+                data=get_timer_event_data(task, timer),
+            )
+
             return timer
 
         for field, value in data.items():
@@ -559,6 +747,14 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
                 timer.last_paused_at = timezone.now()
 
         timer.save()
+        # publish timer update event to subscribers
+        publish_event_on_commit(
+            board_id=task.column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TASK_TIMER_UPDATED,
+            data=get_timer_event_data(task, timer),
+        )
+
         return timer
 
 # ------------------
