@@ -768,7 +768,7 @@ function getUserTooltip(user?: any): string {
   const name = getUserDisplayName(user).trim()
   const email = getUserEmail(user).trim()
   if (name && email) {
-    return `${name} <${email}>`
+    return `${name}\n${email}`
   }
   if (name) {
     return name

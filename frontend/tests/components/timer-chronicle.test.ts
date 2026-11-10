@@ -321,7 +321,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-1"]')
     expect(avatar.exists()).toBe(true)
     expect(avatar.text()).toBe('SC')
-    expect(avatar.attributes('title')).toBe('Sarah Connor <sarah@example.com>')
+    expect(avatar.attributes('title')).toBe('Sarah Connor\nsarah@example.com')
   })
 
   it('renders fallback avatar with user icon and Unknown user tooltip when user data is missing on a shared board', () => {
@@ -543,7 +543,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const avatarAfter = wrapper.find('[data-testid="time-entry-avatar-session-reassign-1"]')
     expect(avatarAfter.exists()).toBe(true)
     expect(avatarAfter.text()).toBe('BD')
-    expect(avatarAfter.attributes('title')).toBe('Bob Dylan <bob@example.com>')
+    expect(avatarAfter.attributes('title')).toBe('Bob Dylan\nbob@example.com')
   })
 
   it('omits Recorded by dropdown in inline session editor on a private/solo board', async () => {
