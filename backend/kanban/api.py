@@ -1,7 +1,8 @@
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField
+from django.db.models import Prefetch, Max, Q, Exists, OuterRef, Case, When, Value, BooleanField, Sum
+from django.db.models.functions import Coalesce
 from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
@@ -70,53 +71,73 @@ def get_accessible_boards(user):
         user_blocked_owner=False,
     ).distinct()
 
+def session_already_recorded(task, started_at) -> bool:
+    """Return whether a time entry already exists for this timer session.
+
+    An entry keeps its timer's started_at, so saving the same session twice
+    (for example, a client stop racing the countdown cleanup) matches exactly.
+    """
+    return TaskTimeEntry.objects.filter(task=task, started_at=started_at).exists()
+
 def reconcile_expired_countdowns(user):
     """
     Find any RUNNING COUNT_DOWN timers belonging to user's boards that have expired,
     commit TaskTimeEntry records capped at target_duration_seconds, and reset timers to IDLE.
     """
     now = timezone.now()
-    running_timers = TaskTimer.objects.select_related("task__column__board").filter(
+    candidate_ids = list(TaskTimer.objects.filter(
         task__column__board__owner=user,
         state=TimerState.RUNNING,
         mode=TimerMode.COUNT_DOWN,
         started_at__isnull=False,
-    )
-    for timer in running_timers:
-        target = timer.target_duration_seconds or 0
-        elapsed_prior = timer.elapsed_seconds or 0
-        remaining = max(0, target - elapsed_prior)
-        anchor = timer.last_resumed_at or timer.started_at
-        if remaining > 0 and anchor and now >= anchor + timedelta(seconds=remaining):
-            with transaction.atomic():
-                ended_at = anchor + timedelta(seconds=remaining)
-                start_time = timer.started_at or (ended_at - timedelta(seconds=target))
-                duplicate = TaskTimeEntry.objects.filter(
+    ).values_list("id", flat=True))
+    for timer_id in candidate_ids:
+        with transaction.atomic():
+            # Lock the timer, like the stop endpoint does, so a stop arriving at
+            # the same moment waits and then sees the timer already IDLE.
+            timer = (
+                TaskTimer.objects.select_for_update()
+                .select_related("task")
+                .filter(id=timer_id, state=TimerState.RUNNING)
+                .first()
+            )
+            if timer is None:
+                continue
+            target = timer.target_duration_seconds or 0
+            elapsed_prior = timer.elapsed_seconds or 0
+            remaining = max(0, target - elapsed_prior)
+            anchor = timer.last_resumed_at or timer.started_at
+            if not (remaining > 0 and anchor and now >= anchor + timedelta(seconds=remaining)):
+                continue
+
+            ended_at = anchor + timedelta(seconds=remaining)
+            start_time = timer.started_at or (ended_at - timedelta(seconds=target))
+            if not session_already_recorded(timer.task, start_time):
+                TaskTimeEntry.objects.create(
                     task=timer.task,
-                    created_at__gte=timezone.now() - timedelta(seconds=15),
-                ).exists() or TaskTimeEntry.objects.filter(
-                    task=timer.task,
-                    started_at__gte=start_time - timedelta(seconds=5),
-                    started_at__lte=start_time + timedelta(seconds=5),
-                ).exists()
-                if not duplicate:
-                    TaskTimeEntry.objects.create(
-                        task=timer.task,
-                        user=user,
-                        started_at=start_time,
-                        ended_at=ended_at,
-                        duration_seconds=target,
-                        note="Completed countdown session",
-                    )
-                timer.state = TimerState.IDLE
-                timer.started_at = None
-                timer.last_resumed_at = None
-                timer.last_paused_at = None
-                timer.elapsed_seconds = 0
-                timer.save()
+                    user=user,
+                    started_at=start_time,
+                    ended_at=ended_at,
+                    duration_seconds=target,
+                    note="Completed countdown session",
+                )
+            timer.state = TimerState.IDLE
+            timer.started_at = None
+            timer.last_resumed_at = None
+            timer.last_paused_at = None
+            timer.elapsed_seconds = 0
+            timer.save()
 
 def get_board_queryset(user):
-    task_qs = Task.objects.select_related("timer").prefetch_related("tags")
+    # Each task's tracked time is summed in the same query that loads the tasks,
+    # so a board's totals don't cost one extra query per task. Django skips
+    # Meta.ordering on aggregated queries, so the order is restated here.
+    task_qs = (
+        Task.objects.select_related("timer")
+        .prefetch_related("tags")
+        .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+        .order_by(*Task._meta.ordering)
+    )
     col_qs = BoardColumn.objects.prefetch_related(Prefetch("tasks", queryset=task_qs))
     return (
         get_accessible_boards(user)
@@ -447,15 +468,7 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
                 if total_duration > 0:
                     start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
                     default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
-                    duplicate = TaskTimeEntry.objects.filter(
-                        task=task,
-                        created_at__gte=timezone.now() - timedelta(seconds=15),
-                    ).exists() or TaskTimeEntry.objects.filter(
-                        task=task,
-                        started_at__gte=start_time - timedelta(seconds=5),
-                        started_at__lte=start_time + timedelta(seconds=5),
-                    ).exists()
-                    if not duplicate:
+                    if not session_already_recorded(task, start_time):
                         TaskTimeEntry.objects.create(
                             task=task,
                             user=request.auth,

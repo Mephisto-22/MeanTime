@@ -555,6 +555,7 @@ import {
   toLocalTimeString,
   toLocalDateString,
   combineDateAndTime,
+  sumEntryDurations,
 } from '~/composables/useTaskTimer'
 
 const props = defineProps<{
@@ -665,7 +666,13 @@ watch(
 )
 
 const syncTimerOut = () => emit('update:timer', { ...localTimer.value })
-const syncEntriesOut = () => emit('update:timeEntries', [...entries.value])
+const syncEntriesOut = () => {
+  emit('update:timeEntries', [...entries.value])
+  // Keep the task card's total in step with the entries shown here.
+  if (isPersistedTaskId.value) {
+    kanbanContext?.setTaskTotal?.(props.taskId, sumEntryDurations(entries.value))
+  }
+}
 
 // Target duration & inline editing
 const targetMinutes = computed(() => {
@@ -764,12 +771,7 @@ const setMode = (m: TimerMode) => {
   onModeChange()
 }
 
-const totalDurationSeconds = computed(() => {
-  return entries.value.reduce((acc, cur) => {
-    const dur = Number(cur.durationSeconds ?? 0)
-    return acc + (isNaN(dur) ? 0 : dur)
-  }, 0)
-})
+const totalDurationSeconds = computed(() => sumEntryDurations(entries.value))
 
 const {
   isRunning,
