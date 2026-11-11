@@ -62,7 +62,7 @@ async function login(credentials: LoginRequest) {
     // Only allow same-app paths; never navigate to an external redirect target.
     const destination = typeof redirect === 'string' && redirect.startsWith('/') &&
       !redirect.startsWith('//') && !redirect.includes('\\') &&
-      !/^\/(login|register)(?:[/?#]|$)/.test(redirect) ? redirect : '/'
+      !/^\/(login|register)(?:[/?#]|$)/.test(redirect) ? redirect : '/boards'
     await navigateTo(destination)
   } catch (err) {
     notify.error(err, 'Unable to log in')

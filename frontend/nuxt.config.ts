@@ -27,6 +27,7 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
   ],
   routeRules: {
+    '/': { ssr: true },
     // Keep login/register pre-rendered/SSR if desired, or set ssr: false for protected routes
     '/login': { ssr: true },
     '/register': { ssr: true },
