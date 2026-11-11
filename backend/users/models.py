@@ -16,6 +16,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     timezone = models.CharField(max_length=63, default="UTC")
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
     is_active = models.BooleanField(default=True)
+    # Existing/admin-provisioned accounts are trusted; public registration
+    # explicitly creates unverified accounts before any tokens can be issued.
+    is_verified = models.BooleanField(default=True)
+    email_verification_version = models.PositiveIntegerField(default=0, editable=False)
+    email_verification_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
     is_staff = models.BooleanField(default=False)
     resetting_password = models.BooleanField(default=False)
     password_reset_started_at = models.DateTimeField(null=True, blank=True)

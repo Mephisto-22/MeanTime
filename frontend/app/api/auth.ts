@@ -71,6 +71,14 @@ export class AuthApi {
     return apiService.post<User>(`${this.endpoint}/register`, details, { auth: false })
   }
 
+  confirmEmail(token: string): Promise<AuthMessage> {
+    return apiService.post<AuthMessage>(`${this.endpoint}/email-verification/confirm`, { token }, { auth: false })
+  }
+
+  resendConfirmation(email: string): Promise<AuthMessage> {
+    return apiService.post<AuthMessage>(`${this.endpoint}/email-verification/resend`, { email }, { auth: false })
+  }
+
   refresh(refreshToken: string): Promise<RefreshResponse> {
     return apiService.post<RefreshResponse>(`${this.endpoint}/refresh`, { refresh_token: refreshToken }, { auth: false })
   }
