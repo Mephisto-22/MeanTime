@@ -33,6 +33,7 @@ class TaskTimeEntryIn(Schema):
     ended_at: datetime | None = None
     duration_seconds: int = 0
     note: str = ""
+    user_id: int | None = None
 
 class TaskTimeEntryUpdateIn(Schema):
     """Payload expected when updating a recorded time entry."""
@@ -40,12 +41,14 @@ class TaskTimeEntryUpdateIn(Schema):
     ended_at: datetime | None = None
     duration_seconds: int | None = None
     note: str | None = None
+    user_id: int | None = None
 
 class TaskTimeEntryOut(Schema):
     """Shape of recorded time entry returned to clients."""
     id: int
     task_id: int
     user_id: int | None = None
+    user: UserOut | None = None
     started_at: datetime
     ended_at: datetime | None = None
     duration_seconds: int

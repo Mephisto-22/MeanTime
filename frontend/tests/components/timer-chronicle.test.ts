@@ -286,4 +286,299 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
     expect(updated[0].durationSeconds).toBe(1200) // Preserved!
   })
+
+  it('renders contributor avatar with initials and tooltip on a shared board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-collab-1',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Collaboration session',
+        user: {
+          id: 42,
+          display_name: 'Sarah Connor',
+          email: 'sarah@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: true,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-1"]')
+    expect(avatar.exists()).toBe(true)
+    expect(avatar.text()).toBe('SC')
+    expect(avatar.attributes('title')).toBe('Sarah Connor\nsarah@example.com')
+  })
+
+  it('renders fallback avatar with user icon and Unknown user tooltip when user data is missing on a shared board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-collab-anonymous',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Anonymous session',
+        user: null,
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: true,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-anonymous"]')
+    expect(avatar.exists()).toBe(true)
+    expect(avatar.attributes('title')).toBe('Unknown user')
+    expect(avatar.find('.pi-user').exists()).toBe(true)
+  })
+
+  it('omits contributor avatars completely on an unshared/solo board', () => {
+    const entries: TaskTimeEntryDto[] = [
+      {
+        id: 'entry-solo-1',
+        taskId: 'chronicle-task-1',
+        startedAt: '2026-11-01T10:00:00.000Z',
+        endedAt: '2026-11-01T10:30:00.000Z',
+        durationSeconds: 1800,
+        note: 'Solo session',
+        user: {
+          id: 1,
+          display_name: 'Solo User',
+          email: 'solo@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      },
+    ]
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: entries,
+        isShared: false,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-solo-1"]')
+    expect(avatar.exists()).toBe(false)
+  })
+
+  it('displays Recorded by dropdown defaulting to current user and records manual entry with selected contributor on a shared board', async () => {
+    const member1 = {
+      id: 10,
+      display_name: 'Alice Cooper',
+      email: 'alice@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+    const member2 = {
+      id: 20,
+      display_name: 'Bob Dylan',
+      email: 'bob@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [],
+        isShared: true,
+        boardMembers: [member1, member2],
+        currentUserId: member2.id,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    // Toggle manual log form open
+    const toggleBtn = wrapper.find('[data-testid="btn-toggle-log-past-work"]')
+    await toggleBtn.trigger('click')
+
+    // Dropdown is present
+    const select = wrapper.find('[data-testid="manual-select-recorded-by"]')
+    expect(select.exists()).toBe(true)
+
+    // Option listing includes members
+    expect(wrapper.text()).toContain('Bob Dylan')
+
+    // Save manual session
+    const noteInput = wrapper.find('[data-testid="manual-input-note"]')
+    await noteInput.setValue('Pair programming with Bob')
+
+    const saveBtn = wrapper.find('[data-testid="manual-save-btn"]')
+    await saveBtn.trigger('click')
+
+    expect(wrapper.emitted('update:timeEntries')).toBeTruthy()
+    const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
+    expect(updated.length).toBe(1)
+    expect(updated[0].userId).toBe(member2.id)
+    expect(updated[0].user?.id).toBe(member2.id)
+    expect(updated[0].note).toBe('Pair programming with Bob')
+  })
+
+  it('omits Recorded by dropdown in manual log form on a private/solo board', async () => {
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [],
+        isShared: false,
+        boardMembers: [{
+          id: 1,
+          display_name: 'Solo User',
+          email: 'solo@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        }],
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const toggleBtn = wrapper.find('[data-testid="btn-toggle-log-past-work"]')
+    await toggleBtn.trigger('click')
+
+    expect(wrapper.find('[data-testid="manual-work-form"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="manual-select-recorded-by"]').exists()).toBe(false)
+  })
+
+  it('displays Recorded by dropdown in inline session editor on shared board and updates contributor avatar immediately upon saving', async () => {
+    const member1 = {
+      id: 101,
+      display_name: 'Alice Cooper',
+      email: 'alice@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+    const member2 = {
+      id: 102,
+      display_name: 'Bob Dylan',
+      email: 'bob@example.com',
+      timezone: 'UTC',
+      created_at: '2026-01-01T00:00:00Z',
+    }
+
+    const initialEntry: TaskTimeEntryDto = {
+      id: 'session-reassign-1',
+      taskId: 'chronicle-task-1',
+      userId: member1.id,
+      user: member1,
+      startedAt: '2026-11-01T10:00:00.000Z',
+      endedAt: '2026-11-01T10:30:00.000Z',
+      durationSeconds: 1800,
+      note: 'Initially attributed to Alice',
+    }
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [initialEntry],
+        isShared: true,
+        boardMembers: [member1, member2],
+        currentUserId: member1.id,
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    // Initially avatar displays Alice's initials
+    const avatarBefore = wrapper.find('[data-testid="time-entry-avatar-session-reassign-1"]')
+    expect(avatarBefore.exists()).toBe(true)
+    expect(avatarBefore.text()).toBe('AC')
+
+    // Click edit session
+    const editBtn = wrapper.find('[data-testid="btn-edit-session-session-reassign-1"]')
+    await editBtn.trigger('click')
+
+    // Inline editor shows Recorded by dropdown
+    const select = wrapper.findComponent('[data-testid="edit-session-recorded-by"]')
+    expect(select.exists()).toBe(true)
+
+    // Reassign to Bob Dylan (member2)
+    await select.vm.$emit('update:modelValue', member2.id)
+
+    // Also save edits
+    const saveBtn = wrapper.find('[data-testid="btn-save-session-edits"]')
+    await saveBtn.trigger('click')
+
+    expect(wrapper.emitted('update:timeEntries')).toBeTruthy()
+    const updated = wrapper.emitted('update:timeEntries')!.at(-1)![0] as TaskTimeEntryDto[]
+    expect(updated[0].userId).toBe(member2.id)
+    expect(updated[0].user?.id).toBe(member2.id)
+
+    // Avatar immediately updates to Bob Dylan's initials 'BD'
+    const avatarAfter = wrapper.find('[data-testid="time-entry-avatar-session-reassign-1"]')
+    expect(avatarAfter.exists()).toBe(true)
+    expect(avatarAfter.text()).toBe('BD')
+    expect(avatarAfter.attributes('title')).toBe('Bob Dylan\nbob@example.com')
+  })
+
+  it('omits Recorded by dropdown in inline session editor on a private/solo board', async () => {
+    const initialEntry: TaskTimeEntryDto = {
+      id: 'session-solo-edit-1',
+      taskId: 'chronicle-task-1',
+      startedAt: '2026-11-01T10:00:00.000Z',
+      endedAt: '2026-11-01T10:30:00.000Z',
+      durationSeconds: 1800,
+      note: 'Solo work',
+    }
+
+    const wrapper = mount(TaskTimerEditor, {
+      props: {
+        taskId: 'chronicle-task-1',
+        timer: defaultTimer,
+        timeEntries: [initialEntry],
+        isShared: false,
+        boardMembers: [{
+          id: 1,
+          display_name: 'Solo User',
+          email: 'solo@example.com',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        }],
+      },
+      global: {
+        plugins: [PrimeVue],
+      },
+    })
+
+    const editBtn = wrapper.find('[data-testid="btn-edit-session-session-solo-edit-1"]')
+    await editBtn.trigger('click')
+
+    expect(wrapper.find('[data-testid="inline-session-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="edit-session-recorded-by"]').exists()).toBe(false)
+  })
 })
