@@ -196,15 +196,18 @@ def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
         id=entry_id
     )
 
-def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
-    """Return the requested tags if they all belong to the user."""
+def get_available_board_tags(user, board, tag_ids: list[int]) -> list[Tag]:
+    """Return requested tags if they belong to the board owner or a collaborator."""
     if len(tag_ids) != len(set(tag_ids)):
         raise HttpError(400, "Duplicate tag IDs are not allowed.")
 
-    tags = list(Tag.objects.filter(user=user, id__in=tag_ids))
+    member_ids = [board.owner_id]
+    member_ids.extend(board.collaborators.values_list("id", flat=True))
+
+    tags = list(Tag.objects.filter(user_id__in=member_ids, id__in=tag_ids))
 
     if len(tags) != len(tag_ids):
-        raise HttpError(400, "One or more tags are invalid or do not belong to you.")
+        raise HttpError(400, "One or more tags are invalid or do not belong to a board member.")
 
     return tags
 
@@ -358,7 +361,7 @@ def delete_column(request, column_id: int):
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_accessible_column(request.auth, column_id)
-    tags = get_owned_tags(request.auth, payload.tag_ids)
+    tags = get_available_board_tags(request.auth, payload.tag_ids)
     last = column.tasks.aggregate(m=Max("position"))["m"]
 
     with transaction.atomic():
@@ -385,7 +388,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
     tags = None
 
     if tag_ids is not None:
-        tags = get_owned_tags(request.auth, tag_ids)
+        tags = get_available_board_tags(request.auth, tag_ids)
 
     with transaction.atomic():
         for field, value in updates.items():
