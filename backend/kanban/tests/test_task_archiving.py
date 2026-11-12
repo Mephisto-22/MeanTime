@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from django.utils import timezone
 
 from kanban.models import Board, BoardColumn, Task, TaskPriority, TaskTimer, TaskTimeEntry, TimerState, TimerMode
-from kanban.api import archive_task
+from kanban.scheduler import archive_task
 
 User = get_user_model()
 PASSWORD = "ArchivingPassword123!"

@@ -9,8 +9,14 @@ from django.test import TestCase
 from django.utils import timezone
 
 from kanban.models import Board, BoardColumn, Task, TaskTimer, TaskTimeEntry, TimerState, TimerMode
-from kanban.services import auto_clear_expired_tasks, run_auto_clear_job, AUTO_CLEAR_ADVISORY_LOCK_ID
-from kanban.scheduler import start_scheduler, stop_scheduler, get_scheduler
+from kanban.scheduler import (
+    AUTO_CLEAR_ADVISORY_LOCK_ID,
+    auto_clear_expired_tasks,
+    get_scheduler,
+    run_auto_clear_job,
+    start_scheduler,
+    stop_scheduler,
+)
 
 User = get_user_model()
 
@@ -194,7 +200,7 @@ class AdvisoryLockAndSchedulerTests(TestCase):
 
     def test_run_auto_clear_job_executes_service(self):
         """run_auto_clear_job executes auto_clear_expired_tasks."""
-        with patch("kanban.services.auto_clear_expired_tasks") as mock_clear:
+        with patch("kanban.scheduler.auto_clear_expired_tasks") as mock_clear:
             run_auto_clear_job()
             mock_clear.assert_called_once()
 
@@ -213,7 +219,7 @@ class AdvisoryLockAndSchedulerTests(TestCase):
                 self.assertTrue(locked)
                 try:
                     # With lock held by other_conn, run_auto_clear_job on connection should skip
-                    with patch("kanban.services.auto_clear_expired_tasks") as mock_clear:
+                    with patch("kanban.scheduler.auto_clear_expired_tasks") as mock_clear:
                         result = run_auto_clear_job()
                         self.assertIsNone(result)
                         mock_clear.assert_not_called()

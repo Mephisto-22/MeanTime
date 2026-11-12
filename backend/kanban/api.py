@@ -211,31 +211,12 @@ def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
 
     return tags
 
+
 def _reindex(items):
     """Rewrite position 0..n-1."""
     for i, obj in enumerate(items):
         obj.position = i
         obj.save(update_fields=["position"])
-
-def archive_task(task: Task, archived_at: datetime | None = None) -> Task:
-    """
-    Mark a task archived (archived_at set, position = None),
-    preserving all related TaskTimeEntry records, and re-indexing
-    remaining active tasks in that column.
-    """
-    now = archived_at or timezone.now()
-    with transaction.atomic():
-        column = task.column
-        task.archived_at = now
-        task.position = None
-        task.save(update_fields=["archived_at", "position", "updated_at"])
-        remaining_active = list(
-            Task.objects.active()
-            .filter(column=column)
-            .order_by("position", "id")
-        )
-        _reindex(remaining_active)
-    return task
 
 
 
