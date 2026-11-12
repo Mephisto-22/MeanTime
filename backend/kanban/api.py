@@ -361,7 +361,7 @@ def delete_column(request, column_id: int):
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_accessible_column(request.auth, column_id)
-    tags = get_available_board_tags(request.auth, payload.tag_ids)
+    tags = get_available_board_tags(request.auth, column.board, payload.tag_ids)
     last = column.tasks.aggregate(m=Max("position"))["m"]
 
     with transaction.atomic():
@@ -388,7 +388,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
     tags = None
 
     if tag_ids is not None:
-        tags = get_available_board_tags(request.auth, tag_ids)
+        tags = get_available_board_tags(request.auth, task.column.board, tag_ids)
 
     with transaction.atomic():
         for field, value in updates.items():
