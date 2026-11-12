@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from django.db.models import Sum
 from ninja import Schema
+from pydantic import Field, field_validator
 from users.schemas import UserOut
 from .models import TaskPriority, TimerMode, TimerState
 
@@ -109,6 +110,14 @@ class BoardColumnIn(Schema):
     """Payload expected when creating or updating a board column."""
     title: str
     position: int = 0
+    auto_clear_duration_seconds: int | None = Field(default=None, ge=0)
+
+    @field_validator("auto_clear_duration_seconds")
+    @classmethod
+    def normalize_auto_clear(cls, v: int | None) -> int | None:
+        if v == 0:
+            return None
+        return v
 
 class BoardColumnOut(Schema):
     """Shape of a board column returned to clients."""
@@ -116,6 +125,7 @@ class BoardColumnOut(Schema):
     title: str
     position: int
     board_id: int
+    auto_clear_duration_seconds: int | None = None
     tasks: list[TaskOut]
     created_at: datetime
     updated_at: datetime
@@ -124,6 +134,14 @@ class BoardColumnUpdateIn(Schema):
     """Payload expected for partially updating a board column."""
     title: str | None = None
     position: int | None = None
+    auto_clear_duration_seconds: int | None = Field(default=None, ge=0)
+
+    @field_validator("auto_clear_duration_seconds")
+    @classmethod
+    def normalize_auto_clear(cls, v: int | None) -> int | None:
+        if v == 0:
+            return None
+        return v
 
 
 # Board Schemas
