@@ -46,12 +46,12 @@
         />
       </div>
 
-      <div v-if="autoClearEnabled" class="flex flex-col gap-3">
-        <div class="field-group">
-          <Label for="auto-clear-preset-select" class="text-sm font-medium">
-            Retention Duration
-          </Label>
+      <div v-if="autoClearEnabled" class="field-group">
+        <Label for="auto-clear-preset-select" class="text-sm font-medium">
+          Retention Duration
+        </Label>
 
+        <div class="flex items-center gap-2 w-full">
           <Select
             id="auto-clear-preset-select"
             v-model="selectedPreset"
@@ -60,22 +60,21 @@
             optionValue="value"
             placeholder="Select retention duration"
             :disabled="busy"
+            :class="selectedPreset === 'custom' ? 'w-3/5 min-w-0' : 'w-full'"
             data-testid="auto-clear-preset-select"
           />
-        </div>
-
-        <div v-if="selectedPreset === 'custom'" class="field-group">
-          <Label for="custom-auto-clear-days" class="text-sm font-medium">
-            Custom Days
-          </Label>
 
           <InputNumber
+            v-if="selectedPreset === 'custom'"
             id="custom-auto-clear-days"
             v-model="customDays"
             :min="1"
             :max="365"
-            placeholder="Days before auto-clearing"
+            placeholder="Days"
+            suffix=" days"
             :disabled="busy"
+            fluid
+            class="flex-1 min-w-0"
             data-testid="custom-auto-clear-days"
           />
         </div>
