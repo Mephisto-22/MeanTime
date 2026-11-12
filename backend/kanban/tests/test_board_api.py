@@ -4,6 +4,7 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
+from django.utils import timezone
 
 from kanban.models import Board, BoardColumn, Task
 
@@ -262,4 +263,27 @@ class ColumnAutoClearTests(TestCase):
         self.assertEqual(response.status_code, 200)
         col_data = next(c for c in response.json()["columns"] if c["id"] == self.column["id"])
         self.assertEqual(col_data["auto_clear_duration_seconds"], 1209600)
+
+    def test_update_column_does_not_return_archived_tasks(self):
+        """PATCH column only serializes active tasks, excluding archived ones."""
+        col = BoardColumn.objects.get(id=self.column["id"])
+        active_task = Task.objects.create(column=col, title="Active Task", position=0)
+        archived_task = Task.objects.create(
+            column=col,
+            title="Archived Task",
+            position=None,
+            archived_at=timezone.now(),
+        )
+
+        response = self.client.patch(
+            f"/api/kanban/columns/{col.id}",
+            data=json.dumps({"auto_clear_duration_seconds": 86400}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        returned_task_ids = [t["id"] for t in response.json()["tasks"]]
+        self.assertIn(active_task.id, returned_task_ids)
+        self.assertNotIn(archived_task.id, returned_task_ids)
+
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
 from users.schemas import UserOut
@@ -131,6 +132,23 @@ class BoardColumnOut(Schema):
     tasks: list[TaskOut]
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_tasks(obj):
+        if isinstance(obj, dict):
+            return obj.get("tasks", [])
+        if hasattr(obj, "_prefetched_objects_cache") and "tasks" in obj._prefetched_objects_cache:
+            return [t for t in obj._prefetched_objects_cache["tasks"] if getattr(t, "archived_at", None) is None]
+        tasks_manager = getattr(obj, "tasks", None)
+        if tasks_manager is not None and hasattr(tasks_manager, "filter"):
+            return (
+                tasks_manager.filter(archived_at__isnull=True)
+                .select_related("timer")
+                .prefetch_related("tags")
+                .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+                .order_by("position", "id")
+            )
+        return tasks_manager or []
 
 class BoardColumnUpdateIn(Schema):
     """Payload expected for partially updating a board column."""

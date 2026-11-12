@@ -93,8 +93,10 @@ export interface KanbanTaskDto {
   id: string | number
   title: string
   description?: string
-  position: number
+  position: number | null
   columnId: string | number
+  columnActivityAt?: string
+  archivedAt?: string | null
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
   /** Sum of the task's time entry durations, in seconds. */
