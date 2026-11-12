@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "uvicorn[standard]>=0.34",
     "watchfiles>=1.0",
+    "apscheduler>=3.10,<4.0",
 ]
 
 [build-system]
