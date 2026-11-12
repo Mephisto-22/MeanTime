@@ -70,8 +70,10 @@ class TaskOut(Schema):
     title: str
     description: str
     priority: TaskPriority | None = None
-    position: int
+    position: int | None = None
     column_id: int
+    column_activity_at: datetime | None = None
+    archived_at: datetime | None = None
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
     total_seconds: int = 0
