@@ -315,6 +315,7 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
         board=board,
         title=payload.title,
         position=0 if last is None else last + 1,
+        auto_clear_duration_seconds=payload.auto_clear_duration_seconds,
     )
 
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
@@ -329,6 +330,8 @@ def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
     with transaction.atomic():
         if "title" in updates:
             column.title = updates["title"]
+        if "auto_clear_duration_seconds" in updates:
+            column.auto_clear_duration_seconds = updates["auto_clear_duration_seconds"]
         if "position" in updates:
             others = [c for c in column.board.columns.all() if c.id != column.id]
             idx = max(0, min(updates["position"], len(others)))

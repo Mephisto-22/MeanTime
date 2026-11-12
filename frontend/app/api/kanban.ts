@@ -109,6 +109,7 @@ export interface KanbanColumnDto {
   title: string
   position: number
   boardId: string | number
+  autoClearDurationSeconds?: number | null
   tasks: KanbanTaskDto[]
 }
 

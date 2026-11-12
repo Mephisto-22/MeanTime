@@ -138,3 +138,128 @@ class DeleteBoardTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertTrue(Board.objects.filter(id=self.board.id).exists())
+
+
+class ColumnAutoClearTests(TestCase):
+    """Column auto-clear policy configuration via API."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="colowner@example.com",
+            password=PASSWORD,
+            display_name="Column Owner",
+        )
+        login = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({"email": "colowner@example.com", "password": PASSWORD}),
+            content_type="application/json",
+        )
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {login.json()['access_token']}"}
+        board_res = self.client.post(
+            "/api/kanban/boards",
+            data=json.dumps({"title": "Auto-Clear Board", "description": ""}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.board = board_res.json()
+        self.column = self.board["columns"][0]
+
+    def test_column_default_auto_clear_duration_is_null(self):
+        """New columns default to auto_clear_duration_seconds = None."""
+        self.assertIsNone(self.column.get("auto_clear_duration_seconds"))
+
+    def test_create_column_with_auto_clear_duration(self):
+        """Can create a column with an explicit auto_clear_duration_seconds."""
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board['id']}/columns",
+            data=json.dumps({
+                "title": "Review",
+                "auto_clear_duration_seconds": 259200,
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["auto_clear_duration_seconds"], 259200)
+
+        # Check DB persistence
+        col_db = BoardColumn.objects.get(id=data["id"])
+        self.assertEqual(col_db.auto_clear_duration_seconds, 259200)
+
+    def test_update_column_auto_clear_duration(self):
+        """PATCH column can configure auto_clear_duration_seconds."""
+        response = self.client.patch(
+            f"/api/kanban/columns/{self.column['id']}",
+            data=json.dumps({"auto_clear_duration_seconds": 604800}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["auto_clear_duration_seconds"], 604800)
+
+        col_db = BoardColumn.objects.get(id=self.column["id"])
+        self.assertEqual(col_db.auto_clear_duration_seconds, 604800)
+
+    def test_clear_auto_clear_duration_with_null(self):
+        """PATCH column with auto_clear_duration_seconds = null disables auto-clear."""
+        # First set it
+        col = BoardColumn.objects.get(id=self.column["id"])
+        col.auto_clear_duration_seconds = 604800
+        col.save()
+
+        response = self.client.patch(
+            f"/api/kanban/columns/{self.column['id']}",
+            data=json.dumps({"auto_clear_duration_seconds": None}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["auto_clear_duration_seconds"])
+
+        col.refresh_from_db()
+        self.assertIsNone(col.auto_clear_duration_seconds)
+
+    def test_clear_auto_clear_duration_with_zero(self):
+        """PATCH column with auto_clear_duration_seconds = 0 disables auto-clear (persists as null)."""
+        col = BoardColumn.objects.get(id=self.column["id"])
+        col.auto_clear_duration_seconds = 604800
+        col.save()
+
+        response = self.client.patch(
+            f"/api/kanban/columns/{self.column['id']}",
+            data=json.dumps({"auto_clear_duration_seconds": 0}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["auto_clear_duration_seconds"])
+
+        col.refresh_from_db()
+        self.assertIsNone(col.auto_clear_duration_seconds)
+
+    def test_boundary_validation_negative_auto_clear_duration(self):
+        """PATCH or POST with negative auto_clear_duration_seconds fails boundary validation."""
+        response = self.client.patch(
+            f"/api/kanban/columns/{self.column['id']}",
+            data=json.dumps({"auto_clear_duration_seconds": -50}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertIn(response.status_code, [400, 422])
+
+    def test_board_view_includes_column_auto_clear_duration(self):
+        """GET /api/kanban/boards/{id} includes auto_clear_duration_seconds for columns."""
+        col = BoardColumn.objects.get(id=self.column["id"])
+        col.auto_clear_duration_seconds = 1209600
+        col.save()
+
+        response = self.client.get(
+            f"/api/kanban/boards/{self.board['id']}",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        col_data = next(c for c in response.json()["columns"] if c["id"] == self.column["id"])
+        self.assertEqual(col_data["auto_clear_duration_seconds"], 1209600)
+

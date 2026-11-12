@@ -69,6 +69,11 @@ class BoardColumn(models.Model):
     )
     title = models.CharField(max_length=100)
     position = models.PositiveIntegerField(default=0) # horizontal position L -> R
+    auto_clear_duration_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        default=None,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
