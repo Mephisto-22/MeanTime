@@ -316,6 +316,46 @@
                 </div>
               </div>
 
+              <!-- Row: Recorded by Dropdown (When on Shared Board) -->
+              <div v-if="isShared" class="flex flex-col gap-1">
+                <Label for="manual-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                <Select
+                  id="manual-recorded-by"
+                  v-model="manualUserId"
+                  :options="members"
+                  option-label="display_name"
+                  option-value="id"
+                  placeholder="Select contributor"
+                  fluid
+                  class="!text-xs"
+                  data-testid="manual-select-recorded-by"
+                >
+                  <template #value="slotProps">
+                    <div v-if="slotProps.value" class="flex items-center gap-2">
+                      <Avatar
+                        :label="getUserInitials(getMemberById(slotProps.value))"
+                        shape="circle"
+                        size="small"
+                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                      />
+                      <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                    </div>
+                    <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                  </template>
+                  <template #option="slotProps">
+                    <div class="flex items-center gap-2 py-0.5">
+                      <Avatar
+                        :label="getUserInitials(slotProps.option)"
+                        shape="circle"
+                        size="small"
+                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                      />
+                      <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
+
               <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
               <div class="flex flex-col gap-1">
                 <Label for="manual-session-note" class="text-[10px] font-semibold text-surface-500">Session Note</Label>
@@ -411,14 +451,28 @@
                     </div>
                   </div>
 
-                  <!-- Note Display -->
-                  <p
-                    class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
-                    title="Click to edit session"
-                    @click="startEditingSession(entry)"
-                  >
-                    {{ entry.note || '(No session note recorded)' }}
-                  </p>
+                  <!-- Bottom Row: Session Note & Contributor Avatar on Shared Boards -->
+                  <div class="flex items-end justify-between gap-2">
+                    <p
+                      class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors flex-1"
+                      title="Click to edit session"
+                      @click="startEditingSession(entry)"
+                    >
+                      {{ entry.note || '(No session note recorded)' }}
+                    </p>
+                    <Avatar
+                      v-if="isShared"
+                      v-tooltip="getUserTooltip(entry.user)"
+                      :title="getUserTooltip(entry.user)"
+                      :label="entry.user ? getUserInitials(entry.user) : undefined"
+                      :icon="entry.user ? undefined : 'pi pi-user'"
+                      shape="circle"
+                      size="normal"
+                      class="shrink-0 text-[10px] font-bold"
+                      :class="entry.user ? 'user-avatar-primary' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300'"
+                      :data-testid="`time-entry-avatar-${entry.id}`"
+                    />
+                  </div>
                 </template>
 
                 <!-- Inline Session Editor (When Editing this Entry) -->
@@ -486,6 +540,46 @@
                       </div>
                     </div>
 
+                    <!-- Editable Recorded by Dropdown (When on Shared Board) -->
+                    <div v-if="isShared" class="flex flex-col gap-0.5">
+                      <Label for="edit-session-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                      <Select
+                        id="edit-session-recorded-by"
+                        v-model="editUserId"
+                        :options="members"
+                        option-label="display_name"
+                        option-value="id"
+                        placeholder="Select contributor"
+                        fluid
+                        class="!text-xs"
+                        data-testid="edit-session-recorded-by"
+                      >
+                        <template #value="slotProps">
+                          <div v-if="slotProps.value" class="flex items-center gap-2">
+                            <Avatar
+                              :label="getUserInitials(getMemberById(slotProps.value))"
+                              shape="circle"
+                              size="small"
+                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                            />
+                            <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                          </div>
+                          <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                        </template>
+                        <template #option="slotProps">
+                          <div class="flex items-center gap-2 py-0.5">
+                            <Avatar
+                              :label="getUserInitials(slotProps.option)"
+                              shape="circle"
+                              size="small"
+                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                            />
+                            <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                          </div>
+                        </template>
+                      </Select>
+                    </div>
+
                     <!-- Editable Note -->
                     <div class="flex flex-col gap-0.5">
                       <Label class="text-[10px] font-semibold text-surface-500">Note</Label>
@@ -545,6 +639,8 @@ import {
 } from '~/api/kanban'
 import { toCamelCase } from '~/utils/case'
 import { useNotifications } from '~/composables/useNotifications'
+import { useAuthStore } from '~/stores/auth'
+import type { UserOut } from '~/api/friends'
 import {
   useTaskTimer,
   formatDigital,
@@ -558,11 +654,20 @@ import {
   sumEntryDurations,
 } from '~/composables/useTaskTimer'
 
-const props = defineProps<{
+interface Props {
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
   taskId: string | number
-}>()
+  isShared?: boolean
+  boardMembers?: UserOut[]
+  currentUserId?: number | string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isShared: undefined,
+  boardMembers: undefined,
+  currentUserId: undefined,
+})
 
 const emit = defineEmits<{
   (e: 'update:timer', timer: TaskTimerDto): void
@@ -572,6 +677,108 @@ const emit = defineEmits<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 const notify = useNotifications()
+
+let authStore: any
+try {
+  authStore = useAuthStore()
+} catch {
+  // Pinia not active
+}
+
+const isShared = computed<boolean>(() => {
+  if (props.isShared !== undefined) {
+    return props.isShared
+  }
+  return kanbanContext?.isShared?.value ?? false
+})
+
+const members = computed<UserOut[]>(() => {
+  if (props.boardMembers !== undefined) {
+    return props.boardMembers
+  }
+  return kanbanContext?.boardMembers?.value ?? []
+})
+
+const effectiveCurrentUserId = computed<number | string | null>(() => {
+  if (props.currentUserId !== undefined) {
+    return props.currentUserId
+  }
+  return authStore?.user?.id ?? null
+})
+
+const manualUserId = ref<number | string | null>(null)
+
+watch(
+  [effectiveCurrentUserId, members],
+  ([userId, mems]) => {
+    if (manualUserId.value == null) {
+      if (userId != null && mems.some(m => String(m.id) === String(userId))) {
+        manualUserId.value = userId
+      } else if (userId != null) {
+        manualUserId.value = userId
+      } else if (mems.length > 0 && mems[0]) {
+        manualUserId.value = mems[0].id
+      }
+    }
+  },
+  { immediate: true },
+)
+
+function getMemberById(id: number | string | null | undefined): UserOut | undefined {
+  if (id == null) return undefined
+  return members.value.find(m => String(m.id) === String(id))
+}
+
+function getMemberName(id: number | string | null | undefined): string {
+  const member = getMemberById(id)
+  return member ? getUserDisplayName(member) : ''
+}
+
+function getUserDisplayName(user?: any): string {
+  if (!user) return ''
+  return user.displayName || user.display_name || ''
+}
+
+function getUserEmail(user?: any): string {
+  if (!user) return ''
+  return user.email || ''
+}
+
+function getUserInitials(user?: any): string {
+  const name = getUserDisplayName(user).trim()
+  const email = getUserEmail(user).trim()
+  if (name) {
+    const parts = name.split(/\s+/)
+    const first = parts[0]
+    const last = parts[parts.length - 1]
+    if (parts.length >= 2 && first && last && first[0] && last[0]) {
+      return (first[0] + last[0]).toUpperCase()
+    }
+    if (first) {
+      return first.slice(0, 1).toUpperCase()
+    }
+  }
+  if (email) {
+    return email.slice(0, 1).toUpperCase()
+  }
+  return '?'
+}
+
+function getUserTooltip(user?: any): string {
+  if (!user) return 'Unknown user'
+  const name = getUserDisplayName(user).trim()
+  const email = getUserEmail(user).trim()
+  if (name && email) {
+    return `${name}\n${email}`
+  }
+  if (name) {
+    return name
+  }
+  if (email) {
+    return email
+  }
+  return 'Unknown user'
+}
 
 const modeOptions = [
   { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },
@@ -886,6 +1093,7 @@ const toggleManualLog = () => {
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
     manualNote.value = ''
+    manualUserId.value = effectiveCurrentUserId.value ?? (members.value[0]?.id ?? null)
   }
 }
 
@@ -952,10 +1160,15 @@ const submitManualEntry = async () => {
   const durationSec = durationMins * 60
   const note = manualNote.value.trim() || 'Manual session'
 
+  const selectedUserId = isShared.value ? (manualUserId.value != null ? Number(manualUserId.value) : undefined) : undefined
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   const tempId = `manual-${Date.now()}`
   const newEntry: TaskTimeEntryDto = {
     id: tempId,
     taskId: props.taskId,
+    userId: selectedUserId,
+    user: selectedMember,
     startedAt: started,
     endedAt: ended,
     durationSeconds: durationSec,
@@ -971,6 +1184,7 @@ const submitManualEntry = async () => {
   if (isPersistedTaskId.value) {
     try {
       const persisted = await kanbanApi.createTimeEntry(props.taskId, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,
@@ -998,6 +1212,7 @@ const editStartTime = ref('')
 const editEndTime = ref('')
 const editDurationMinutes = ref<number | null>(0)
 const editNoteText = ref('')
+const editUserId = ref<number | string | null>(null)
 
 const startEditingSession = (entry: TaskTimeEntryDto) => {
   editingEntryId.value = entry.id
@@ -1006,6 +1221,7 @@ const startEditingSession = (entry: TaskTimeEntryDto) => {
   editEndTime.value = toLocalTimeString(entry.endedAt)
   editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
   editNoteText.value = entry.note
+  editUserId.value = entry.userId ?? entry.user?.id ?? effectiveCurrentUserId.value ?? null
 }
 
 const onEditTimeChanged = () => {
@@ -1048,16 +1264,24 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   const durationSec = durationMins * 60
   const note = editNoteText.value
 
+  const selectedUserId = isShared.value ? (editUserId.value != null ? Number(editUserId.value) : undefined) : entry.userId
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   entry.startedAt = started
   entry.endedAt = ended
   entry.durationSeconds = durationSec
   entry.note = note
+  if (isShared.value) {
+    entry.userId = selectedUserId
+    entry.user = selectedMember ?? entry.user
+  }
   editingEntryId.value = null
   syncEntriesOut()
 
   if (isPersistedTaskId.value && !String(entry.id).startsWith('manual') && !String(entry.id).startsWith('entry')) {
     try {
       const updated = await kanbanApi.updateTimeEntry(entry.id, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,

@@ -26,6 +26,9 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
   ],
+  tailwindcss: {
+    cssPath: '~/assets/css/main.css',
+  },
   routeRules: {
     // Keep login/register pre-rendered/SSR if desired, or set ssr: false for protected routes
     '/login': { ssr: true },

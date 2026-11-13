@@ -188,23 +188,26 @@ def get_owned_task(user, task_id: int) -> Task:
     )
 
 def get_owned_time_entry(user, entry_id: int) -> TaskTimeEntry:
-    """Retrieve a time entry belonging to the authenticated user's task or created by the user."""
+    """Retrieve a time entry belonging to the user, created by the user, or on a board accessible to the user."""
     return get_object_or_404(
         TaskTimeEntry.objects.select_related("task__column__board").filter(
-            Q(user=user) | Q(task__column__board__owner=user)
-        ),
+            Q(user=user) | Q(task__column__board__in=get_accessible_boards(user))
+        ).distinct(),
         id=entry_id
     )
 
-def get_owned_tags(user, tag_ids: list[int]) -> list[Tag]:
-    """Return the requested tags if they all belong to the user."""
+def get_available_board_tags(user, board, tag_ids: list[int]) -> list[Tag]:
+    """Return requested tags if they belong to the board owner or a collaborator."""
     if len(tag_ids) != len(set(tag_ids)):
         raise HttpError(400, "Duplicate tag IDs are not allowed.")
 
-    tags = list(Tag.objects.filter(user=user, id__in=tag_ids))
+    member_ids = [board.owner_id]
+    member_ids.extend(board.collaborators.values_list("id", flat=True))
+
+    tags = list(Tag.objects.filter(user_id__in=member_ids, id__in=tag_ids))
 
     if len(tags) != len(tag_ids):
-        raise HttpError(400, "One or more tags are invalid or do not belong to you.")
+        raise HttpError(400, "One or more tags are invalid or do not belong to a board member.")
 
     return tags
 
@@ -358,7 +361,7 @@ def delete_column(request, column_id: int):
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_accessible_column(request.auth, column_id)
-    tags = get_owned_tags(request.auth, payload.tag_ids)
+    tags = get_available_board_tags(request.auth, column.board, payload.tag_ids)
     last = column.tasks.aggregate(m=Max("position"))["m"]
 
     with transaction.atomic():
@@ -385,7 +388,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
     tags = None
 
     if tag_ids is not None:
-        tags = get_owned_tags(request.auth, tag_ids)
+        tags = get_available_board_tags(request.auth, task.column.board, tag_ids)
 
     with transaction.atomic():
         for field, value in updates.items():
@@ -537,7 +540,7 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
 def list_time_entries(request, task_id: int):
     """List historical time entries recorded for a task."""
     task = get_accessible_task(request.auth, task_id)
-    return task.time_entries.all()
+    return task.time_entries.select_related("user").all()
 
 @router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
 def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
@@ -558,10 +561,24 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
     elif end is not None and duration > int((end - start).total_seconds()):
         raise HttpError(400, "Duration cannot exceed elapsed time range")
 
+    board = task.column.board
+    target_user = request.auth
+    target_user_id = data.get("user_id")
+
+    if target_user_id is not None:
+        is_owner = (board.owner_id == target_user_id)
+        is_collab = board.collaborators.filter(id=target_user_id).exists()
+        if not (is_owner or is_collab):
+            raise HttpError(400, "Selected user is not a member of this board")
+        if target_user_id == request.auth.id:
+            target_user = request.auth
+        else:
+            target_user = get_object_or_404(User, id=target_user_id)
+
     with transaction.atomic():
         entry = TaskTimeEntry.objects.create(
             task=task,
-            user=request.auth,
+            user=target_user,
             started_at=start,
             ended_at=end,
             duration_seconds=duration,
@@ -585,6 +602,21 @@ def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
                 raise HttpError(400, "End time cannot precede start time")
             if duration is not None and duration > int((end - start).total_seconds()):
                 raise HttpError(400, "Duration cannot exceed elapsed time range")
+
+        if "user_id" in updates:
+            new_user_id = updates.pop("user_id")
+            if new_user_id is not None:
+                board = entry.task.column.board
+                is_owner = (board.owner_id == new_user_id)
+                is_collab = board.collaborators.filter(id=new_user_id).exists()
+                if not (is_owner or is_collab):
+                    raise HttpError(400, "Selected user is not a member of this board")
+                if new_user_id == request.auth.id:
+                    entry.user = request.auth
+                else:
+                    entry.user = get_object_or_404(User, id=new_user_id)
+            else:
+                entry.user = None
 
         for field, val in updates.items():
             setattr(entry, field, val)
