@@ -139,13 +139,13 @@ def reconcile_expired_countdowns(user):
             timer.elapsed_seconds = 0
             timer.save()
 
-                # publish updated timer event to subscribers
-                publish_event_on_commit(
-                    board_id=timer.task.column.board_id,
-                    actor_id=user.id,
-                    event_type=BoardEventType.TASK_TIMER_UPDATED,
-                    data=get_timer_event_data(timer.task, timer),
-                )
+            # publish updated timer event to subscribers
+            publish_event_on_commit(
+                board_id=timer.task.column.board_id,
+                actor_id=user.id,
+                event_type=BoardEventType.TASK_TIMER_UPDATED,
+                data=get_timer_event_data(timer.task, timer),
+            )
 
 def get_board_queryset(user):
     # Each task's tracked time is summed in the same query that loads the tasks,
