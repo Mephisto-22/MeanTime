@@ -70,6 +70,8 @@ jobs:
         run: cp .env.example .env
 
       - name: Start the app
+        env:
+          EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
         run: docker compose up -d --build
 
       - name: Wait for the app to answer through the frontend
@@ -84,37 +86,7 @@ jobs:
       - name: Smoke check
         env:
           BASE_URL: http://localhost:3000
-        run: |
-          set -euo pipefail
-          api="$BASE_URL/api"
-          email="smoke-${GITHUB_RUN_ID:-local}-$(date +%s)@example.com"
-          password='Smoke-check-pass-123!'
-          json='Content-Type: application/json'
-
-          echo "1. Health check reports the database connected"
-          curl -fsS "$api/health" | jq -e '.database == "connected"'
-
-          echo "2. Register a new user"
-          curl -fsS -X POST "$api/auth/register" -H "$json" \
-            -d "{\"email\":\"$email\",\"password\":\"$password\",\"display_name\":\"Smoke Check\"}" \
-            | jq -e --arg e "$email" '.email == $e'
-
-          echo "3. Log in"
-          token=$(curl -fsS -X POST "$api/auth/login" -H "$json" \
-            -d "{\"email\":\"$email\",\"password\":\"$password\"}" | jq -er '.access_token')
-
-          echo "4. Fetch the logged-in user"
-          curl -fsS "$api/auth/me" -H "Authorization: Bearer $token" \
-            | jq -e --arg e "$email" '.email == $e'
-
-          echo "5. Create a board; it starts with the default columns"
-          curl -fsS -X POST "$api/kanban/boards" -H "$json" -H "Authorization: Bearer $token" \
-            -d '{"title":"Smoke check board","description":""}' \
-            | jq -e '[.columns[].title] == ["To Do", "In Progress", "Done"]'
-
-          echo "6. The board shows up in the user's list"
-          curl -fsS "$api/kanban/boards" -H "Authorization: Bearer $token" \
-            | jq -e 'map(.title) | index("Smoke check board") != null'
+        run: python3 scripts/smoke_check.py
 
       - name: Show container logs
         if: failure()
