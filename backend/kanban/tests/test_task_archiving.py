@@ -105,18 +105,74 @@ class TaskArchivingModelAndApiTests(TestCase):
         self.assertTrue(TaskTimeEntry.objects.filter(id=entry.id).exists())
         self.assertEqual(entry.task_id, t1.id)
 
-    def test_partial_unique_position_constraint(self):
-        """Active tasks enforce unique position, but multiple archived tasks can have null position."""
+    def test_unique_position_constraint_deferred_and_archived_null(self):
+        """Active tasks enforce unique position at commit time, multiple archived tasks have null position, and active tasks cannot have null position."""
         from django.db import IntegrityError, transaction
         t1 = Task.objects.create(column=self.column1, title="T1", position=0)
-        # Creating another active task at position 0 should raise IntegrityError
-        with transaction.atomic():
-            with self.assertRaises(IntegrityError):
-                Task.objects.create(column=self.column1, title="T1 Dup", position=0)
 
-        # Multiple archived tasks with position=None should succeed without error
+        # Active tasks cannot have position=None (violates task_position_null_iff_archived check constraint immediately)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Task.objects.create(column=self.column1, title="Active Null Pos", position=None, archived_at=None)
+
+        # Multiple archived tasks with position=None succeed without error
         Task.objects.create(column=self.column1, title="Archived 1", position=None, archived_at=timezone.now())
         Task.objects.create(column=self.column1, title="Archived 2", position=None, archived_at=timezone.now())
+
+        # Creating another active task at position 0 causes an IntegrityError when deferred constraints are checked
+        # (savepoint rollback cleans up the duplicate so subsequent tests run cleanly)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Task.objects.create(column=self.column1, title="T1 Dup", position=0)
+                from django.db import connection
+                connection.check_constraints()
+
+    def test_move_task_reordering_within_column(self):
+        """Reordering tasks within the same column succeeds without transient uniqueness collisions."""
+        t0 = Task.objects.create(column=self.column1, title="T0", position=0)
+        t1 = Task.objects.create(column=self.column1, title="T1", position=1)
+        t2 = Task.objects.create(column=self.column1, title="T2", position=2)
+
+        # Reorder t2 to position 0 ([t2, t0, t1])
+        res = self.client.post(
+            f"/api/kanban/tasks/{t2.id}/move",
+            data=json.dumps({"to_column_id": self.column1.id, "target_position": 0}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        t0.refresh_from_db()
+        t1.refresh_from_db()
+        t2.refresh_from_db()
+        self.assertEqual(t2.position, 0)
+        self.assertEqual(t0.position, 1)
+        self.assertEqual(t1.position, 2)
+
+    def test_move_task_between_columns_with_occupied_positions(self):
+        """Moving task to another column that already has a task at the same position succeeds."""
+        src_t0 = Task.objects.create(column=self.column1, title="Src T0", position=0)
+        src_t1 = Task.objects.create(column=self.column1, title="Src T1", position=1)
+        dest_t0 = Task.objects.create(column=self.column2, title="Dest T0", position=0)
+        dest_t1 = Task.objects.create(column=self.column2, title="Dest T1", position=1)
+
+        # Move src_t1 (pos 1) to column 2 at position 0
+        res = self.client.post(
+            f"/api/kanban/tasks/{src_t1.id}/move",
+            data=json.dumps({"to_column_id": self.column2.id, "target_position": 0}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        src_t0.refresh_from_db()
+        src_t1.refresh_from_db()
+        dest_t0.refresh_from_db()
+        dest_t1.refresh_from_db()
+
+        self.assertEqual(src_t0.position, 0)
+        self.assertEqual(src_t1.column_id, self.column2.id)
+        self.assertEqual(src_t1.position, 0)
+        self.assertEqual(dest_t0.position, 1)
+        self.assertEqual(dest_t1.position, 2)
 
     def test_move_task_updates_column_activity_at(self):
         """Moving a task across or within columns updates column_activity_at."""

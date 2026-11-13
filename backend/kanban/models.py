@@ -134,8 +134,15 @@ class Task(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["column", "position"],
-                name="unique_active_task_position_per_column",
-                condition=models.Q(archived_at__isnull=True),
+                name="unique_task_position_per_column",
+                deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(archived_at__isnull=True, position__isnull=False)
+                    | models.Q(archived_at__isnull=False, position__isnull=True)
+                ),
+                name="task_position_null_iff_archived",
             ),
         ]
 
