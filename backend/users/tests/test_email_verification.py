@@ -94,6 +94,16 @@ class EmailVerificationTests(TestCase):
         User.objects.filter(email="new@example.com").update(is_active=False)
         self.assertEqual(self.post("email-verification/confirm", {"token": token}).status_code, 400)
 
+    def test_resetting_password_does_not_bypass_email_confirmation(self):
+        self.register()
+        self.post("password-reset", {"email": "new@example.com"})
+        url = re.search(r"http://localhost:3000/reset-password#[^\s]+", mail.outbox[-1].body).group()
+        values = parse_qs(urlsplit(url).fragment)
+        link = {"uid": values["uid"][0], "token": values["token"][0]}
+        self.assertEqual(self.post("password-reset/confirm", {**link, "password": "NewCedar!Orbit82", "password_confirm": "NewCedar!Orbit82"}).status_code, 200)
+        self.assertFalse(User.objects.get(email="new@example.com").is_verified)
+        self.assertEqual(self.post("login", {"email": "new@example.com", "password": "NewCedar!Orbit82"}).status_code, 403)
+
     def test_console_url_is_not_mime_wrapped(self):
         from contextlib import redirect_stdout
         from io import StringIO
