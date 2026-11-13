@@ -1,116 +1,50 @@
-from django.test import TestCase
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
-from django.utils import timezone
+from django.test import TestCase
 from kanban.models import Board
-from chat.models import (
-    Conversation,
-    ConversationParticipant,
-    Message,
-    ConversationType,
-    ParticipantStatus,
-)
+from chat.models import Message
 
 User = get_user_model()
 
 
 class ChatModelTests(TestCase):
     def setUp(self):
-        self.user1 = User.objects.create_user(
+        self.owner = User.objects.create_user(
             email="alice@example.com",
             display_name="Alice",
             password="password123",
         )
-        self.user2 = User.objects.create_user(
+        self.collaborator = User.objects.create_user(
             email="bob@example.com",
             display_name="Bob",
             password="password123",
         )
+        self.board = Board.objects.create(owner=self.owner, title="Sprint Board")
+        self.board.collaborators.add(self.collaborator)
 
-    def test_create_conversation_and_participants(self):
-        conv = Conversation.objects.create(
-            type=ConversationType.DIRECT,
-            created_by=self.user1,
-        )
-        p1 = ConversationParticipant.objects.create(
-            conversation=conv,
-            user=self.user1,
-            status=ParticipantStatus.ACCEPTED,
-        )
-        p2 = ConversationParticipant.objects.create(
-            conversation=conv,
-            user=self.user2,
-            status=ParticipantStatus.PENDING,
-            invited_by=self.user1,
-        )
-
-        self.assertEqual(conv.participants.count(), 2)
-        self.assertEqual(p1.status, ParticipantStatus.ACCEPTED)
-        self.assertEqual(p2.status, ParticipantStatus.PENDING)
-        self.assertTrue(conv.is_active)
-        self.assertEqual(conv.type, ConversationType.DIRECT)
-
-    def test_message_creation_and_ordering(self):
-        conv = Conversation.objects.create(
-            type=ConversationType.GROUP,
-            title="Sprint Team",
-            created_by=self.user1,
-        )
+    def test_create_board_message_and_ordering(self):
         m1 = Message.objects.create(
-            conversation=conv,
-            sender=self.user1,
-            content="Hello",
+            board=self.board,
+            sender=self.owner,
+            content="Hello board",
         )
         m2 = Message.objects.create(
-            conversation=conv,
-            sender=self.user2,
-            content="World",
+            board=self.board,
+            sender=self.collaborator,
+            content="Ready to work",
         )
 
-        messages = list(conv.messages.all())
+        messages = list(self.board.chat_messages.all())
         self.assertEqual(messages, [m1, m2])
+        self.assertEqual(m1.board_id, self.board.id)
+        self.assertEqual(m1.sender_id, self.owner.id)
+        self.assertIsNotNone(m1.created_at)
 
-    def test_unique_conversation_participant_constraint(self):
-        conv = Conversation.objects.create(
-            type=ConversationType.DIRECT,
-            created_by=self.user1,
+    def test_cascade_delete_when_board_deleted(self):
+        Message.objects.create(
+            board=self.board,
+            sender=self.owner,
+            content="Will be deleted with board",
         )
-        ConversationParticipant.objects.create(
-            conversation=conv,
-            user=self.user1,
-            status=ParticipantStatus.ACCEPTED,
-        )
-        with self.assertRaises(IntegrityError):
-            ConversationParticipant.objects.create(
-                conversation=conv,
-                user=self.user1,
-                status=ParticipantStatus.ACCEPTED,
-            )
-
-    def test_conversation_with_board_link(self):
-        board = Board.objects.create(owner=self.user1, title="Project Board")
-        conv = Conversation.objects.create(
-            type=ConversationType.GROUP,
-            title="Board Discussion",
-            created_by=self.user1,
-            board=board,
-        )
-        self.assertEqual(conv.board, board)
-        self.assertIn(conv, board.board_chats.all())
-
-    def test_participant_cleared_at_and_last_read_at(self):
-        conv = Conversation.objects.create(
-            type=ConversationType.DIRECT,
-            created_by=self.user1,
-        )
-        now = timezone.now()
-        participant = ConversationParticipant.objects.create(
-            conversation=conv,
-            user=self.user1,
-            status=ParticipantStatus.ACCEPTED,
-            cleared_at=now,
-            last_read_at=now,
-        )
-        participant.refresh_from_db()
-        self.assertIsNotNone(participant.cleared_at)
-        self.assertIsNotNone(participant.last_read_at)
+        self.assertEqual(Message.objects.count(), 1)
+        self.board.delete()
+        self.assertEqual(Message.objects.count(), 0)
