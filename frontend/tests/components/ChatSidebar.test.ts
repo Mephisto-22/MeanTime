@@ -1,187 +1,140 @@
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { ref } from 'vue'
 import ChatSidebar from '~/components/chat/ChatSidebar.vue'
-import CreateChatDialog from '~/components/chat/CreateChatDialog.vue'
-import { useChatStore } from '~/stores/chat'
+import Board from '~/components/kanban/Board.vue'
+import { kanbanContextKey, type KanbanBoardDto } from '~/api/kanban'
+import { chatApi, type MessageOut } from '~/api/chat'
+import type { BoardChatComposable } from '~/composables/useBoardChat'
 import { useAuthStore } from '~/stores/auth'
-import type { UserOut } from '~/api/friends'
-import type { ConversationDetailOut, ConversationOut, MessageOut, PendingInviteOut } from '~/api/chat'
-
-const DialogStub = {
-  name: 'Dialog',
-  props: ['visible', 'header'],
-  template: `
-    <div v-if="visible" class="p-dialog" :data-header="header">
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-}
 
 const DrawerStub = {
   name: 'Drawer',
-  props: ['visible', 'position'],
+  props: ['visible', 'position', 'header', 'modal'],
+  emits: ['update:visible'],
   template: `
-    <div v-if="visible" class="p-drawer" :data-position="position">
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
+    <div v-if="visible" class="p-drawer" data-testid="chat-drawer">
+      <div class="p-drawer-header">
+        <slot name="header" />
+      </div>
+      <div class="p-drawer-content">
+        <slot />
+      </div>
     </div>
   `,
 }
 
 const ScrollPanelStub = {
   name: 'ScrollPanel',
-  template: '<div class="p-scrollpanel"><slot /></div>',
+  template: `<div class="p-scrollpanel"><slot /></div>`,
 }
 
-const mockFriends: UserOut[] = [
-  {
-    id: 10,
-    email: 'bob@example.com',
-    display_name: 'Bob Ross',
-    timezone: 'UTC',
-    created_at: '2026-01-01T00:00:00Z',
-  },
-  {
-    id: 11,
-    email: 'charlie@example.com',
-    display_name: 'Charlie Brown',
-    timezone: 'UTC',
-    created_at: '2026-01-01T00:00:00Z',
-  },
-]
-
-const mockConversations: ConversationOut[] = [
-  {
-    id: 101,
-    type: 'DIRECT',
-    title: 'Direct Chat',
-    updated_at: '2026-11-10T12:00:00Z',
-    other_participants: [
-      {
-        id: 1,
-        user_id: 10,
-        display_name: 'Bob Ross',
-        email: 'bob@example.com',
-        status: 'ACCEPTED',
-      },
-    ],
-    last_message: {
-      content: 'Hello Bob!',
-      sender_name: 'Bob Ross',
-      created_at: '2026-11-10T12:00:00Z',
-    },
-    unread_count: 2,
-  },
-  {
-    id: 102,
-    type: 'GROUP',
-    title: 'Weekend Crew',
-    updated_at: '2026-11-10T12:30:00Z',
-    other_participants: [
-      {
-        id: 2,
-        user_id: 10,
-        display_name: 'Bob Ross',
-        email: 'bob@example.com',
-        status: 'ACCEPTED',
-      },
-      {
-        id: 3,
-        user_id: 11,
-        display_name: 'Charlie Brown',
-        email: 'charlie@example.com',
-        status: 'ACCEPTED',
-      },
-    ],
-    last_message: null,
-    unread_count: 0,
-  },
-]
-
-const mockPendingInvites: PendingInviteOut[] = [
-  {
-    id: 201,
-    conversation_id: 103,
-    conversation_type: 'GROUP',
-    conversation_title: 'Secret Project',
-    invited_by_name: 'Alice Wonder',
-    created_at: '2026-11-10T11:00:00Z',
-  },
-]
-
-const mockActiveConversation: ConversationDetailOut = {
-  id: 101,
-  type: 'DIRECT',
-  title: 'Direct Chat',
-  created_at: '2026-11-10T10:00:00Z',
-  updated_at: '2026-11-10T12:00:00Z',
-  is_active: true,
-  participants: [
-    {
-      id: 99,
-      user_id: 1,
-      display_name: 'Current User',
-      email: 'me@example.com',
-      status: 'ACCEPTED',
-    },
-    {
-      id: 1,
-      user_id: 10,
-      display_name: 'Bob Ross',
-      email: 'bob@example.com',
-      status: 'ACCEPTED',
-    },
-  ],
+const DialogStub = {
+  name: 'Dialog',
+  props: ['visible', 'header'],
+  template: `<div v-if="visible" class="p-dialog"><slot /><slot name="footer" /></div>`,
 }
 
 const mockMessages: MessageOut[] = [
   {
     id: 1,
-    conversation_id: 101,
-    sender_id: 10,
-    sender_name: 'Bob Ross',
-    content: 'Hi there!',
-    created_at: '2026-11-10T12:00:00Z',
+    board_id: 10,
+    sender_id: 2,
+    sender_name: 'Bob Collaborator',
+    content: 'Moving the auth task to In Progress!',
+    created_at: '2026-11-13T12:00:00Z',
   },
   {
     id: 2,
-    conversation_id: 101,
+    board_id: 10,
     sender_id: 1,
     sender_name: 'Current User',
-    content: 'Hey Bob, what is up?',
-    created_at: '2026-11-10T12:01:00Z',
+    content: 'Sounds good, thanks Bob!',
+    created_at: '2026-11-13T12:01:00Z',
   },
 ]
 
-function mountChatSidebar(props: { friends?: UserOut[] } = {}) {
+function createMockBoardChat(
+  overrides: Partial<{
+    messages: MessageOut[]
+    isOpen: boolean
+    loading: boolean
+  }> = {},
+): BoardChatComposable {
+  const messages = ref<MessageOut[]>(overrides.messages ?? [])
+  const isOpen = ref(overrides.isOpen ?? false)
+  const loading = ref(overrides.loading ?? false)
+  const isPolling = ref(false)
+
+  return {
+    messages,
+    isOpen,
+    loading,
+    isPolling,
+    loadHistory: vi.fn().mockResolvedValue(undefined),
+    pollMessages: vi.fn().mockResolvedValue(undefined),
+    sendMessage: vi.fn().mockImplementation(async (text: string) => {
+      const msg: MessageOut = {
+        id: 99,
+        board_id: 10,
+        sender_id: 1,
+        sender_name: 'Current User',
+        content: text,
+        created_at: '2026-11-13T12:05:00Z',
+      }
+      messages.value.push(msg)
+      return msg
+    }),
+    open: vi.fn(() => {
+      isOpen.value = true
+    }),
+    close: vi.fn(() => {
+      isOpen.value = false
+    }),
+    toggle: vi.fn(() => {
+      isOpen.value = !isOpen.value
+    }),
+    stopPolling: vi.fn(),
+  }
+}
+
+function mountChatSidebar(
+  boardChat: BoardChatComposable,
+  boardTitle = 'Sprint Planning Board',
+) {
   return mount(ChatSidebar, {
     props: {
-      friends: props.friends ?? mockFriends,
+      boardTitle,
     },
     global: {
       plugins: [PrimeVue, ToastService],
+      provide: {
+        [kanbanContextKey as symbol]: {
+          columns: ref([]),
+          moveTask: vi.fn(),
+          openCreateTaskDialog: vi.fn(),
+          openEditTaskDialog: vi.fn(),
+          createTask: vi.fn(),
+          updateTask: vi.fn(),
+          deleteTask: vi.fn(),
+          boardChat,
+        },
+      },
       stubs: {
         Drawer: DrawerStub,
-        Dialog: DialogStub,
         ScrollPanel: ScrollPanelStub,
       },
     },
   })
 }
 
-describe('ChatSidebar Component Suite', () => {
-  let chatStore: ReturnType<typeof useChatStore>
-  let authStore: ReturnType<typeof useAuthStore>
-
+describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    chatStore = useChatStore()
-    authStore = useAuthStore()
+    const authStore = useAuthStore()
     authStore.user = {
       id: 1,
       email: 'me@example.com',
@@ -195,289 +148,160 @@ describe('ChatSidebar Component Suite', () => {
     vi.restoreAllMocks()
   })
 
-  describe('Minimized Dock State', () => {
-    it('renders dock button when minimized with correct badge count', () => {
-      chatStore.isSidebarOpen = false
-      chatStore.conversations = [...mockConversations]
-      chatStore.pendingInvites = [...mockPendingInvites]
+  it('renders floating dock button when drawer is closed and clicking it calls boardChat.open()', async () => {
+    const boardChat = createMockBoardChat({ isOpen: false })
+    const wrapper = mountChatSidebar(boardChat)
 
-      const wrapper = mountChatSidebar()
+    const dockBtn = wrapper.find('[data-testid="chat-dock-button"]')
+    expect(dockBtn.exists()).toBe(true)
+    expect(dockBtn.text()).toContain('Chat')
 
-      const dockBtn = wrapper.find('[data-testid="chat-dock-button"]')
-      expect(dockBtn.exists()).toBe(true)
-      expect(dockBtn.text()).toContain('Chat')
-
-      const badge = wrapper.find('[data-testid="chat-dock-badge"]')
-      expect(badge.exists()).toBe(true)
-      // 2 unread + 1 invite = 3
-      expect(badge.text()).toBe('3')
-    })
-
-    it('clicking dock button calls chatStore.openSidebar()', async () => {
-      chatStore.isSidebarOpen = false
-      const openSpy = vi.spyOn(chatStore, 'openSidebar')
-
-      const wrapper = mountChatSidebar()
-      const dockBtn = wrapper.find('[data-testid="chat-dock-button"]')
-      await dockBtn.trigger('click')
-
-      expect(openSpy).toHaveBeenCalledTimes(1)
-    })
+    await dockBtn.trigger('click')
+    expect(boardChat.open).toHaveBeenCalledTimes(1)
   })
 
-  describe('Roster & Invites View (activeConversationId === null)', () => {
-    beforeEach(() => {
-      chatStore.isSidebarOpen = true
-      chatStore.activeConversationId = null
-    })
+  it('renders drawer with board title and Live Chat header when boardChat.isOpen is true', () => {
+    const boardChat = createMockBoardChat({ isOpen: true })
+    const wrapper = mountChatSidebar(boardChat, 'Release v2.0')
 
-    it('renders pending invite cards with Accept and Decline buttons and dispatches actions', async () => {
-      chatStore.pendingInvites = [...mockPendingInvites]
-      const acceptSpy = vi.spyOn(chatStore, 'acceptInvite').mockResolvedValue(undefined)
-      const declineSpy = vi.spyOn(chatStore, 'declineInvite').mockResolvedValue(undefined)
-
-      const wrapper = mountChatSidebar()
-
-      const inviteItem = wrapper.find('[data-testid="pending-invite-201"]')
-      expect(inviteItem.exists()).toBe(true)
-      expect(inviteItem.text()).toContain('Alice Wonder')
-      expect(inviteItem.text()).toContain('Secret Project')
-
-      const acceptBtn = wrapper.find('[data-testid="accept-invite-201"]')
-      expect(acceptBtn.exists()).toBe(true)
-      await acceptBtn.trigger('click')
-      expect(acceptSpy).toHaveBeenCalledWith(201)
-
-      const declineBtn = wrapper.find('[data-testid="decline-invite-201"]')
-      expect(declineBtn.exists()).toBe(true)
-      await declineBtn.trigger('click')
-      expect(declineSpy).toHaveBeenCalledWith(201)
-    })
-
-    it('renders conversation items and clicking one calls chatStore.selectConversation', async () => {
-      chatStore.conversations = [...mockConversations]
-      const selectSpy = vi.spyOn(chatStore, 'selectConversation').mockResolvedValue(undefined)
-
-      const wrapper = mountChatSidebar()
-
-      const convItem = wrapper.find('[data-testid="conversation-item-101"]')
-      expect(convItem.exists()).toBe(true)
-      expect(convItem.text()).toContain('Bob Ross')
-      expect(convItem.text()).toContain('Hello Bob!')
-
-      // Group conversation item
-      const groupConv = wrapper.find('[data-testid="conversation-item-102"]')
-      expect(groupConv.exists()).toBe(true)
-      expect(groupConv.text()).toContain('Weekend Crew')
-
-      await convItem.trigger('click')
-      expect(selectSpy).toHaveBeenCalledWith(101)
-    })
-
-    it('renders empty state when there are no conversations and no pending invites', () => {
-      chatStore.conversations = []
-      chatStore.pendingInvites = []
-
-      const wrapper = mountChatSidebar()
-
-      expect(wrapper.find('[data-testid="empty-conversations-message"]').exists()).toBe(true)
-    })
-
-    it('opens CreateChatDialog when clicking "+ New Chat" button', async () => {
-      const wrapper = mountChatSidebar()
-
-      const newChatBtn = wrapper.find('[data-testid="new-chat-button"]')
-      expect(newChatBtn.exists()).toBe(true)
-      await newChatBtn.trigger('click')
-
-      const dialog = wrapper.findComponent(CreateChatDialog)
-      expect(dialog.exists()).toBe(true)
-      expect(dialog.props('visible')).toBe(true)
-    })
+    expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain(
+      'Release v2.0',
+    )
+    // Verify no legacy Friends/Invite/Clear History elements exist
+    expect(wrapper.find('[data-testid="clear-history-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="new-chat-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pending-invites-section"]').exists()).toBe(false)
   })
 
-  describe('Active Chat View (activeConversationId !== null)', () => {
-    beforeEach(() => {
-      chatStore.isSidebarOpen = true
-      chatStore.activeConversationId = 101
-      chatStore.activeConversation = mockActiveConversation
-      chatStore.activeMessages = [...mockMessages]
-    })
+  it('renders empty state message when board has no chat messages', () => {
+    const boardChat = createMockBoardChat({ isOpen: true, messages: [] })
+    const wrapper = mountChatSidebar(boardChat)
 
-    it('switches to active view when activeConversationId is set and displays header details', () => {
-      const wrapper = mountChatSidebar()
-
-      expect(wrapper.find('[data-testid="back-to-roster-button"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain('Bob Ross')
-      expect(wrapper.find('[data-testid="active-chat-member-count"]').text()).toContain('2 members')
-    })
-
-    it('back button resets activeConversationId to null', async () => {
-      const wrapper = mountChatSidebar()
-
-      const backBtn = wrapper.find('[data-testid="back-to-roster-button"]')
-      await backBtn.trigger('click')
-
-      expect(chatStore.activeConversationId).toBeNull()
-    })
-
-    it('renders message history with bubbles, senders, and timestamps', () => {
-      const wrapper = mountChatSidebar()
-
-      const msg1 = wrapper.find('[data-testid="message-item-1"]')
-      expect(msg1.exists()).toBe(true)
-      expect(msg1.text()).toContain('Bob Ross')
-      expect(msg1.text()).toContain('Hi there!')
-
-      const msg2 = wrapper.find('[data-testid="message-item-2"]')
-      expect(msg2.exists()).toBe(true)
-      expect(msg2.text()).toContain('Current User')
-      expect(msg2.text()).toContain('Hey Bob, what is up?')
-    })
-
-    it('message input triggers chatStore.sendMessage on button click and clears input', async () => {
-      const sendSpy = vi.spyOn(chatStore, 'sendMessage').mockResolvedValue(null)
-      const wrapper = mountChatSidebar()
-
-      const input = wrapper.find('[data-testid="message-input"]')
-      await input.setValue('Testing message send')
-
-      const sendBtn = wrapper.find('[data-testid="send-message-button"]')
-      expect(sendBtn.attributes('disabled')).toBeUndefined()
-
-      await sendBtn.trigger('click')
-      await flushPromises()
-
-      expect(sendSpy).toHaveBeenCalledWith('Testing message send')
-      expect((input.element as HTMLInputElement).value).toBe('')
-    })
-
-    it('message input triggers chatStore.sendMessage on Enter key and clears input', async () => {
-      const sendSpy = vi.spyOn(chatStore, 'sendMessage').mockResolvedValue(null)
-      const wrapper = mountChatSidebar()
-
-      const input = wrapper.find('[data-testid="message-input"]')
-      await input.setValue('Testing Enter key')
-
-      await input.trigger('keydown.enter')
-      await flushPromises()
-
-      expect(sendSpy).toHaveBeenCalledWith('Testing Enter key')
-      expect((input.element as HTMLInputElement).value).toBe('')
-    })
-
-    it('disables send button when input is whitespace or empty', async () => {
-      const wrapper = mountChatSidebar()
-
-      const input = wrapper.find('[data-testid="message-input"]')
-      await input.setValue('   ')
-
-      const sendBtn = wrapper.find('[data-testid="send-message-button"]')
-      expect(sendBtn.attributes('disabled')).toBeDefined()
-    })
-
-    it('clear history confirmation dialog dispatches chatStore.clearHistory', async () => {
-      const clearSpy = vi.spyOn(chatStore, 'clearHistory').mockResolvedValue(undefined)
-      const wrapper = mountChatSidebar()
-
-      const clearBtn = wrapper.find('[data-testid="clear-history-button"]')
-      expect(clearBtn.exists()).toBe(true)
-      await clearBtn.trigger('click')
-
-      // Confirmation dialog should now be visible
-      const confirmDialog = wrapper.find('[data-testid="clear-history-dialog"]')
-      expect(confirmDialog.exists()).toBe(true)
-
-      const confirmBtn = wrapper.find('[data-testid="confirm-clear-button"]')
-      expect(confirmBtn.exists()).toBe(true)
-      await confirmBtn.trigger('click')
-      await flushPromises()
-
-      expect(clearSpy).toHaveBeenCalledTimes(1)
-    })
+    expect(wrapper.find('[data-testid="empty-messages-state"]').exists()).toBe(true)
   })
 
-  describe('CreateChatDialog Component', () => {
-    it('creates 1-on-1 direct message when selecting a friend', async () => {
-      const createSpy = vi.spyOn(chatStore, 'createChat').mockResolvedValue(mockActiveConversation)
+  it('renders message history with sender initials avatar, sender name, timestamp, and own vs collaborator alignment', () => {
+    const boardChat = createMockBoardChat({
+      isOpen: true,
+      messages: [...mockMessages],
+    })
+    const wrapper = mountChatSidebar(boardChat)
 
-      const wrapper = mount(CreateChatDialog, {
-        props: {
-          visible: true,
-          friends: mockFriends,
+    const items = wrapper.findAll('[data-testid^="message-item-"]')
+    expect(items).toHaveLength(2)
+
+    expect(items[0]!.text()).toContain('Bob Collaborator')
+    expect(items[0]!.text()).toContain('Moving the auth task to In Progress!')
+    expect(items[0]!.classes()).toContain('items-start')
+
+    expect(items[1]!.text()).toContain('Current User')
+    expect(items[1]!.text()).toContain('Sounds good, thanks Bob!')
+    expect(items[1]!.classes()).toContain('items-end')
+  })
+
+  it('sending message via button click or Enter key calls boardChat.sendMessage and clears input', async () => {
+    const boardChat = createMockBoardChat({ isOpen: true, messages: [] })
+    const wrapper = mountChatSidebar(boardChat)
+
+    const input = wrapper.find('[data-testid="message-input"]')
+    await input.setValue(' ship it! ')
+    await wrapper.find('[data-testid="send-message-button"]').trigger('click')
+
+    expect(boardChat.sendMessage).toHaveBeenCalledWith('ship it!')
+    expect((input.element as HTMLInputElement).value).toBe('')
+
+    await input.setValue('via enter key')
+    await input.trigger('keydown.enter')
+    expect(boardChat.sendMessage).toHaveBeenCalledWith('via enter key')
+  })
+
+  it('disables send button when input is empty or whitespace-only', async () => {
+    const boardChat = createMockBoardChat({ isOpen: true })
+    const wrapper = mountChatSidebar(boardChat)
+
+    const sendBtn = wrapper.find('[data-testid="send-message-button"]')
+    expect((sendBtn.element as HTMLButtonElement).disabled).toBe(true)
+
+    await wrapper.find('[data-testid="message-input"]').setValue('   ')
+    expect((sendBtn.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('clicking close button in drawer header calls boardChat.close()', async () => {
+    const boardChat = createMockBoardChat({ isOpen: true })
+    const wrapper = mountChatSidebar(boardChat)
+
+    await wrapper.find('[data-testid="close-active-sidebar-button"]').trigger('click')
+    expect(boardChat.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('Board.vue hides Chat button and ChatSidebar when board is not shared (collaborators is empty)', () => {
+    const soloBoard: KanbanBoardDto = {
+      id: 50,
+      title: 'Personal Board',
+      description: 'Solo work',
+      isOwner: true,
+      collaborators: [],
+      columns: [],
+    }
+
+    const wrapper = mount(Board, {
+      props: { board: soloBoard },
+      global: {
+        plugins: [PrimeVue, ToastService],
+        stubs: {
+          Drawer: DrawerStub,
+          ScrollPanel: ScrollPanelStub,
+          Dialog: DialogStub,
         },
-        global: {
-          plugins: [PrimeVue, ToastService],
-          stubs: {
-            Dialog: DialogStub,
-            ScrollPanel: ScrollPanelStub,
-          },
-        },
-      })
-
-      // Radio button / row for Bob Ross
-      const bobRadio = wrapper.find('[data-testid="friend-radio-10"]')
-      expect(bobRadio.exists()).toBe(true)
-      await bobRadio.trigger('click')
-      await flushPromises()
-
-      const confirmBtn = wrapper.find('[data-testid="confirm-create-chat-button"]')
-      expect(confirmBtn.attributes('disabled')).toBeUndefined()
-      await confirmBtn.trigger('click')
-      await flushPromises()
-
-      expect(createSpy).toHaveBeenCalledWith({
-        type: 'DIRECT',
-        participant_ids: [10],
-      })
-      expect(wrapper.emitted('created')).toBeTruthy()
+      },
     })
 
-    it('creates group chat with title and selected friends', async () => {
-      const createSpy = vi.spyOn(chatStore, 'createChat').mockResolvedValue(mockActiveConversation)
+    expect(wrapper.find('[data-testid="board-chat-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="chat-dock-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(false)
+  })
 
-      const wrapper = mount(CreateChatDialog, {
-        props: {
-          visible: true,
-          friends: mockFriends,
+  it('Board.vue renders Chat button and ChatSidebar when board is shared (collaborators.length > 0) and clicking toolbar Chat button toggles drawer', async () => {
+    vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValue([...mockMessages])
+
+    const sharedBoard: KanbanBoardDto = {
+      id: 51,
+      title: 'Team Board',
+      description: 'Shared work',
+      isOwner: true,
+      collaborators: [
+        {
+          id: 2,
+          email: 'bob@example.com',
+          display_name: 'Bob Collaborator',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
         },
-        global: {
-          plugins: [PrimeVue, ToastService],
-          stubs: {
-            Dialog: DialogStub,
-            ScrollPanel: ScrollPanelStub,
-          },
+      ],
+      columns: [],
+    }
+
+    const wrapper = mount(Board, {
+      props: { board: sharedBoard },
+      global: {
+        plugins: [PrimeVue, ToastService],
+        stubs: {
+          Drawer: DrawerStub,
+          ScrollPanel: ScrollPanelStub,
+          Dialog: DialogStub,
         },
-      })
-
-      // Switch to GROUP
-      const groupRadio = wrapper.find('[data-testid="chat-type-group"]')
-      await groupRadio.trigger('click')
-      await flushPromises()
-
-      // Set group title
-      const titleInput = wrapper.find('[data-testid="group-title-input"]')
-      expect(titleInput.exists()).toBe(true)
-      await titleInput.setValue('Frontend Developers')
-
-      // Select friends
-      const bobCheckbox = wrapper.find('[data-testid="friend-checkbox-10"]')
-      await bobCheckbox.trigger('click')
-
-      const charlieCheckbox = wrapper.find('[data-testid="friend-checkbox-11"]')
-      await charlieCheckbox.trigger('click')
-      await flushPromises()
-
-      const confirmBtn = wrapper.find('[data-testid="confirm-create-chat-button"]')
-      await confirmBtn.trigger('click')
-      await flushPromises()
-
-      expect(createSpy).toHaveBeenCalledWith({
-        type: 'GROUP',
-        title: 'Frontend Developers',
-        participant_ids: expect.arrayContaining([10, 11]),
-      })
-      expect(wrapper.emitted('created')).toBeTruthy()
+      },
     })
+
+    const chatBtn = wrapper.find('[data-testid="board-chat-button"]')
+    expect(chatBtn.exists()).toBe(true)
+    expect(wrapper.find('[data-testid="chat-dock-button"]').exists()).toBe(true)
+
+    await chatBtn.trigger('click')
+    expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain(
+      'Team Board',
+    )
   })
 })
