@@ -91,15 +91,6 @@
         <!-- Action Buttons -->
         <div class="flex items-center gap-2 self-end sm:self-auto">
           <Button
-            label="Chat"
-            icon="pi pi-comments"
-            severity="primary"
-            variant="outlined"
-            size="small"
-            :data-testid="'chat-button-' + friend.id"
-            @click="$emit('chat', friend)"
-          />
-          <Button
             label="Share board"
             severity="secondary"
             variant="outlined"
@@ -228,7 +219,6 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'unfriend', userId: number): void
   (e: 'block', userId: number): void
-  (e: 'chat', friend: UserOut): void
 }>()
 
 const isUnfriendDialogOpen = ref(false)
