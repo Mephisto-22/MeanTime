@@ -65,6 +65,7 @@ class UserOut(Schema):
     """Public user profile returned in responses."""
 
     id: int
+    is_verified: bool
     email: str
     display_name: str
     timezone: str
@@ -90,6 +91,10 @@ class ErrorDetail(Schema):
     """Standard single error message response."""
 
     detail: str
+
+
+class EmailVerificationIn(Schema):
+    token: str = Field(..., min_length=1, max_length=2048)
 
 
 class PasswordRequirementsIn(Schema):

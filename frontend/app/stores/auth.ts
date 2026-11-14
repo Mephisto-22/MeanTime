@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { authApi, type AuthTokens, type LoginRequest, type RegistrationRequest } from '~/api/auth'
 
 export interface User {
+  is_verified?: boolean
   id: number
   email: string
   display_name: string

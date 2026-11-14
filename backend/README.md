@@ -1,5 +1,8 @@
 # MeanTime Backend Service
 
+See [Registration email confirmation](../docs/email-verification.md) for the
+mail service, migration, verification endpoints, local testing, and SES setup.
+
 Django Ninja backend service running on Python 3.14 with PostgreSQL 18, managed via Docker Compose and Uvicorn (ASGI).
 
 ---
