@@ -776,4 +776,109 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(taskOnBoard.recurringTaskId).toBe('rec-202')
     expect(taskOnBoard.recurringTask?.isActive).toBe(false)
   })
+
+  it('optimistically updates task timer when switching between stopwatch, countdown, and none', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-timer-1',
+              title: 'Task without timer',
+              columnId: 'col-1',
+              timer: null,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockImplementation(async (taskId, payload) => {
+      return {
+        id: taskId,
+        title: payload.title ?? 'Task',
+        columnId: 'col-1',
+        timer: (payload as any).timerMode && (payload as any).timerMode !== 'NONE'
+          ? {
+              taskId,
+              mode: (payload as any).timerMode,
+              targetDurationSeconds: (payload as any).targetDurationSeconds ?? null,
+              state: 'IDLE',
+              startedAt: null,
+              elapsedSeconds: 0,
+            }
+          : null,
+      } as any
+    })
+
+    const wrapper = mountBoard(board)
+    const taskDialog = wrapper.findComponent(TaskDialog)
+
+    // 1. Switch to stopwatch (COUNT_UP)
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with stopwatch',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'COUNT_UP',
+        targetDurationSeconds: null,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
+    expect(taskOnBoard.timer).not.toBeNull()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_UP')
+
+    await flushPromises()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_UP')
+
+    // 2. Switch to countdown (COUNT_DOWN) with 25 minutes
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with countdown',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'COUNT_DOWN',
+        targetDurationSeconds: 1500,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_DOWN')
+    expect(taskOnBoard.timer?.targetDurationSeconds).toBe(1500)
+
+    await flushPromises()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_DOWN')
+
+    // 3. Switch to NONE
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with no timer',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'NONE',
+        targetDurationSeconds: null,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    expect(taskOnBoard.timer).toBeNull()
+
+    await flushPromises()
+    expect(taskOnBoard.timer).toBeNull()
+  })
 })

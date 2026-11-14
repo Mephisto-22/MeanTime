@@ -364,12 +364,27 @@ const applyTaskUpdates = (
     description?: string
     priority?: TaskPriorityType
     tags?: TagDto[]
+    timer?: TaskTimerDto | null
   },
 ): void => {
   if (source.title !== undefined) target.title = source.title
   if (source.description !== undefined) target.description = source.description
   if (source.priority !== undefined) target.priority = source.priority
   if (source.tags !== undefined) target.tags = source.tags
+  if (source.timer !== undefined) {
+    if (source.timer === null || source.timer.mode === 'NONE') {
+      target.timer = null
+    } else {
+      target.timer = {
+        taskId: target.id,
+        mode: source.timer.mode,
+        targetDurationSeconds: source.timer.targetDurationSeconds ?? null,
+        state: source.timer.state ?? 'IDLE',
+        startedAt: source.timer.startedAt ?? null,
+        elapsedSeconds: source.timer.elapsedSeconds ?? target.timer?.elapsedSeconds ?? 0,
+      }
+    }
+  }
 }
 
 const handleUpdateTask = async (
@@ -478,6 +493,9 @@ const handleUpdateTask = async (
       if (updated.recurringTask !== undefined) {
         targetTask.recurringTask = updated.recurringTask
       }
+      if (updated.timer !== undefined) {
+        targetTask.timer = updated.timer && updated.timer.mode !== 'NONE' ? updated.timer : null
+      }
     }
   } catch (err) {
     localColumns.value = columnsSnapshot
@@ -547,6 +565,7 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
       applyToFuture: savePayload.applyToFuture,
+      timer: savePayload.timer,
     }
     if (savePayload.recurrence) {
       updateTaskPayload.recurrence = savePayload.recurrence

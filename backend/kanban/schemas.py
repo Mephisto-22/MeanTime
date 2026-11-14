@@ -221,7 +221,10 @@ class TaskOut(Schema):
     @staticmethod
     def resolve_timer(obj):
         try:
-            return obj.timer
+            t = getattr(obj, "timer", None)
+            if t is not None and getattr(t, "mode", None) != TimerMode.NONE:
+                return t
+            return None
         except Exception:
             return None
 

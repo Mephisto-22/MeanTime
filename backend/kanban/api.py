@@ -537,6 +537,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
         if timer_mode is not None or target_duration_seconds is not None:
             if timer_mode == TimerMode.NONE:
                 TaskTimer.objects.filter(task=task).delete()
+                task.timer = None
             else:
                 timer, _ = TaskTimer.objects.get_or_create(task=task)
                 if timer_mode is not None:
@@ -544,6 +545,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
                 if target_duration_seconds is not None:
                     timer.target_duration_seconds = target_duration_seconds
                 timer.save()
+                task.timer = timer
 
         # Handle explicit unlinking of recurrence if recurring_task_id is None in updates
         if "recurring_task_id" in updates and updates["recurring_task_id"] is None:
