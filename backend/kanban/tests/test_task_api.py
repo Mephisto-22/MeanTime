@@ -4,7 +4,7 @@ import json
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
-from kanban.models import Board, BoardColumn, Task, TaskPriority
+from kanban.models import Board, BoardColumn, Task, Tag, TaskPriority
 
 User = get_user_model()
 
@@ -138,3 +138,139 @@ class TaskPriorityApiTests(TestCase):
 
         task = Task.objects.get(id=task_id)
         self.assertEqual(task.priority, "LOW")
+
+
+class TaskTagSharingApiTests(TestCase):
+    """Tests for using board members' tags on shared tasks."""
+
+    def setUp(self):
+        self.client = Client()
+
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            password=PASSWORD,
+            display_name="Board Owner",
+        )
+        self.collaborator = User.objects.create_user(
+            email="collaborator@example.com",
+            password=PASSWORD,
+            display_name="Collaborator",
+        )
+        self.other_collaborator = User.objects.create_user(
+            email="other-collaborator@example.com",
+            password=PASSWORD,
+            display_name="Other Collaborator",
+        )
+        self.outsider = User.objects.create_user(
+            email="outsider@example.com",
+            password=PASSWORD,
+            display_name="Outsider",
+        )
+
+        self.board = Board.objects.create(
+            owner=self.owner,
+            title="Shared Board",
+        )
+        self.board.collaborators.add(
+            self.collaborator,
+            self.other_collaborator,
+        )
+
+        self.column = BoardColumn.objects.create(
+            board=self.board,
+            title="To Do",
+        )
+        self.task = Task.objects.create(
+            column=self.column,
+            title="Original Task",
+        )
+
+        self.owner_tag = Tag.objects.create(
+            user=self.owner,
+            name="Owner Tag",
+        )
+        self.collaborator_tag = Tag.objects.create(
+            user=self.other_collaborator,
+            name="Collaborator Tag",
+        )
+        self.outsider_tag = Tag.objects.create(
+            user=self.outsider,
+            name="Outsider Tag",
+        )
+
+    def auth_headers(self, email):
+        login = self.client.post(
+            "/api/auth/login",
+            data=json.dumps({
+                "email": email,
+                "password": PASSWORD,
+            }),
+            content_type="application/json",
+        )
+        return {
+            "HTTP_AUTHORIZATION": f"Bearer {login.json()['access_token']}"
+        }
+
+    def update_task(self, payload, **auth):
+        return self.client.patch(
+            f"/api/kanban/tasks/{self.task.id}",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **auth,
+        )
+
+    def test_collaborator_can_update_task_with_owner_owned_tag(self):
+        """A collaborator can update a task while retaining the owner's tag."""
+        self.task.tags.add(self.owner_tag)
+
+        response = self.update_task(
+            {
+                "title": "Updated by Collaborator",
+                "tag_ids": [self.owner_tag.id],
+            },
+            **self.auth_headers("collaborator@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["title"], "Updated by Collaborator")
+        self.assertEqual(
+            list(self.task.tags.values_list("id", flat=True)),
+            [self.owner_tag.id],
+        )
+
+    def test_collaborator_can_attach_another_collaborators_tag(self):
+        """A collaborator can attach a tag owned by another board collaborator."""
+        response = self.update_task(
+            {"tag_ids": [self.collaborator_tag.id]},
+            **self.auth_headers("collaborator@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(self.task.tags.values_list("id", flat=True)),
+            [self.collaborator_tag.id],
+        )
+
+        # Attaching the tag does not transfer ownership.
+        self.collaborator_tag.refresh_from_db()
+        self.assertEqual(self.collaborator_tag.user_id, self.other_collaborator.id)
+
+    def test_collaborator_cannot_attach_outsiders_tag(self):
+        """Tags belonging to users outside the board are rejected."""
+        response = self.update_task(
+            {"tag_ids": [self.outsider_tag.id]},
+            **self.auth_headers("collaborator@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.task.tags.exists())
+
+    def test_duplicate_tag_ids_are_rejected(self):
+        """Submitting the same tag ID more than once returns a validation error."""
+        response = self.update_task(
+            {"tag_ids": [self.owner_tag.id, self.owner_tag.id]},
+            **self.auth_headers("collaborator@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.task.tags.exists())
