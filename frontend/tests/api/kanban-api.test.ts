@@ -94,8 +94,8 @@ describe('KanbanApi Contract Suite', () => {
     const postSpy = vi.spyOn(apiService, 'post').mockResolvedValue({} as any)
 
     // 13. listTags
-    await kanbanApi.listTags()
-    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/tags')
+    await kanbanApi.listTags(42)
+    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/tags?board_id=42')
 
     // 14. createTag
     await kanbanApi.createTag({ name: 'Urgent' })
@@ -154,7 +154,7 @@ describe('KanbanApi Contract Suite', () => {
     expect(moveCall.options.body).toEqual({ to_column_id: 2, target_position: 0 })
 
     // TAG LIST (GET)
-    await kanbanApi.listTags()
+    await kanbanApi.listTags(42)
     const tagListCall = fetchCalls[fetchCalls.length - 1]
     expect(tagListCall.options.method).toBe('GET')
     expect(tagListCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')
