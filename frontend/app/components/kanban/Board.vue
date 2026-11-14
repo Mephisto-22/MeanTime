@@ -107,8 +107,8 @@ const boardDescription = ref(props.board.description)
 watch(
   () => [props.board.title, props.board.description],
   ([title, description]) => {
-    boardTitle.value = title
-    boardDescription.value = description
+    boardTitle.value = title ?? ''
+    boardDescription.value = description ?? ''
   },
 )
 
@@ -125,7 +125,7 @@ const selectedColumn = ref<KanbanColumnDto | null>(null)
 
 const loadTags = async (): Promise<void> => {
   try {
-    const tags = await kanbanApi.listTags()
+    const tags = await kanbanApi.listTags(props.board.id)
     availableTags.value = tags || []
   } catch (err) {
     notify.error(err, 'Unable to fetch tags')
@@ -355,8 +355,13 @@ const boardEvents = useBoardEvents({
   },
 })
 
+watch(
+  () => props.board.id,
+  () => loadTags(),
+  { immediate: true },
+)
+
 onMounted(() => {
-  loadTags()
   void boardEvents.connect()
 })
 
