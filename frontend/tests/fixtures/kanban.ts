@@ -36,6 +36,7 @@ export function createColumnFixture(overrides: Partial<KanbanColumnDto> = {}): K
     title: overrides.title ?? `Column ${id}`,
     position: overrides.position ?? 0,
     boardId: overrides.boardId ?? 'board-1',
+    autoClearDurationSeconds: overrides.autoClearDurationSeconds ?? null,
     tasks: overrides.tasks ?? [],
   }
 }

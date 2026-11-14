@@ -745,7 +745,7 @@ const handleColumnUpdated = (updatedColumn: KanbanColumnDto) => {
     localColumns.value[index] = {
       ...existingColumn,
       ...updatedColumn,
-      tasks: updatedColumn.tasks ?? existingColumn.tasks,
+      tasks: existingColumn.tasks ?? updatedColumn.tasks ?? [],
     }
 
     notify.success('Column updated.')
