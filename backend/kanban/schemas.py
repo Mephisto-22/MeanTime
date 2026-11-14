@@ -5,7 +5,7 @@ from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
 from users.schemas import UserOut
-from .models import TaskPriority, TimerMode, TimerState
+from .models import TaskPriority, TimerMode, TimerState, RecurrenceCadence
 
 # Timer schemas
 class TaskTimerOut(Schema):
@@ -57,6 +57,57 @@ class TaskTimeEntryOut(Schema):
     note: str
     created_at: datetime
 
+# Recurrence schemas
+class RecurringTaskIn(Schema):
+    """Payload expected when configuring recurrence."""
+    cadence: RecurrenceCadence = RecurrenceCadence.DAILY
+    days_of_week: list[int] = []
+    day_of_month: int | None = None
+    time_of_day: str = "00:00"
+    timezone: str = "UTC"
+
+class RecurringTaskPatchIn(Schema):
+    """Payload expected for partially updating a recurring task schedule or template."""
+    is_active: bool | None = None
+    cadence: RecurrenceCadence | None = None
+    days_of_week: list[int] | None = None
+    day_of_month: int | None = None
+    time_of_day: str | None = None
+    timezone: str | None = None
+    title: str | None = None
+    description: str | None = None
+    priority: TaskPriority | None = None
+    tag_ids: list[int] | None = None
+    default_timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+
+class RecurringTaskOut(Schema):
+    """Shape of a recurring task returned to clients."""
+    id: int
+    board_id: int
+    creator_id: int
+    title: str
+    description: str = ""
+    priority: TaskPriority | None = None
+    cadence: RecurrenceCadence
+    days_of_week: list[int] = []
+    day_of_month: int | None = None
+    time_of_day: str
+    timezone: str
+    default_timer_mode: TimerMode
+    target_duration_seconds: int | None = None
+    is_active: bool
+    next_run_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    @staticmethod
+    def resolve_time_of_day(obj):
+        if hasattr(obj.time_of_day, "strftime"):
+            return obj.time_of_day.strftime("%H:%M:%S")
+        return str(obj.time_of_day)
+
+
 # Task schemas
 class TaskIn(Schema):
     """Payload expected when creating a task."""
@@ -64,6 +115,10 @@ class TaskIn(Schema):
     description: str = ""
     priority: TaskPriority | None = None
     tag_ids: list[int] = []
+    timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    column_id: int | None = None
+    recurrence: RecurringTaskIn | None = None
 
 class TaskOut(Schema):
     """Shape of the task returned to clients."""
@@ -75,11 +130,20 @@ class TaskOut(Schema):
     column_id: int
     column_activity_at: datetime | None = None
     archived_at: datetime | None = None
+    recurring_task_id: int | None = None
+    recurring_task: RecurringTaskOut | None = None
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
     total_seconds: int = 0
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_recurring_task(obj):
+        try:
+            return obj.recurring_task
+        except Exception:
+            return None
 
     @staticmethod
     def resolve_timer(obj):
@@ -107,6 +171,9 @@ class TaskUpdateIn(Schema):
     description: str | None = None
     priority: TaskPriority | None = None
     tag_ids: list[int] | None = None
+    timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    apply_to_future: bool = False
 
 # Column Schemas
 class BoardColumnIn(Schema):
@@ -143,7 +210,7 @@ class BoardColumnOut(Schema):
         if tasks_manager is not None and hasattr(tasks_manager, "filter"):
             return (
                 tasks_manager.filter(archived_at__isnull=True)
-                .select_related("timer")
+                .select_related("timer", "recurring_task")
                 .prefetch_related("tags")
                 .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
                 .order_by("position", "id")

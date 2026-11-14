@@ -91,6 +91,64 @@ class BoardColumn(models.Model):
     def __str__(self):
         return f"{self.board.title} = {self.title}"
 
+class RecurrenceCadence(models.TextChoices):
+    DAILY = "DAILY", "Daily"
+    WEEKLY = "WEEKLY", "Weekly"
+    MONTHLY = "MONTHLY", "Monthly"
+
+
+class RecurringTask(models.Model):
+    board = models.ForeignKey(
+        to=Board,
+        on_delete=models.CASCADE,
+        related_name="recurring_tasks",
+    )
+    creator = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="recurring_tasks",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    priority = models.CharField(
+        max_length=10,
+        choices=TaskPriority.choices,
+        default=None,
+        null=True,
+        blank=True,
+    )
+    tags = models.ManyToManyField(
+        to=Tag,
+        blank=True,
+        related_name="recurring_tasks",
+    )
+    cadence = models.CharField(
+        max_length=20,
+        choices=RecurrenceCadence.choices,
+        default=RecurrenceCadence.DAILY,
+    )
+    days_of_week = models.JSONField(default=list, blank=True)
+    day_of_month = models.PositiveSmallIntegerField(null=True, blank=True, default=None)
+    time_of_day = models.TimeField(default="00:00:00")
+    timezone = models.CharField(max_length=63, default="UTC")
+    default_timer_mode = models.CharField(
+        max_length=20,
+        choices=TimerMode.choices,
+        default=TimerMode.NONE,
+    )
+    target_duration_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
+    is_active = models.BooleanField(default=True)
+    next_run_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"Recurring: {self.title} ({self.cadence})"
+
+
 class TaskQuerySet(models.QuerySet):
     def active(self):
         return self.filter(archived_at__isnull=True)
@@ -120,6 +178,13 @@ class Task(models.Model):
         to=BoardColumn,
         on_delete=models.CASCADE,
         related_name="tasks"
+    )
+    recurring_task = models.ForeignKey(
+        to=RecurringTask,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="occurrences",
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
