@@ -6,12 +6,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from django.db import connection, transaction
 from django.utils import timezone
 
-from kanban.models import BoardColumn, Task, TimerState
+from kanban.models import BoardColumn, Task, TaskTimer, TimerMode, TimerState, RecurringTask
+from kanban.recurrence import calculate_next_run_at
 
 logger = logging.getLogger(__name__)
 
 # 64-bit integer constant for PostgreSQL advisory locking (Ticket #244/247)
 AUTO_CLEAR_ADVISORY_LOCK_ID = 244244244
+RECURRING_TASKS_ADVISORY_LOCK_ID = 249251249
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -78,6 +80,114 @@ def auto_clear_expired_tasks(as_of: datetime | None = None) -> int:
     return cleared_total
 
 
+def spawn_due_recurring_tasks(as_of: datetime | None = None) -> int:
+    """
+    Evaluate all active RecurringTask records where next_run_at <= as_of.
+    For each due recurring task, find the board's leftmost column, shift existing active tasks downward,
+    spawn a new occurrence at position 0 cloning template properties, tags, and timer settings,
+    and advance next_run_at to the subsequent cycle.
+    """
+    now = as_of or timezone.now()
+    spawned_total = 0
+
+    due_schedules = list(
+        RecurringTask.objects.filter(
+            is_active=True,
+            next_run_at__lte=now,
+        ).select_related("board").prefetch_related("tags")
+    )
+
+    for rec_task in due_schedules:
+        leftmost_column = (
+            BoardColumn.objects.filter(board=rec_task.board)
+            .order_by("position", "id")
+            .first()
+        )
+        if leftmost_column is None:
+            logger.warning(
+                "RecurringTask %s (id=%s) has no columns on board %s; skipping.",
+                rec_task.title,
+                rec_task.id,
+                rec_task.board_id,
+            )
+            continue
+
+        with transaction.atomic():
+            # Get existing active tasks in the leftmost column
+            existing_active_tasks = list(
+                Task.objects.active()
+                .filter(column=leftmost_column)
+                .order_by("position", "id")
+            )
+            # Shift existing active tasks downward in reverse order to prevent position collisions
+            for i in range(len(existing_active_tasks) - 1, -1, -1):
+                existing_active_tasks[i].position = i + 1
+                existing_active_tasks[i].save(update_fields=["position"])
+
+            # Create new occurrence at position 0
+            new_task = Task.objects.create(
+                column=leftmost_column,
+                recurring_task=rec_task,
+                title=rec_task.title,
+                description=rec_task.description,
+                priority=rec_task.priority,
+                position=0,
+                column_activity_at=now,
+            )
+            # Copy tags
+            new_task.tags.set(rec_task.tags.all())
+
+            # Copy timer configuration if mode is not NONE
+            if rec_task.default_timer_mode != TimerMode.NONE:
+                TaskTimer.objects.create(
+                    task=new_task,
+                    mode=rec_task.default_timer_mode,
+                    target_duration_seconds=rec_task.target_duration_seconds,
+                    state=TimerState.IDLE,
+                )
+
+            # Advance next_run_at
+            rec_task.next_run_at = calculate_next_run_at(
+                cadence=rec_task.cadence,
+                time_of_day=rec_task.time_of_day,
+                timezone_name=rec_task.timezone,
+                days_of_week=rec_task.days_of_week,
+                day_of_month=rec_task.day_of_month,
+                after=now,
+            )
+            rec_task.save(update_fields=["next_run_at", "updated_at"])
+            spawned_total += 1
+
+    if spawned_total > 0:
+        logger.info("Spawned %d recurring tasks.", spawned_total)
+
+    return spawned_total
+
+
+def run_recurring_tasks_job() -> int | None:
+    """
+    Execute the recurring task spawning routine guarded by a PostgreSQL advisory lock.
+    Guarantees single-leader execution across multiple Uvicorn workers and dev reloader processes.
+    """
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_try_advisory_lock(%s);", [RECURRING_TASKS_ADVISORY_LOCK_ID])
+            acquired = cursor.fetchone()[0]
+
+            if not acquired:
+                logger.debug("Recurring tasks advisory lock not acquired; another worker is currently executing.")
+                return None
+
+            try:
+                return spawn_due_recurring_tasks()
+            finally:
+                with connection.cursor() as unlock_cursor:
+                    unlock_cursor.execute("SELECT pg_advisory_unlock(%s);", [RECURRING_TASKS_ADVISORY_LOCK_ID])
+    else:
+        # Non-PostgreSQL fallback (e.g. SQLite unit tests)
+        return spawn_due_recurring_tasks()
+
+
 def run_auto_clear_job() -> int | None:
     """
     Execute the auto-clear routine guarded by a PostgreSQL advisory lock.
@@ -126,8 +236,17 @@ def start_scheduler() -> BackgroundScheduler:
             max_instances=1,
             coalesce=True,
         )
+        scheduler.add_job(
+            run_recurring_tasks_job,
+            "interval",
+            minutes=1,
+            id="spawn_due_recurring_tasks",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         scheduler.start()
-        logger.info("APScheduler started: auto-clear job scheduled every 5 minutes.")
+        logger.info("APScheduler started: auto-clear (5m) and recurring tasks (1m) scheduled.")
     return scheduler
 
 
