@@ -656,8 +656,6 @@ def delete_recurring_task(request, recurring_task_id: int):
         rec.delete()
     return {"success": True}
 
-    return rec
-
 @router.post("/tasks/{task_id}/move", response=TaskOut)
 def move_task(request, task_id: int, payload: TaskMoveIn):
     """Move a task to another column and position."""
