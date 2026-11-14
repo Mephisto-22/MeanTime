@@ -213,6 +213,81 @@ class RecurringTaskApiTests(TestCase):
         self.assertEqual(rec.default_timer_mode, "COUNT_DOWN")
         self.assertEqual(rec.target_duration_seconds, 1800)
 
+    def test_update_non_recurring_task_add_recurrence(self):
+        """Updating a non-recurring task with recurrence configures recurrence and links a new RecurringTask."""
+        task = Task.objects.create(
+            column=self.col_todo,
+            title="Non-recurring Task",
+            position=0,
+        )
+        self.assertIsNone(task.recurring_task)
+
+        payload = {
+            "recurrence": {
+                "cadence": "DAILY",
+                "days_of_week": [],
+                "time_of_day": "09:30",
+                "timezone": "America/Chicago",
+            },
+        }
+
+        response = self.client.patch(
+            f"/api/kanban/tasks/{task.id}",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsNotNone(data["recurring_task_id"])
+        self.assertIsNotNone(data["recurring_task"])
+        self.assertEqual(data["recurring_task"]["cadence"], "DAILY")
+        self.assertEqual(data["recurring_task"]["time_of_day"], "09:30:00")
+
+        task.refresh_from_db()
+        self.assertIsNotNone(task.recurring_task)
+        self.assertEqual(task.recurring_task.cadence, RecurrenceCadence.DAILY)
+        self.assertEqual(str(task.recurring_task.time_of_day), "09:30:00")
+
+    def test_update_task_recurrence_schedule_without_apply_to_future(self):
+        """Updating recurrence schedule on a recurring task updates the blueprint even if apply_to_future=False."""
+        rec = RecurringTask.objects.create(
+            board=self.board,
+            creator=self.user,
+            title="Blueprint Title",
+            cadence=RecurrenceCadence.DAILY,
+            next_run_at=timezone.now(),
+        )
+        task = Task.objects.create(
+            column=self.col_todo,
+            recurring_task=rec,
+            title="Initial Title",
+            position=0,
+        )
+
+        payload = {
+            "title": "One-off title change",
+            "apply_to_future": False,
+            "recurrence": {
+                "cadence": "WEEKLY",
+                "days_of_week": [1, 4],
+            },
+        }
+
+        response = self.client.patch(
+            f"/api/kanban/tasks/{task.id}",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        rec.refresh_from_db()
+        self.assertEqual(task.title, "One-off title change")
+        self.assertEqual(rec.title, "Blueprint Title")
+        self.assertEqual(rec.cadence, RecurrenceCadence.WEEKLY)
+        self.assertEqual(rec.days_of_week, [1, 4])
+
     def test_delete_task_cancel_recurrence_false(self):
         """Deleting a recurring task with cancel_recurrence=False leaves the recurrence schedule active."""
         rec = RecurringTask.objects.create(

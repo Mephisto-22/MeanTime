@@ -279,6 +279,8 @@ const handleCreateTask = async (
     columnId,
     priority: payload.priority ?? null,
     tags: payload.tags ?? [],
+    recurringTaskId: null,
+    recurringTask: null,
   }
   targetCol.tasks.push(optimisticTask)
 
@@ -556,8 +558,11 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       try {
         await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
         const target = findTaskById(savePayload.taskId)
-        if (target && target.recurringTask) {
-          target.recurringTask.isActive = false
+        if (target) {
+          if (target.recurringTask) {
+            target.recurringTask.isActive = false
+          }
+          target.recurringTaskId = null
         }
       } catch (err) {
         notify.error(err, 'Unable to deactivate recurring schedule')

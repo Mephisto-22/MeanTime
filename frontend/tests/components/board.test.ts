@@ -619,4 +619,142 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     expect(boardVm.localColumns[0].tasks).toHaveLength(1)
     expect(boardVm.localColumns[0].tasks[0].id).toBe('task-1')
   })
+
+  it('saving an edited task with recurrence configures recurrence and updates task recurrence state', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-recur-1',
+              title: 'Regular Task',
+              columnId: 'col-1',
+              recurringTaskId: null,
+              recurringTask: null,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+      id: 'task-recur-1',
+      title: 'Recurring Task Title',
+      position: 0,
+      columnId: 'col-1',
+      recurringTaskId: 'rec-101',
+      recurringTask: {
+        id: 'rec-101',
+        boardId: board.id,
+        creatorId: 1,
+        title: 'Recurring Task Title',
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00:00',
+        timezone: 'UTC',
+        defaultTimerMode: 'NONE',
+        isActive: true,
+        nextRunAt: '2026-11-15T09:00:00Z',
+        createdAt: '2026-11-14T00:00:00Z',
+        updatedAt: '2026-11-14T00:00:00Z',
+      },
+      tags: [],
+    } as any)
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    await boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-recur-1',
+      title: 'Recurring Task Title',
+      description: '',
+      columnId: 'col-1',
+      recurrence: {
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00',
+        timezone: 'UTC',
+      },
+    })
+
+    expect(updateSpy).toHaveBeenCalledWith('task-recur-1', expect.objectContaining({
+      title: 'Recurring Task Title',
+      recurrence: expect.objectContaining({
+        cadence: 'DAILY',
+        timeOfDay: '09:00',
+      }),
+    }))
+
+    const taskOnBoard = boardVm.localColumns[0].tasks[0]
+    expect(taskOnBoard.recurringTaskId).toBe('rec-101')
+    expect(taskOnBoard.recurringTask?.cadence).toBe('DAILY')
+    expect(taskOnBoard.recurringTask?.isActive).toBe(true)
+  })
+
+  it('saving an existing recurring task with recurrence toggled off deactivates recurring schedule', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-recur-2',
+              title: 'Recurring Task',
+              columnId: 'col-1',
+              recurringTaskId: 'rec-202',
+              recurringTask: {
+                id: 'rec-202',
+                boardId: 1,
+                creatorId: 1,
+                title: 'Recurring Task',
+                cadence: 'DAILY',
+                daysOfWeek: [],
+                dayOfMonth: null,
+                timeOfDay: '09:00:00',
+                timezone: 'UTC',
+                defaultTimerMode: 'NONE',
+                isActive: true,
+                nextRunAt: '2026-11-15T09:00:00Z',
+                createdAt: '2026-11-14T00:00:00Z',
+                updatedAt: '2026-11-14T00:00:00Z',
+              },
+            } as any),
+          ],
+        }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+      id: 'task-recur-2',
+      title: 'Recurring Task',
+      position: 0,
+      columnId: 'col-1',
+      recurringTaskId: null,
+      recurringTask: null,
+      tags: [],
+    } as any)
+
+    const updateRecSpy = vi.spyOn(kanbanApi, 'updateRecurringTask').mockResolvedValue({} as any)
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    await boardVm.handleSaveTask({
+      mode: 'edit',
+      taskId: 'task-recur-2',
+      title: 'Recurring Task',
+      description: '',
+      columnId: 'col-1',
+      recurringTaskId: 'rec-202',
+      recurrence: null,
+    })
+
+    expect(updateRecSpy).toHaveBeenCalledWith('rec-202', { isActive: false })
+    const taskOnBoard = boardVm.localColumns[0].tasks[0]
+    expect(taskOnBoard.recurringTaskId).toBeNull()
+  })
 })

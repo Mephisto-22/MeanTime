@@ -501,7 +501,67 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
                 timer.target_duration_seconds = target_duration_seconds
             timer.save()
 
-        # If apply_to_future is True and task is linked to RecurringTask, update blueprint
+        # Handle recurrence if provided
+        if recurrence is not None:
+            rec_updates = recurrence if isinstance(recurrence, dict) else recurrence.dict(exclude_unset=True)
+            if task.recurring_task is None:
+                # Add recurrence to previously non-recurring task
+                tz_name = (
+                    rec_updates.get("timezone")
+                    or getattr(request.auth, "timezone", "UTC")
+                    or "UTC"
+                )
+                cadence_raw = rec_updates.get("cadence", RecurrenceCadence.DAILY)
+                cadence_val = cadence_raw.value if hasattr(cadence_raw, "value") else str(cadence_raw)
+
+                default_timer = TimerMode.NONE
+                timer_duration = None
+                if timer_mode is not None:
+                    default_timer = timer_mode.value if hasattr(timer_mode, "value") else str(timer_mode)
+                    timer_duration = target_duration_seconds
+                elif hasattr(task, "timer") and task.timer:
+                    default_timer = task.timer.mode
+                    timer_duration = task.timer.target_duration_seconds
+
+                rec = RecurringTask(
+                    board=task.column.board,
+                    creator=request.auth,
+                    title=task.title,
+                    description=task.description,
+                    priority=task.priority,
+                    cadence=cadence_val,
+                    days_of_week=rec_updates.get("days_of_week", []),
+                    day_of_month=rec_updates.get("day_of_month", None),
+                    time_of_day=rec_updates.get("time_of_day", "00:00"),
+                    timezone=tz_name,
+                    default_timer_mode=default_timer,
+                    target_duration_seconds=timer_duration,
+                    is_active=True,
+                )
+                rec.next_run_at = rec.calculate_next_run()
+                rec.save()
+                rec.tags.set(tags if tags is not None else task.tags.all())
+
+                task.recurring_task = rec
+                task.save(update_fields=["recurring_task", "column_activity_at", "updated_at"])
+            else:
+                # Update recurrence schedule on existing recurring blueprint
+                rec = task.recurring_task
+                schedule_changed = False
+                for field in ("cadence", "days_of_week", "day_of_month", "time_of_day", "timezone"):
+                    if field in rec_updates:
+                        val = rec_updates[field]
+                        if field == "cadence" and val is not None and hasattr(val, "value"):
+                            val = val.value
+                        setattr(rec, field, val)
+                        schedule_changed = True
+                if "is_active" in rec_updates and rec_updates["is_active"] is not None:
+                    rec.is_active = rec_updates["is_active"]
+                if schedule_changed:
+                    rec.next_run_at = rec.calculate_next_run()
+                rec.save()
+
+        # If apply_to_future is True and task is linked to RecurringTask, update template fields
         if apply_to_future and task.recurring_task is not None:
             rec = task.recurring_task
             if "title" in updates:
@@ -514,20 +574,9 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
                 rec.default_timer_mode = timer_mode.value if hasattr(timer_mode, "value") else str(timer_mode)
             if target_duration_seconds is not None:
                 rec.target_duration_seconds = target_duration_seconds
-            if recurrence is not None:
-                rec_updates = recurrence if isinstance(recurrence, dict) else recurrence.dict(exclude_unset=True)
-                schedule_changed = False
-                for field, value in rec_updates.items():
-                    if field in ("cadence", "days_of_week", "day_of_month", "time_of_day", "timezone"):
-                        schedule_changed = True
-                    if field in ("priority", "cadence", "default_timer_mode") and value is not None and hasattr(value, "value"):
-                        value = value.value
-                    setattr(rec, field, value)
-                if schedule_changed:
-                    rec.next_run_at = rec.calculate_next_run()
-            rec.save()
             if tags is not None:
                 rec.tags.set(tags)
+            rec.save()
 
     return task
 
