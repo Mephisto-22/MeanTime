@@ -283,12 +283,21 @@ const handleCreateTask = async (
   targetCol.tasks.push(optimisticTask)
 
   try {
-    const createdTask = await kanbanApi.createTask(columnId, {
+    const createPayload: any = {
       title: payload.title,
       description: payload.description,
       priority: payload.priority,
       tagIds: payload.tagIds,
-    })
+    }
+    if (payload.recurrence) {
+      createPayload.recurrence = payload.recurrence
+    }
+    if (payload.timer?.mode && payload.timer.mode !== 'NONE') {
+      createPayload.timerMode = payload.timer.mode
+      createPayload.targetDurationSeconds = payload.timer.targetDurationSeconds
+    }
+
+    const createdTask = await kanbanApi.createTask(columnId, createPayload)
     notify.success('Task created.')
 
     let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
@@ -311,6 +320,15 @@ const handleCreateTask = async (
       }
       if (createdTask.tags !== undefined) {
         taskInCol.tags = createdTask.tags
+      }
+      if (createdTask.recurringTaskId !== undefined) {
+        taskInCol.recurringTaskId = createdTask.recurringTaskId
+      }
+      if (createdTask.recurringTask !== undefined) {
+        taskInCol.recurringTask = createdTask.recurringTask
+      }
+      if (createdTask.timer !== undefined) {
+        taskInCol.timer = createdTask.timer
       }
     }
   } catch (err) {
@@ -412,6 +430,9 @@ const handleUpdateTask = async (
     if (payload.tagIds !== undefined) {
       updatePayload.tagIds = payload.tagIds
     }
+    if ((payload as any).applyToFuture !== undefined) {
+      updatePayload.applyToFuture = (payload as any).applyToFuture
+    }
 
     const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
     let updated: KanbanTaskDto | undefined
@@ -436,6 +457,12 @@ const handleUpdateTask = async (
       if (updated.columnId != null) {
         targetTask.columnId = updated.columnId
       }
+      if (updated.recurringTaskId !== undefined) {
+        targetTask.recurringTaskId = updated.recurringTaskId
+      }
+      if (updated.recurringTask !== undefined) {
+        targetTask.recurringTask = updated.recurringTask
+      }
     }
   } catch (err) {
     localColumns.value = columnsSnapshot
@@ -443,7 +470,10 @@ const handleUpdateTask = async (
   }
 }
 
-const handleDeleteTask = async (taskId: string | number): Promise<void> => {
+const handleDeleteTask = async (
+  taskId: string | number,
+  options?: { cancelRecurrence?: boolean },
+): Promise<void> => {
   let targetCol: KanbanColumnDto | undefined
   let targetIndex = -1
   let deletedTask: KanbanTaskDto | undefined
@@ -469,7 +499,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
   reindexTasks(targetCol.tasks)
 
   try {
-    await kanbanApi.deleteTask(taskId)
+    await kanbanApi.deleteTask(taskId, options)
     notify.success('Task deleted.')
   } catch (err) {
     // Restore task to original column and position
@@ -490,6 +520,8 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       priority: savePayload.priority,
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
+      recurrence: savePayload.recurrence,
+      timer: savePayload.timer,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
     await handleUpdateTask(savePayload.taskId, {
@@ -499,7 +531,23 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
-    })
+      applyToFuture: savePayload.applyToFuture,
+    } as any)
+
+    // If recurrence was turned off on an existing recurring task, deactivate it
+    if (savePayload.recurrence === null && savePayload.recurringTaskId != null) {
+      try {
+        await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
+        const target = findTaskById(savePayload.taskId)
+        if (target) {
+          target.recurringTaskId = null
+          target.recurringTask = null
+        }
+      } catch (err) {
+        notify.error(err, 'Unable to deactivate recurring schedule')
+      }
+    }
+
     if (savePayload.timer) {
       try {
         const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
