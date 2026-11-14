@@ -76,10 +76,6 @@ describe('KanbanApi Contract Suite', () => {
     await kanbanApi.createTask(101, { title: 'New Task', description: 'Details' })
     expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/columns/101/tasks', { title: 'New Task', description: 'Details' })
 
-    // 9b. createBoardTask
-    await kanbanApi.createBoardTask(10, { title: 'Board Task' })
-    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/10/tasks', { title: 'Board Task' })
-
     // 10. updateTask
     await kanbanApi.updateTask(505, { title: 'Updated Title', description: 'Updated Details' })
     expect(patchSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', { title: 'Updated Title', description: 'Updated Details' })

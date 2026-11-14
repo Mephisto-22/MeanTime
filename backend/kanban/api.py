@@ -488,20 +488,6 @@ def create_task(request, column_id: int, payload: TaskIn):
     column = get_accessible_column(request.auth, column_id)
     return create_task_in_column(request.auth, column, payload)
 
-@router.post("/boards/{board_id}/tasks", response=TaskOut)
-def create_board_task(request, board_id: int, payload: TaskIn):
-    """Create a task on a board, either in specified column or in leftmost column."""
-    board = get_accessible_board(request.auth, board_id)
-    if payload.column_id is not None:
-        column = get_accessible_column(request.auth, payload.column_id)
-        if column.board_id != board.id:
-            raise HttpError(400, "Column does not belong to specified board.")
-    else:
-        column = board.columns.order_by("position").first()
-        if column is None:
-            raise HttpError(400, "Board has no columns.")
-    return create_task_in_column(request.auth, column, payload)
-
 @router.patch("/tasks/{task_id}", response=TaskOut)
 def update_task(request, task_id: int, payload: TaskUpdateIn):
     """Update the supplied fields of a task."""
