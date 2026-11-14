@@ -83,9 +83,9 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
       ]
       const getSpy = vi.spyOn(apiService, 'get').mockResolvedValue(mockTags)
 
-      const result = await kanbanApi.listTags()
+      const result = await kanbanApi.listTags(42)
 
-      expect(getSpy).toHaveBeenCalledWith('/api/kanban/tags')
+      expect(getSpy).toHaveBeenCalledWith('/api/kanban/tags?board_id=42')
       expect(result).toEqual(mockTags)
       expect(result).toHaveLength(2)
       expect(result[0].name).toBe('Backend')
@@ -94,7 +94,7 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
     it('propagates error when listTags fails', async () => {
       vi.spyOn(apiService, 'get').mockRejectedValue(new ApiError('Failed to fetch tags', 500))
 
-      await expect(kanbanApi.listTags()).rejects.toThrow('Failed to fetch tags')
+      await expect(kanbanApi.listTags(42)).rejects.toThrow('Failed to fetch tags')
     })
 
     it('deserializes GET /api/kanban/tags response through ApiService with auth headers', async () => {
@@ -110,10 +110,10 @@ describe('KanbanApi Tag & Priority Suite (frontend/tests/api/kanban.test.ts)', (
         async expireSession() {},
       })
 
-      const tags = await kanbanApi.listTags()
+      const tags = await kanbanApi.listTags(42)
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/kanban/tags',
+        '/api/kanban/tags?board_id=42',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
