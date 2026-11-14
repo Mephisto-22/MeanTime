@@ -60,6 +60,42 @@ class PasswordResetTests(TestCase):
         self.assertTrue(default_token_generator.check_token(self.user, fragment["token"][0]))
         self.assertEqual(self.login().status_code, 200)
 
+    @override_settings(EMAIL_BACKEND="services.mail.SESBackend", AWS_SES_REGION="us-east-2", DEFAULT_FROM_EMAIL="noreply@example.com")
+    def test_ses_delivered_mime_link_completes_reset_and_revokes_old_session(self):
+        from email import message_from_bytes, policy
+        old = self.login().json()
+        with patch("boto3.client") as sdk:
+            self.assertEqual(self.post("password-reset", {"email": self.user.email}).status_code, 200)
+        sent = sdk.return_value.send_email.call_args.kwargs
+        self.assertEqual(sent["FromEmailAddress"], "noreply@example.com")
+        self.assertEqual(sent["Destination"]["ToAddresses"], [self.user.email])
+        email = message_from_bytes(sent["Content"]["Raw"]["Data"], policy=policy.default)
+        self.assertEqual(str(email["Subject"]), "Reset your MeanTime password")
+        # Decode the MIME body like an email client; do not extract a raw wrapped URL.
+        body = email.get_content()
+        url = re.search(r"http://localhost:3000/reset-password#[^\s]+", body).group()
+        self.assertNotIn("password=", body)
+        values = parse_qs(urlsplit(url).fragment)
+        link = {"uid": values["uid"][0], "token": values["token"][0]}
+        self.assertEqual(self.post("password-reset/validate", link).status_code, 200)
+        self.assertEqual(self.confirm(**link).status_code, 200)
+        self.assertEqual(self.login().status_code, 401)
+        self.assertEqual(self.login("ReplacementSecure759!").status_code, 200)
+        self.assertEqual(self.post("refresh", {"refresh_token": old["refresh_token"]}).status_code, 401)
+        self.assertEqual(self.confirm(**link).status_code, 400)
+
+    @override_settings(EMAIL_BACKEND="services.mail.SESBackend", AWS_SES_REGION="us-east-2", DEFAULT_FROM_EMAIL="noreply@example.com")
+    def test_ses_failure_keeps_the_same_generic_response_and_does_not_lock_user(self):
+        with patch("boto3.client") as sdk:
+            sdk.return_value.send_email.side_effect = RuntimeError("SES unavailable")
+            known = self.post("password-reset", {"email": self.user.email})
+            unknown = self.post("password-reset", {"email": "unknown@example.com"})
+        self.assertEqual(known.status_code, 200)
+        self.assertEqual(known.json(), unknown.json())
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.resetting_password)
+        self.assertEqual(self.login().status_code, 200)
+
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
     def test_console_delivered_link_can_be_submitted_to_validate(self):
         output = StringIO()

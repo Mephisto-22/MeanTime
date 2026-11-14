@@ -2,11 +2,11 @@ import logging
 from urllib.parse import urlencode
 
 from django.conf import settings
+from django.core import signing
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password, get_default_password_validators
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.db import models, transaction
 from django.http import JsonResponse
 from django.utils import timezone
@@ -20,12 +20,14 @@ from ninja_jwt.utils import datetime_from_epoch
 from ninja_jwt.settings import api_settings
 
 from users.models import Friendship, FriendshipStatus, UserBlock
+from services.mail import send_transactional_email
 from users.schemas import (
     PasswordRequirementsIn,
     PasswordRequirementsOut,
     AuthTokenOut,
     DeleteAccountIn,
     ErrorDetail,
+    EmailVerificationIn,
     FriendRequestOut,
     FriendRequestsListOut,
     LoginIn,
@@ -47,6 +49,53 @@ users_router = Router(tags=["Users"])
 
 
 INVALID_RESET_LINK = "This password reset link is invalid or expired. Request a new link."
+VERIFICATION_SALT = "users.email-verification.v1"
+VERIFICATION_SENT = "If this account needs confirmation, a confirmation email will be sent. Check your inbox and spam folder."
+
+
+def deliver_verification_link(user):
+    user.email_verification_version += 1
+    token = signing.dumps({"uid": user.pk, "email": user.email,
+                           "version": user.email_verification_version}, salt=VERIFICATION_SALT)
+    link = f"{settings.FRONTEND_URL}/confirm-email#{urlencode({'token': token})}"
+    send_transactional_email(
+        "Confirm your MeanTime email",
+        f"Welcome to MeanTime! Confirm your email to sign in:\n{link}\n\n"
+        "This link expires in 24 hours. If you did not create this account, ignore this email.",
+        user.email,
+    )
+    user.email_verification_sent_at = timezone.now()
+    user.save(update_fields=["email_verification_version", "email_verification_sent_at"])
+
+
+@auth_router.post("/email-verification/confirm", response={200: ErrorDetail, 400: ErrorDetail}, auth=None)
+@transaction.atomic
+def confirm_email(request, payload: EmailVerificationIn):
+    try:
+        data = signing.loads(payload.token, salt=VERIFICATION_SALT, max_age=settings.EMAIL_VERIFICATION_TIMEOUT)
+        user = User.objects.select_for_update().get(pk=data["uid"], email=data["email"], is_active=True)
+        if data["version"] != user.email_verification_version:
+            raise ValueError("Superseded link")
+    except (signing.BadSignature, ValueError, TypeError, KeyError, User.DoesNotExist):
+        return 400, {"detail": "This confirmation link is invalid or expired. Request a new email."}
+    if not user.is_verified:
+        user.is_verified = True
+        user.save(update_fields=["is_verified"])
+    return {"detail": "Your email is confirmed. You can now log in."}
+
+
+@auth_router.post("/email-verification/resend", response={200: ErrorDetail, 503: ErrorDetail}, auth=None)
+def resend_verification(request, payload: PasswordResetRequestIn):
+    try:
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(email=payload.email.strip().lower(), is_active=True, is_verified=False).first()
+            if user and (not user.email_verification_sent_at or
+                         (timezone.now() - user.email_verification_sent_at).total_seconds() >= settings.EMAIL_VERIFICATION_RESEND_SECONDS):
+                deliver_verification_link(user)
+    except Exception:
+        logging.getLogger(__name__).error("Verification email delivery failed.")
+        return 503, {"detail": "Email delivery is temporarily unavailable. Please try again later."}
+    return {"detail": VERIFICATION_SENT}
 
 
 def issue_tokens(user):
@@ -72,18 +121,12 @@ def deliver_reset_link(user):
         "token": default_token_generator.make_token(user),
     })
     link = f"{settings.FRONTEND_URL}/reset-password#{fragment}"
-    if settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
-        # MIME quoted-printable output wraps long URLs with '=\n', corrupting
-        # clickable console links. Development delivery must print the raw URL.
-        print(f"MeanTime password reset link (development only):\n{link}", flush=True)
-        return
-    send_mail(
+    send_transactional_email(
         "Reset your MeanTime password",
         f"Open this link to reset your password:\n{link}\n\n"
         "If you did not request this, ignore this message.\n"
         f"This link expires in {settings.PASSWORD_RESET_TIMEOUT // 60} minutes.",
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
+        user.email,
     )
 
 
@@ -123,7 +166,7 @@ def password_requirements(request, payload: PasswordRequirementsIn):
 
 @auth_router.post(
     "/register",
-    response={201: UserOut, 400: ErrorDetail, 409: ErrorDetail},
+    response={201: UserOut, 400: ErrorDetail, 409: ErrorDetail, 503: ErrorDetail},
     auth=None,
     summary="Register a new user account",
 )
@@ -145,12 +188,19 @@ def register(request, payload: RegisterIn):
     except ValidationError as err:
         return 400, {"detail": " ".join(err.messages)}
 
-    user = User.objects.create_user(
-        email=normalized_email,
-        password=payload.password,
-        display_name=payload.display_name.strip(),
-        timezone=payload.timezone,
-    )
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                email=normalized_email,
+                password=payload.password,
+                display_name=payload.display_name.strip(),
+                timezone=payload.timezone,
+                is_verified=False,
+            )
+            deliver_verification_link(user)
+    except Exception:
+        logging.getLogger(__name__).error("Registration or verification delivery failed.")
+        return 503, {"detail": "Account creation could not be completed. Please try again later."}
     return 201, user
 
 
@@ -178,6 +228,9 @@ def login(request, payload: LoginIn):
     if not user.is_active:
         return 403, {"detail": "This account is inactive."}
 
+    if not user.is_verified:
+        return 403, {"detail": "Confirm your email before logging in. Request a new confirmation email if needed."}
+
     if user.password_reset_active():
         return 403, {"detail": "Password reset is in progress. Complete the reset before logging in."}
 
@@ -197,6 +250,8 @@ def refresh_token(request, payload: RefreshIn):
     try:
         token = RefreshToken(payload.refresh_token)
         user = User.objects.get(pk=token["user_id"], is_active=True)
+        if not user.is_verified:
+            return 401, {"detail": "Confirm your email before signing in."}
         if user.password_reset_active() or token.get("password_version", 0) != user.password_version:
             return 401, {"detail": "Complete your password reset before signing in again."}
         # Also upgrades refresh tokens issued before session_jti was introduced.
