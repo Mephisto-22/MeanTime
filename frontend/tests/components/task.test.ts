@@ -340,4 +340,40 @@ describe('Task Component DOM Suite', () => {
       expect(kanbanContext.openEditTaskDialog).not.toHaveBeenCalled()
     })
   })
+
+  describe('Recurring badge indicator', () => {
+    it('renders recurring badge icon when task has recurringTaskId', () => {
+      const { wrapper } = mountTask({
+        task: createTaskFixture({ recurringTaskId: 'rec-123' } as any),
+      })
+      const badge = wrapper.find('[data-testid="task-recurring-badge"]')
+      expect(badge.exists()).toBe(true)
+      expect(badge.find('.pi-sync').exists()).toBe(true)
+    })
+
+    it('renders recurring badge icon when task has recurringTask object', () => {
+      const { wrapper } = mountTask({
+        task: createTaskFixture({
+          recurringTask: {
+            id: 'rec-456',
+            cadence: 'WEEKLY',
+            daysOfWeek: [1, 3, 5],
+            dayOfMonth: null,
+            timeOfDay: '09:00:00',
+            timezone: 'UTC',
+            isActive: true,
+          },
+        } as any),
+      })
+      const badge = wrapper.find('[data-testid="task-recurring-badge"]')
+      expect(badge.exists()).toBe(true)
+    })
+
+    it('does not render recurring badge icon when neither recurringTaskId nor recurringTask is present', () => {
+      const { wrapper } = mountTask({
+        task: createTaskFixture({ recurringTaskId: null, recurringTask: null } as any),
+      })
+      expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(false)
+    })
+  })
 })
