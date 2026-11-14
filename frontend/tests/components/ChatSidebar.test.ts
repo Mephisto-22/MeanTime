@@ -13,10 +13,10 @@ import { useAuthStore } from '~/stores/auth'
 
 const DrawerStub = {
   name: 'Drawer',
-  props: ['visible', 'position', 'header', 'modal'],
+  props: ['visible', 'position', 'header', 'modal', 'showCloseIcon'],
   emits: ['update:visible'],
   template: `
-    <div v-if="visible" class="p-drawer" data-testid="chat-drawer">
+    <div v-if="visible" class="p-drawer" data-testid="chat-drawer" :data-show-close-icon="String(showCloseIcon)">
       <div class="p-drawer-header">
         <slot name="header" />
       </div>
@@ -164,7 +164,9 @@ describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
     const boardChat = createMockBoardChat({ isOpen: true })
     const wrapper = mountChatSidebar(boardChat, 'Release v2.0')
 
-    expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(true)
+    const drawer = wrapper.find('[data-testid="chat-drawer"]')
+    expect(drawer.exists()).toBe(true)
+    expect(drawer.attributes('data-show-close-icon')).toBe('false')
     expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain(
       'Release v2.0',
     )

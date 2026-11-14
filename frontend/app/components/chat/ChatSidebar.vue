@@ -21,6 +21,7 @@
       class="chat-drawer"
       data-testid="chat-drawer"
       :modal="false"
+      :show-close-icon="false"
     >
       <template #header>
         <div
@@ -147,6 +148,7 @@ const props = defineProps<Props>()
 
 const kanbanCtx = inject(kanbanContextKey, null)
 const authStore = useAuthStore()
+const notify = useNotifications()
 
 const chat = computed(() => props.boardChat ?? kanbanCtx?.boardChat ?? null)
 
@@ -184,6 +186,9 @@ async function handleSend() {
   messageText.value = ''
   try {
     await activeChat.sendMessage(text)
+  } catch (err) {
+    messageText.value = text
+    notify.error(err, 'Unable to send message')
   } finally {
     isSending.value = false
   }

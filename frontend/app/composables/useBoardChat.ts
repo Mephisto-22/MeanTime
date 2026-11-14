@@ -129,6 +129,12 @@ export function useBoardChat(
     }
   }
 
+  watch(isOpen, (openState) => {
+    if (!openState) {
+      stopPolling()
+    }
+  })
+
   watch(
     () => toValue(boardId),
     (newId, oldId) => {
