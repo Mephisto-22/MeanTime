@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "ninja_jwt.token_blacklist",
     "users.apps.UsersConfig",
     "kanban",
+    "chat.apps.ChatConfig",
 ]
 
 AUTH_USER_MODEL = "users.User"

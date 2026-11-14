@@ -1,5 +1,6 @@
 import type { ComputedRef, InjectionKey } from 'vue'
 import type { UserOut } from '~/api/friends'
+import type { BoardChatComposable } from '~/composables/useBoardChat'
 import { apiService } from '~/services/ApiService'
 
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
@@ -176,6 +177,7 @@ export interface KanbanContext {
   stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
   setTaskTotal?: (taskId: string | number, totalSeconds: number) => void
   onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
+  boardChat?: BoardChatComposable
 }
 
 export const kanbanContextKey: InjectionKey<KanbanContext> = Symbol('kanbanContext')

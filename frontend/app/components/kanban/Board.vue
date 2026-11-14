@@ -22,6 +22,16 @@
           <div class="flex items-center gap-3">
             <slot name="actions" />
             <Button
+              v-if="isSharedBoard"
+              data-testid="board-chat-button"
+              label="Chat"
+              icon="pi pi-comments"
+              severity="secondary"
+              outlined
+              class="h-fit shrink-0"
+              @click="boardChat.toggle()"
+            />
+            <Button
               data-testid="add-column-button"
               label="Add Column"
               icon="pi pi-plus"
@@ -71,6 +81,12 @@
         @delete="handleDeleteTask"
         @timer-expired="handleDialogTimerExpired"
       />
+
+      <!-- Board-Scoped Live Chat Sidebar (only on shared boards) -->
+      <ChatSidebar
+        v-if="isSharedBoard"
+        :board-title="props.board.title"
+      />
     </template>
   </Card>
 </template>
@@ -93,6 +109,8 @@ import type { UserOut } from '~/api/friends'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 import { sumEntryDurations } from '~/composables/useTaskTimer'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
+import ChatSidebar from '~/components/chat/ChatSidebar.vue'
+import { useBoardChat } from '~/composables/useBoardChat'
 
 const notify = useNotifications()
 
@@ -110,6 +128,21 @@ const localColumns = ref<KanbanColumnDto[]>([])
 const availableTags = ref<TagDto[]>([])
 const columnDialogVisible = ref(false)
 const selectedColumn = ref<KanbanColumnDto | null>(null)
+
+const boardChat = useBoardChat(() => props.board.id)
+
+const isSharedBoard = computed(() =>
+  Boolean(
+    (props.board.collaborators && props.board.collaborators.length > 0) ||
+      props.board.isOwner === false,
+  ),
+)
+
+watch(isSharedBoard, (shared) => {
+  if (!shared) {
+    boardChat.close()
+  }
+})
 
 const loadTags = async (): Promise<void> => {
   try {
@@ -798,11 +831,13 @@ provide(kanbanContextKey, {
   stopTimer: handleStopTimer,
   setTaskTotal: handleSetTaskTotal,
   onTimerExpired: handleTimerExpired,
+  boardChat,
 })
 
 defineExpose({
   localColumns,
   availableTags,
+  boardChat,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,
