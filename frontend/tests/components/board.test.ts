@@ -584,4 +584,39 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     })
     expect(boardVm.localColumns[0].tasks[0].title).toBe('Updated Title')
   })
+
+  it('editing a column preserves existing client-side tasks', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          title: 'To Do',
+          tasks: [
+            createTaskFixture({
+              id: 'task-1',
+              title: 'Active Task 1',
+              columnId: 'col-1',
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    boardVm.handleColumnUpdated({
+      id: 'col-1',
+      title: 'To Do Updated',
+      position: 0,
+      boardId: board.id,
+      autoClearDurationSeconds: 86400,
+      tasks: [],
+    })
+
+    expect(boardVm.localColumns[0].title).toBe('To Do Updated')
+    expect(boardVm.localColumns[0].autoClearDurationSeconds).toBe(86400)
+    expect(boardVm.localColumns[0].tasks).toHaveLength(1)
+    expect(boardVm.localColumns[0].tasks[0].id).toBe('task-1')
+  })
 })

@@ -1,7 +1,9 @@
 from __future__ import annotations
 from datetime import datetime
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from ninja import Schema
+from pydantic import Field, field_validator
 from users.schemas import UserOut
 from .models import TaskPriority, TimerMode, TimerState
 
@@ -69,8 +71,10 @@ class TaskOut(Schema):
     title: str
     description: str
     priority: TaskPriority | None = None
-    position: int
+    position: int | None = None
     column_id: int
+    column_activity_at: datetime | None = None
+    archived_at: datetime | None = None
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
     total_seconds: int = 0
@@ -109,6 +113,14 @@ class BoardColumnIn(Schema):
     """Payload expected when creating or updating a board column."""
     title: str
     position: int = 0
+    auto_clear_duration_seconds: int | None = Field(default=None, ge=0)
+
+    @field_validator("auto_clear_duration_seconds")
+    @classmethod
+    def normalize_auto_clear(cls, v: int | None) -> int | None:
+        if v == 0:
+            return None
+        return v
 
 class BoardColumnOut(Schema):
     """Shape of a board column returned to clients."""
@@ -116,14 +128,40 @@ class BoardColumnOut(Schema):
     title: str
     position: int
     board_id: int
+    auto_clear_duration_seconds: int | None = None
     tasks: list[TaskOut]
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_tasks(obj):
+        if isinstance(obj, dict):
+            return obj.get("tasks", [])
+        if hasattr(obj, "_prefetched_objects_cache") and "tasks" in obj._prefetched_objects_cache:
+            return [t for t in obj._prefetched_objects_cache["tasks"] if getattr(t, "archived_at", None) is None]
+        tasks_manager = getattr(obj, "tasks", None)
+        if tasks_manager is not None and hasattr(tasks_manager, "filter"):
+            return (
+                tasks_manager.filter(archived_at__isnull=True)
+                .select_related("timer")
+                .prefetch_related("tags")
+                .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+                .order_by("position", "id")
+            )
+        return tasks_manager or []
 
 class BoardColumnUpdateIn(Schema):
     """Payload expected for partially updating a board column."""
     title: str | None = None
     position: int | None = None
+    auto_clear_duration_seconds: int | None = Field(default=None, ge=0)
+
+    @field_validator("auto_clear_duration_seconds")
+    @classmethod
+    def normalize_auto_clear(cls, v: int | None) -> int | None:
+        if v == 0:
+            return None
+        return v
 
 
 # Board Schemas

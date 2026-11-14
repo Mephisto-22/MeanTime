@@ -127,13 +127,16 @@ def reconcile_expired_countdowns(user):
             timer.last_paused_at = None
             timer.elapsed_seconds = 0
             timer.save()
+            timer.task.column_activity_at = now
+            timer.task.save(update_fields=["column_activity_at", "updated_at"])
 
 def get_board_queryset(user):
     # Each task's tracked time is summed in the same query that loads the tasks,
     # so a board's totals don't cost one extra query per task. Django skips
     # Meta.ordering on aggregated queries, so the order is restated here.
     task_qs = (
-        Task.objects.select_related("timer")
+        Task.objects.active()
+        .select_related("timer")
         .prefetch_related("tags")
         .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
         .order_by(*Task._meta.ordering)
@@ -211,11 +214,12 @@ def get_available_board_tags(user, board, tag_ids: list[int]) -> list[Tag]:
 
     return tags
 
+
 def _reindex(items):
     """Rewrite position 0..n-1."""
     for i, obj in enumerate(items):
         obj.position = i
-        obj.save()
+        obj.save(update_fields=["position"])
 
 
 
@@ -318,6 +322,7 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
         board=board,
         title=payload.title,
         position=0 if last is None else last + 1,
+        auto_clear_duration_seconds=payload.auto_clear_duration_seconds,
     )
 
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
@@ -332,6 +337,8 @@ def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
     with transaction.atomic():
         if "title" in updates:
             column.title = updates["title"]
+        if "auto_clear_duration_seconds" in updates:
+            column.auto_clear_duration_seconds = updates["auto_clear_duration_seconds"]
         if "position" in updates:
             others = [c for c in column.board.columns.all() if c.id != column.id]
             idx = max(0, min(updates["position"], len(others)))
@@ -362,7 +369,7 @@ def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_accessible_column(request.auth, column_id)
     tags = get_available_board_tags(request.auth, column.board, payload.tag_ids)
-    last = column.tasks.aggregate(m=Max("position"))["m"]
+    last = column.tasks.filter(archived_at__isnull=True).aggregate(m=Max("position"))["m"]
 
     with transaction.atomic():
         task = Task.objects.create(
@@ -371,6 +378,7 @@ def create_task(request, column_id: int, payload: TaskIn):
             description=payload.description,
             priority=payload.priority.value if payload.priority is not None else None,
             position=0 if last is None else last + 1,
+            column_activity_at=timezone.now(),
         )
         task.tags.set(tags)
 
@@ -398,7 +406,8 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
                 continue
 
             setattr(task, field, value)
-        if updates:
+        if updates or tags is not None:
+            task.column_activity_at = timezone.now()
             task.save()
 
         if tags is not None:
@@ -413,7 +422,7 @@ def delete_task(request, task_id: int):
     column = task.column
     with transaction.atomic():
         task.delete()
-        _reindex(list(column.tasks.all()))
+        _reindex(list(column.tasks.filter(archived_at__isnull=True)))
     return {"success": True}
 
 @router.post("/tasks/{task_id}/move", response=TaskOut)
@@ -426,10 +435,12 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
         raise HttpError(400, "Column on different board")
 
     with transaction.atomic():
-        src_tasks = [t for t in src.tasks.all() if t.id != task.id]
-        dest_tasks = src_tasks if dest.id == src.id else list(dest.tasks.all())
+        src_tasks = [t for t in src.tasks.filter(archived_at__isnull=True) if t.id != task.id]
+        dest_tasks = src_tasks if dest.id == src.id else list(dest.tasks.filter(archived_at__isnull=True))
         idx = max(0, min(payload.target_position, len(dest_tasks)))
         task.column = dest
+        task.column_activity_at = timezone.now()
+        task.save(update_fields=["column", "column_activity_at", "updated_at"])
         dest_tasks.insert(idx, task)
         if dest.id != src.id:
             _reindex(src_tasks)
@@ -492,6 +503,8 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
             if "target_duration_seconds" in data:
                 timer.target_duration_seconds = data["target_duration_seconds"]
             timer.save()
+            task.column_activity_at = timezone.now()
+            task.save(update_fields=["column_activity_at", "updated_at"])
             return timer
 
         for field, value in data.items():
@@ -584,6 +597,8 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
             duration_seconds=duration,
             note=data.get("note", ""),
         )
+        task.column_activity_at = timezone.now()
+        task.save(update_fields=["column_activity_at", "updated_at"])
     return 201, entry
 
 @router.patch("/time-entries/{entry_id}", response=TaskTimeEntryOut)

@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class TaskPriority(models.TextChoices):
     LOW = "LOW", "Low"
@@ -69,6 +70,11 @@ class BoardColumn(models.Model):
     )
     title = models.CharField(max_length=100)
     position = models.PositiveIntegerField(default=0) # horizontal position L -> R
+    auto_clear_duration_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        default=None,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -85,7 +91,19 @@ class BoardColumn(models.Model):
     def __str__(self):
         return f"{self.board.title} = {self.title}"
 
+class TaskQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(archived_at__isnull=True)
+
+    def archived(self):
+        return self.filter(archived_at__isnull=False)
+
+class TaskManager(models.Manager.from_queryset(TaskQuerySet)):
+    pass
+
 class Task(models.Model):
+    objects = TaskManager()
+
     priority = models.CharField(
         max_length=10,
         choices=TaskPriority.choices,
@@ -105,7 +123,9 @@ class Task(models.Model):
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    position = models.PositiveIntegerField(default=0) # vertical position Top -> Bot
+    position = models.PositiveIntegerField(null=True, blank=True, default=0) # vertical position Top -> Bot
+    column_activity_at = models.DateTimeField(default=timezone.now)
+    archived_at = models.DateTimeField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -116,6 +136,13 @@ class Task(models.Model):
                 fields=["column", "position"],
                 name="unique_task_position_per_column",
                 deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(archived_at__isnull=True, position__isnull=False)
+                    | models.Q(archived_at__isnull=False, position__isnull=True)
+                ),
+                name="task_position_null_iff_archived",
             ),
         ]
 
