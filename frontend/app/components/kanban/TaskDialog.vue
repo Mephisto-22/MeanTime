@@ -207,12 +207,12 @@
               <i class="pi pi-sync text-sm" />
             </div>
             <div class="flex flex-col min-w-0">
-              <label
+              <Label
                 for="task-recurrence-toggle"
                 class="text-sm font-semibold text-surface-900 dark:text-surface-100 cursor-pointer select-none"
               >
                 Repeat on schedule
-              </label>
+              </Label>
               <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
                 Repeat this task automatically on a defined cadence
               </p>
@@ -242,20 +242,21 @@
               role="tablist"
               aria-label="Cadence options"
             >
-              <button
+              <Button
                 v-for="opt in cadenceOptions"
                 :key="opt.value"
                 type="button"
                 role="tab"
+                size="small"
                 :aria-selected="recurrenceCadence === opt.value"
-                class="py-1 px-3 text-xs font-semibold rounded-md transition-all cursor-pointer text-center select-none"
+                class="!py-1 !px-3 !text-xs !font-semibold !rounded-md transition-all cursor-pointer text-center select-none !border-0 shadow-none"
                 :class="recurrenceCadence === opt.value
-                  ? 'bg-surface-0 dark:bg-surface-900 text-surface-900 dark:text-surface-0 shadow-xs'
-                  : 'text-surface-500 hover:text-surface-900 dark:hover:text-surface-100'"
+                  ? '!bg-surface-0 dark:!bg-surface-900 !text-surface-900 dark:!text-surface-0 shadow-xs'
+                  : '!bg-transparent !text-surface-500 hover:!text-surface-900 dark:hover:!text-surface-100'"
                 @click="recurrenceCadence = opt.value"
               >
                 {{ opt.label }}
-              </button>
+              </Button>
             </div>
 
             <!-- Accessible Select for assistive tech and test compatibility -->
@@ -298,9 +299,9 @@
             </div>
 
             <div v-else-if="recurrenceCadence === 'MONTHLY'" class="flex flex-col gap-1">
-              <label for="task-day-of-month-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+              <Label for="task-day-of-month-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
                 Day of month
-              </label>
+              </Label>
               <div class="flex items-center gap-2">
                 <DatePicker
                   id="task-day-of-month-input"
@@ -325,9 +326,9 @@
 
             <!-- Right side: Time of Day DatePicker -->
             <div class="flex flex-col gap-1 w-32 sm:w-36 shrink-0">
-              <label for="task-time-of-day-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+              <Label for="task-time-of-day-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
                 Time (HH:MM)
-              </label>
+              </Label>
               <DatePicker
                 id="task-time-of-day-input"
                 v-model="timePickerValue"
