@@ -280,8 +280,8 @@ export class KanbanApi {
   // Tag Endpoints
   // -----------------
 
-  listTags(): Promise<TagDto[]> {
-    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
+  listTags(boardId: string | number): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags?board_id=${boardId}`)
   }
 
   createTag(payload: { name: string }): Promise<TagDto> {

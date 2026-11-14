@@ -860,9 +860,15 @@ def delete_time_entry(request, entry_id: int):
 # Tag Endpoints
 # ------------------
 @router.get("/tags", response=list[TagOut])
-def list_tags(request):
-    """List tags belonging to the authenticated user."""
-    return Tag.objects.filter(user=request.auth)
+def list_tags(request, board_id: int):
+    """List tags belonging to participants of an accessible board."""
+    board = get_accessible_board(request.auth, board_id)
+
+    return Tag.objects.filter(
+        Q(user=board.owner) |
+        Q(user__in=board.collaborators.all()) |
+        Q(user=request.auth)
+    ).distinct()
 
 @router.post("/tags", response={201: TagOut})
 def create_tag(request, payload: TagIn):
