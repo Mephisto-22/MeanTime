@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
-import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub } from '../fixtures'
+import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub, InputMaskStub, DatePickerStub } from '../fixtures'
 import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
 
 const DialogStub = {
@@ -46,6 +46,8 @@ function mountTaskDialog(props: Record<string, any> = {}) {
         Select: SelectStub,
         ToggleSwitch: ToggleSwitchStub,
         InputNumber: InputNumberStub,
+        InputMask: InputMaskStub,
+        DatePicker: DatePickerStub,
       },
     },
   })
@@ -622,6 +624,40 @@ describe('TaskDialog Component DOM Suite', () => {
       const payload = wrapper.emitted('save')![0][0] as TaskDialogSavePayload
       expect(payload.recurrence).toBeNull()
       expect(payload.recurringTaskId).toBe('rec-1')
+    })
+
+    it('recurrence UI: renders compact side-by-side cadence and masked time inputs, clamping invalid times', async () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      await wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]').setValue(true)
+
+      const controls = wrapper.find('[data-testid="task-recurrence-controls"]')
+      expect(controls.exists()).toBe(true)
+
+      // Cadence and Time inputs both exist in controls
+      const cadenceSelect = controls.find('[data-testid="task-cadence-select"]')
+      const timeInput = controls.find<HTMLInputElement>('[data-testid="task-time-of-day-input"]')
+      expect(cadenceSelect.exists()).toBe(true)
+      expect(timeInput.exists()).toBe(true)
+
+      // Test sliding segmented tabs for cadence
+      const weeklyTab = controls.findAll('button[role="tab"]').find(b => b.text().includes('Weekly'))
+      expect(weeklyTab).toBeDefined()
+      await weeklyTab!.trigger('click')
+      expect(wrapper.find('[data-testid="task-weekdays-selector"]').exists()).toBe(true)
+
+      // Test time masking and clamping invalid time (e.g. 25:99 -> 23:59)
+      await timeInput.setValue('25:99')
+      await timeInput.trigger('blur')
+      expect(timeInput.element.value).toBe('23:59')
+
+      // Save task with clamped time
+      const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
+      await titleInput.setValue('Masked Time Task')
+      await wrapper.find('form').trigger('submit.prevent')
+
+      const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
+      expect(savePayload.recurrence?.timeOfDay).toBe('23:59')
+      expect(savePayload.recurrence?.cadence).toBe('WEEKLY')
     })
   })
 })
