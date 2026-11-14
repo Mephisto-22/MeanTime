@@ -29,14 +29,15 @@ definePageMeta({ public: true, layout: 'headless' })
 const authStore = useAuthStore()
 const loading = ref(false)
 const notify = useNotifications()
+const verificationEmail = useState('verification-email', () => '')
 
 async function register(details: RegistrationRequest) {
   if (loading.value) return
   loading.value = true
   try {
     await authStore.register(details)
-    notify.success('Account created. Log in to continue.')
-    await navigateTo('/login')
+    verificationEmail.value = details.email
+    await navigateTo('/check-email')
   } catch (err) {
     notify.error(err, 'Unable to register')
   } finally {

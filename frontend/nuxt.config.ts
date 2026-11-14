@@ -33,6 +33,8 @@ export default defineNuxtConfig({
     // Keep login/register pre-rendered/SSR if desired, or set ssr: false for protected routes
     '/login': { ssr: true },
     '/register': { ssr: true },
+    '/check-email': { ssr: true },
+    '/confirm-email': { ssr: true },
     '/forgot-password': { ssr: true },
     '/reset-password': { ssr: true },
     '/**': { ssr: false } // SPA mode for the dashboard

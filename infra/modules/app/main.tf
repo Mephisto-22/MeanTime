@@ -238,6 +238,9 @@ resource "aws_ecs_task_definition" "this" {
         # The address people open the app at, for links and the Google
         # sign-in callback. Dev is opened through the tunnel on localhost.
         { name = "FRONTEND_URL", value = coalesce(local.app_url, "http://localhost:3000") },
+        { name = "EMAIL_BACKEND", value = "services.mail.SESBackend" },
+        { name = "AWS_SES_REGION", value = var.aws_region },
+        { name = "DEFAULT_FROM_EMAIL", value = var.email_from_address },
       ]
       secrets = [
         { name = "POSTGRES_PASSWORD", valueFrom = data.aws_ssm_parameter.db_password.arn },

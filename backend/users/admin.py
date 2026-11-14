@@ -27,7 +27,7 @@ class UserAdmin(BaseUserAdmin):
     inlines = (ExternalAccountInline,)
 
     list_display = ("email", "display_name", "timezone", "is_active", "is_staff", "created_at")
-    list_filter = ("is_active", "is_staff", "is_superuser")
+    list_filter = ("is_active", "is_verified", "is_staff", "is_superuser")
     search_fields = ("email", "display_name")
     ordering = ("email",)
     readonly_fields = ("created_at", "last_login", "resetting_password", "password_reset_started_at")
@@ -40,6 +40,7 @@ class UserAdmin(BaseUserAdmin):
             {
                 "fields": (
                     "is_active",
+                    "is_verified",
                     "is_staff",
                     "is_superuser",
                     "groups",

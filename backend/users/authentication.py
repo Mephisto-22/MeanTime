@@ -12,6 +12,8 @@ class AppJWTAuth(JWTAuth):
         if BlacklistedToken.objects.filter(revoked).exists():
             raise AuthenticationFailed("This session has been logged out. Please sign in again.")
         user = super().get_user(validated_token)
+        if not user.is_verified:
+            raise AuthenticationFailed("Confirm your email before signing in.")
         if user.password_reset_active():
             raise AuthenticationFailed("Complete your password reset before signing in again.")
         if validated_token.get("password_version", 0) != user.password_version:

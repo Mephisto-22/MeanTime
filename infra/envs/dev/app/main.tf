@@ -56,7 +56,9 @@ module "network" {
 }
 
 module "app" {
-  source = "../../../modules/app"
+  ses_sender_identity_arn = var.ses_sender_identity_arn
+  email_from_address      = var.email_from_address
+  source                  = "../../../modules/app"
 
   environment = "dev"
   public      = false

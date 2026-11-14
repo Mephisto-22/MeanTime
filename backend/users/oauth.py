@@ -127,7 +127,7 @@ def user_for(claims):
     if User.objects.filter(email__iexact=email).exists():
         raise OAuthError("email_in_use")
     name = (claims.get("name") or "").strip() or email.split("@")[0]
-    user = User.objects.create_user(email=email, password=None, display_name=name[:50])
+    user = User.objects.create_user(email=email, password=None, display_name=name[:50], is_verified=True)
     ExternalAccount.objects.create(
         user=user, provider=ExternalAccount.Provider.GOOGLE, subject=claims["sub"]
     )

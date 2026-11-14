@@ -127,12 +127,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Development-only delivery; Mailgun/external email is intentionally deferred.
-EMAIL_BACKEND = (
-    "django.core.mail.backends.console.EmailBackend" if DEBUG
-    else "django.core.mail.backends.dummy.EmailBackend"
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND") or (
+    "django.core.mail.backends.console.EmailBackend" if DEBUG else "services.mail.SESBackend"
 )
-DEFAULT_FROM_EMAIL = "noreply@meantime.local"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@meantime.local" if DEBUG else "")
+AWS_SES_REGION = os.environ.get("AWS_SES_REGION", "")
+EMAIL_VERIFICATION_TIMEOUT = 86400
+EMAIL_VERIFICATION_RESEND_SECONDS = 60
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 # Only send the session cookie (used during Google sign-in) over HTTPS when
 # the app is served over HTTPS (Prod).
