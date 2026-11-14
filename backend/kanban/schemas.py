@@ -64,7 +64,7 @@ class RecurringTaskIn(Schema):
     days_of_week: list[int] = []
     day_of_month: int | None = None
     time_of_day: str = "00:00"
-    timezone: str = "UTC"
+    timezone: str | None = None
 
 class RecurringTaskPatchIn(Schema):
     """Payload expected for partially updating a recurring task schedule or template."""
@@ -174,6 +174,7 @@ class TaskUpdateIn(Schema):
     timer_mode: TimerMode | None = None
     target_duration_seconds: int | None = None
     apply_to_future: bool = False
+    recurrence: RecurringTaskPatchIn | None = None
 
 # Column Schemas
 class BoardColumnIn(Schema):

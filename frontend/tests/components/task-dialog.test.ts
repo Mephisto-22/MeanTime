@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
-import { createTaskFixture, createTagFixture } from '../fixtures/kanban'
+import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub } from '../fixtures'
 import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
 
 const DialogStub = {
@@ -28,32 +28,6 @@ const SelectStub = {
         {{ o.title || o.label }}
       </option>
     </select>
-  `,
-}
-
-const ToggleSwitchStub = {
-  name: 'ToggleSwitch',
-  props: ['modelValue'],
-  emits: ['update:modelValue'],
-  template: `
-    <input
-      type="checkbox"
-      :checked="Boolean(modelValue)"
-      @change="$emit('update:modelValue', $event.target.checked)"
-    />
-  `,
-}
-
-const InputNumberStub = {
-  name: 'InputNumber',
-  props: ['modelValue'],
-  emits: ['update:modelValue'],
-  template: `
-    <input
-      type="number"
-      :value="modelValue"
-      @input="$emit('update:modelValue', Number($event.target.value))"
-    />
   `,
 }
 

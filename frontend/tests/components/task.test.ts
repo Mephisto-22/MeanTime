@@ -375,5 +375,23 @@ describe('Task Component DOM Suite', () => {
       })
       expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(false)
     })
+
+    it('does not render recurring badge icon when recurringTask has isActive === false', () => {
+      const { wrapper } = mountTask({
+        task: createTaskFixture({
+          recurringTaskId: 'rec-789',
+          recurringTask: {
+            id: 'rec-789',
+            cadence: 'DAILY',
+            daysOfWeek: [],
+            dayOfMonth: null,
+            timeOfDay: '00:00:00',
+            timezone: 'UTC',
+            isActive: false,
+          },
+        } as any),
+      })
+      expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(false)
+    })
   })
 })

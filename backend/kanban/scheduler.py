@@ -1,6 +1,7 @@
 """Embedded APScheduler integration and background execution for MeanTime tasks."""
 
 import logging
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.db import connection, transaction
@@ -147,14 +148,7 @@ def spawn_due_recurring_tasks(as_of: datetime | None = None) -> int:
                 )
 
             # Advance next_run_at
-            rec_task.next_run_at = calculate_next_run_at(
-                cadence=rec_task.cadence,
-                time_of_day=rec_task.time_of_day,
-                timezone_name=rec_task.timezone,
-                days_of_week=rec_task.days_of_week,
-                day_of_month=rec_task.day_of_month,
-                after=now,
-            )
+            rec_task.next_run_at = rec_task.calculate_next_run(after=now)
             rec_task.save(update_fields=["next_run_at", "updated_at"])
             spawned_total += 1
 
@@ -164,27 +158,41 @@ def spawn_due_recurring_tasks(as_of: datetime | None = None) -> int:
     return spawned_total
 
 
+@contextmanager
+def pg_advisory_lock_scope(lock_id: int):
+    """
+    Context manager acquiring a PostgreSQL advisory lock if running on PostgreSQL.
+    Yields True if lock was acquired (or if running on non-PostgreSQL), False otherwise.
+    Releases the advisory lock on exit.
+    """
+    if connection.vendor != "postgresql":
+        yield True
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_try_advisory_lock(%s);", [lock_id])
+        acquired = cursor.fetchone()[0]
+
+    if not acquired:
+        yield False
+        return
+
+    try:
+        yield True
+    finally:
+        with connection.cursor() as unlock_cursor:
+            unlock_cursor.execute("SELECT pg_advisory_unlock(%s);", [lock_id])
+
+
 def run_recurring_tasks_job() -> int | None:
     """
     Execute the recurring task spawning routine guarded by a PostgreSQL advisory lock.
     Guarantees single-leader execution across multiple Uvicorn workers and dev reloader processes.
     """
-    if connection.vendor == "postgresql":
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_try_advisory_lock(%s);", [RECURRING_TASKS_ADVISORY_LOCK_ID])
-            acquired = cursor.fetchone()[0]
-
-            if not acquired:
-                logger.debug("Recurring tasks advisory lock not acquired; another worker is currently executing.")
-                return None
-
-            try:
-                return spawn_due_recurring_tasks()
-            finally:
-                with connection.cursor() as unlock_cursor:
-                    unlock_cursor.execute("SELECT pg_advisory_unlock(%s);", [RECURRING_TASKS_ADVISORY_LOCK_ID])
-    else:
-        # Non-PostgreSQL fallback (e.g. SQLite unit tests)
+    with pg_advisory_lock_scope(RECURRING_TASKS_ADVISORY_LOCK_ID) as acquired:
+        if not acquired:
+            logger.debug("Recurring tasks advisory lock not acquired; another worker is currently executing.")
+            return None
         return spawn_due_recurring_tasks()
 
 
@@ -193,22 +201,10 @@ def run_auto_clear_job() -> int | None:
     Execute the auto-clear routine guarded by a PostgreSQL advisory lock.
     Guarantees single-leader execution across multiple Uvicorn workers and dev reloader processes.
     """
-    if connection.vendor == "postgresql":
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_try_advisory_lock(%s);", [AUTO_CLEAR_ADVISORY_LOCK_ID])
-            acquired = cursor.fetchone()[0]
-
-            if not acquired:
-                logger.debug("Auto-clear advisory lock not acquired; another worker is currently executing.")
-                return None
-
-            try:
-                return auto_clear_expired_tasks()
-            finally:
-                with connection.cursor() as unlock_cursor:
-                    unlock_cursor.execute("SELECT pg_advisory_unlock(%s);", [AUTO_CLEAR_ADVISORY_LOCK_ID])
-    else:
-        # Non-PostgreSQL fallback (e.g. SQLite unit tests)
+    with pg_advisory_lock_scope(AUTO_CLEAR_ADVISORY_LOCK_ID) as acquired:
+        if not acquired:
+            logger.debug("Auto-clear advisory lock not acquired; another worker is currently executing.")
+            return None
         return auto_clear_expired_tasks()
 
 

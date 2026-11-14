@@ -430,6 +430,7 @@ import type {
 } from '~/api/kanban'
 import { kanbanContextKey, TASK_PRIORITY_CONFIG } from '~/api/kanban'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
+import { useAuthStore } from '~/stores/auth'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 
 interface Props {
@@ -475,6 +476,10 @@ const isConfirmingDelete = ref(false)
 const isConfirmingSaveScope = ref(false)
 
 // Recurrence Form State
+const authStore = useAuthStore()
+const userTimezone = computed(() => {
+  return authStore.user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+})
 const isRecurring = ref(false)
 const recurrenceCadence = ref<RecurrenceCadence>('DAILY')
 const selectedDaysOfWeek = ref<number[]>([0])
@@ -789,7 +794,7 @@ const executeSave = (applyToFuture = false) => {
       daysOfWeek: recurrenceCadence.value === 'WEEKLY' ? [...selectedDaysOfWeek.value] : [],
       dayOfMonth: recurrenceCadence.value === 'MONTHLY' ? (dayOfMonth.value ?? 1) : null,
       timeOfDay: timeOfDay.value || '00:00',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      timezone: userTimezone.value,
     }
   } else {
     payload.recurrence = null

@@ -274,13 +274,17 @@ export class KanbanApi {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/columns/${columnId}/tasks`, payload)
   }
 
+  createBoardTask(boardId: string | number, payload: Partial<KanbanTaskDto> & Record<string, any>): Promise<KanbanTaskDto> {
+    return apiService.post<KanbanTaskDto>(`${this.endpoint}/boards/${boardId}/tasks`, payload)
+  }
+
   updateTask(taskId: string | number, payload: Partial<KanbanTaskDto>): Promise<KanbanTaskDto> {
     return apiService.patch<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}`, payload)
   }
 
   deleteTask(taskId: string | number, options?: { cancelRecurrence?: boolean }): Promise<SuccessResponse> {
     if (options?.cancelRecurrence !== undefined) {
-      return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`, {
+      return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`, undefined, {
         query: { cancel_recurrence: options.cancelRecurrence },
       })
     }
@@ -295,16 +299,8 @@ export class KanbanApi {
   // Recurring Task Endpoints
   // -------------------------
 
-  getRecurringTask(recurringTaskId: string | number): Promise<RecurringTaskDto> {
-    return apiService.get<RecurringTaskDto>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`)
-  }
-
   updateRecurringTask(recurringTaskId: string | number, payload: Partial<RecurringTaskDto>): Promise<RecurringTaskDto> {
     return apiService.patch<RecurringTaskDto>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`, payload)
-  }
-
-  listBoardRecurringTasks(boardId: string | number): Promise<RecurringTaskDto[]> {
-    return apiService.get<RecurringTaskDto[]>(`${this.endpoint}/boards/${boardId}/recurring-tasks`)
   }
 
   // -----------------

@@ -433,6 +433,15 @@ const handleUpdateTask = async (
     if ((payload as any).applyToFuture !== undefined) {
       updatePayload.applyToFuture = (payload as any).applyToFuture
     }
+    if ((payload as any).recurrence !== undefined) {
+      updatePayload.recurrence = (payload as any).recurrence
+    }
+    if ((payload as any).timerMode !== undefined) {
+      updatePayload.timerMode = (payload as any).timerMode
+    }
+    if ((payload as any).targetDurationSeconds !== undefined) {
+      updatePayload.targetDurationSeconds = (payload as any).targetDurationSeconds
+    }
 
     const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
     let updated: KanbanTaskDto | undefined
@@ -524,7 +533,7 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       timer: savePayload.timer,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
-    await handleUpdateTask(savePayload.taskId, {
+    const updateTaskPayload: any = {
       title: savePayload.title,
       description: savePayload.description,
       priority: savePayload.priority,
@@ -532,16 +541,23 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
       applyToFuture: savePayload.applyToFuture,
-    } as any)
+    }
+    if (savePayload.recurrence) {
+      updateTaskPayload.recurrence = savePayload.recurrence
+    }
+    if (savePayload.timer?.mode && savePayload.timer.mode !== 'NONE') {
+      updateTaskPayload.timerMode = savePayload.timer.mode
+      updateTaskPayload.targetDurationSeconds = savePayload.timer.targetDurationSeconds
+    }
+    await handleUpdateTask(savePayload.taskId, updateTaskPayload)
 
     // If recurrence was turned off on an existing recurring task, deactivate it
     if (savePayload.recurrence === null && savePayload.recurringTaskId != null) {
       try {
         await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
         const target = findTaskById(savePayload.taskId)
-        if (target) {
-          target.recurringTaskId = null
-          target.recurringTask = null
+        if (target && target.recurringTask) {
+          target.recurringTask.isActive = false
         }
       } catch (err) {
         notify.error(err, 'Unable to deactivate recurring schedule')

@@ -148,6 +148,19 @@ class RecurringTask(models.Model):
     def __str__(self):
         return f"Recurring: {self.title} ({self.cadence})"
 
+    def calculate_next_run(self, after: datetime | None = None) -> datetime:
+        from kanban.recurrence import calculate_next_run_at
+
+        return calculate_next_run_at(
+            cadence=self.cadence,
+            time_of_day=self.time_of_day,
+            timezone_name=self.timezone,
+            days_of_week=self.days_of_week,
+            day_of_month=self.day_of_month,
+            after=after,
+        )
+
+
 
 class TaskQuerySet(models.QuerySet):
     def active(self):

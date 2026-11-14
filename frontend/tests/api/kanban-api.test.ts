@@ -76,6 +76,10 @@ describe('KanbanApi Contract Suite', () => {
     await kanbanApi.createTask(101, { title: 'New Task', description: 'Details' })
     expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/columns/101/tasks', { title: 'New Task', description: 'Details' })
 
+    // 9b. createBoardTask
+    await kanbanApi.createBoardTask(10, { title: 'Board Task' })
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/10/tasks', { title: 'Board Task' })
+
     // 10. updateTask
     await kanbanApi.updateTask(505, { title: 'Updated Title', description: 'Updated Details' })
     expect(patchSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', { title: 'Updated Title', description: 'Updated Details' })
@@ -86,7 +90,7 @@ describe('KanbanApi Contract Suite', () => {
 
     // 11b. deleteTask with cancelRecurrence
     await kanbanApi.deleteTask(505, { cancelRecurrence: true })
-    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', { query: { cancel_recurrence: true } })
+    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', undefined, { query: { cancel_recurrence: true } })
 
     // 12. moveTask
     await kanbanApi.moveTask(505, { toColumnId: 102, targetPosition: 1 })
@@ -94,17 +98,10 @@ describe('KanbanApi Contract Suite', () => {
   })
 
   it('routes RecurringTask methods to correct paths, verbs, and payloads', async () => {
-    const getSpy = vi.spyOn(apiService, 'get').mockResolvedValue({} as any)
     const patchSpy = vi.spyOn(apiService, 'patch').mockResolvedValue({} as any)
-
-    await kanbanApi.getRecurringTask(42)
-    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/recurring-tasks/42')
 
     await kanbanApi.updateRecurringTask(42, { isActive: false })
     expect(patchSpy).toHaveBeenLastCalledWith('/api/kanban/recurring-tasks/42', { isActive: false })
-
-    await kanbanApi.listBoardRecurringTasks(10)
-    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/boards/10/recurring-tasks')
   })
 
   it('routes Tag methods to correct paths, verbs, and payloads', async () => {

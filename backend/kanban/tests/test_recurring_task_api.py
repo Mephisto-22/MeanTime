@@ -183,7 +183,14 @@ class RecurringTaskApiTests(TestCase):
         payload = {
             "title": "New Title Across Future Occurrences",
             "priority": "HIGH",
+            "timer_mode": "COUNT_DOWN",
+            "target_duration_seconds": 1800,
             "apply_to_future": True,
+            "recurrence": {
+                "cadence": "WEEKLY",
+                "days_of_week": [1, 3],
+                "time_of_day": "10:00",
+            },
         }
 
         response = self.client.patch(
@@ -201,9 +208,13 @@ class RecurringTaskApiTests(TestCase):
         self.assertEqual(rec.title, "New Title Across Future Occurrences")
         self.assertEqual(task.priority, TaskPriority.HIGH)
         self.assertEqual(rec.priority, TaskPriority.HIGH)
+        self.assertEqual(rec.cadence, RecurrenceCadence.WEEKLY)
+        self.assertEqual(rec.days_of_week, [1, 3])
+        self.assertEqual(rec.default_timer_mode, "COUNT_DOWN")
+        self.assertEqual(rec.target_duration_seconds, 1800)
 
     def test_delete_task_cancel_recurrence_false(self):
-        """Deleting a recurring task card with cancel_recurrence=False leaves the recurrence schedule active."""
+        """Deleting a recurring task with cancel_recurrence=False leaves the recurrence schedule active."""
         rec = RecurringTask.objects.create(
             board=self.board,
             creator=self.user,
@@ -215,7 +226,7 @@ class RecurringTaskApiTests(TestCase):
         task = Task.objects.create(
             column=self.col_todo,
             recurring_task=rec,
-            title="Habit Card",
+            title="Habit Task",
             position=0,
         )
 
@@ -227,7 +238,7 @@ class RecurringTaskApiTests(TestCase):
         self.assertTrue(rec.is_active)
 
     def test_delete_task_cancel_recurrence_true(self):
-        """Deleting a recurring task card with cancel_recurrence=True deactivates the recurrence schedule."""
+        """Deleting a recurring task with cancel_recurrence=True deactivates the recurrence schedule."""
         rec = RecurringTask.objects.create(
             board=self.board,
             creator=self.user,
@@ -239,7 +250,7 @@ class RecurringTaskApiTests(TestCase):
         task = Task.objects.create(
             column=self.col_todo,
             recurring_task=rec,
-            title="Habit Card",
+            title="Habit Task",
             position=0,
         )
 
@@ -250,8 +261,8 @@ class RecurringTaskApiTests(TestCase):
         rec.refresh_from_db()
         self.assertFalse(rec.is_active)
 
-    def test_get_and_patch_recurring_task_blueprint(self):
-        """Blueprint can be directly retrieved and updated, recalculating next_run_at when cadence shifts."""
+    def test_patch_recurring_task_blueprint(self):
+        """Blueprint can be directly updated, recalculating next_run_at when cadence shifts."""
         rec = RecurringTask.objects.create(
             board=self.board,
             creator=self.user,
@@ -262,11 +273,6 @@ class RecurringTaskApiTests(TestCase):
             is_active=True,
             next_run_at=timezone.now(),
         )
-
-        # GET blueprint
-        response = self.client.get(f"/api/kanban/recurring-tasks/{rec.id}", **self.auth)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["title"], "Original Blueprint")
 
         # PATCH blueprint (deactivate)
         response = self.client.patch(
@@ -291,33 +297,8 @@ class RecurringTaskApiTests(TestCase):
         self.assertEqual(rec.cadence, RecurrenceCadence.WEEKLY)
         self.assertEqual(rec.days_of_week, [1, 3])
 
-    def test_list_board_recurring_tasks(self):
-        """Listing recurring tasks returns all blueprints belonging to the board."""
-        RecurringTask.objects.create(
-            board=self.board,
-            creator=self.user,
-            title="Rec 1",
-            cadence=RecurrenceCadence.DAILY,
-            next_run_at=timezone.now(),
-        )
-        RecurringTask.objects.create(
-            board=self.board,
-            creator=self.user,
-            title="Rec 2",
-            cadence=RecurrenceCadence.WEEKLY,
-            next_run_at=timezone.now(),
-        )
-
-        response = self.client.get(f"/api/kanban/boards/{self.board.id}/recurring-tasks", **self.auth)
-        self.assertEqual(response.status_code, 200)
-        items = response.json()
-        self.assertEqual(len(items), 2)
-        titles = {item["title"] for item in items}
-        self.assertIn("Rec 1", titles)
-        self.assertIn("Rec 2", titles)
-
     def test_unauthorized_user_cannot_access_recurring_tasks(self):
-        """Non-collaborators receive 404 when attempting to view or alter recurring blueprints."""
+        """Non-collaborators receive 404 when attempting to alter recurring blueprints."""
         rec = RecurringTask.objects.create(
             board=self.board,
             creator=self.user,
@@ -325,9 +306,6 @@ class RecurringTaskApiTests(TestCase):
             cadence=RecurrenceCadence.DAILY,
             next_run_at=timezone.now(),
         )
-
-        res_get = self.client.get(f"/api/kanban/recurring-tasks/{rec.id}", **self.other_auth)
-        self.assertEqual(res_get.status_code, 404)
 
         res_patch = self.client.patch(
             f"/api/kanban/recurring-tasks/{rec.id}",
