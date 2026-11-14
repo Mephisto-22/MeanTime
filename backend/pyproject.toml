@@ -10,6 +10,7 @@ dependencies = [
     "django-ninja>=1.6",
     "django-ninja-jwt>=0.5.4",
     "psycopg[binary]>=3.2",
+    "redis>=8.1.0",
     "uvicorn[standard]>=0.34",
     "watchfiles>=1.0",
 ]

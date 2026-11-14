@@ -20,6 +20,21 @@ services:
     networks:
       - meantime-network
 
+  redis:
+    image: redis:alpine
+    container_name: meantime-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - meantime-network
+
   backend:
     build:
       context: ./backend
@@ -39,12 +54,16 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "${BACKEND_PORT}:8000"
     volumes:
       - ./backend:/app
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - meantime-network
@@ -77,6 +96,8 @@ volumes:
     name: meantime_postgres_data
   frontend_node_modules:
     name: meantime_frontend_node_modules
+  redis_data:
+    name: meantime_redis_data
 
 networks:
   meantime-network:

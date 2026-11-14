@@ -8,13 +8,13 @@
       <Toolbar class="border-none bg-transparent p-0">
         <template #start>
           <div class="flex flex-col gap-1">
-            <span v-if="board.title" data-testid="board-title" class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">{{ board.title }}</span>
+            <span v-if="boardTitle" data-testid="board-title" class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">{{ boardTitle }}</span>
             <p
-              v-if="board.description"
+              v-if="boardDescription"
               data-testid="board-description"
               class="text-sm font-normal text-surface-600 dark:text-surface-400"
             >
-              {{ board.description }}
+              {{ boardDescription }}
             </p>
           </div>
         </template>
@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, provide, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type {
   KanbanBoardDto,
   KanbanColumnDto,
@@ -93,12 +93,24 @@ import type { UserOut } from '~/api/friends'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 import { sumEntryDurations } from '~/composables/useTaskTimer'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
+import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
 
 const notify = useNotifications()
 
 const props = defineProps<{
   board: KanbanBoardDto
 }>()
+
+const boardTitle = ref(props.board.title)
+const boardDescription = ref(props.board.description)
+
+watch(
+  () => [props.board.title, props.board.description],
+  ([title, description]) => {
+    boardTitle.value = title ?? ''
+    boardDescription.value = description ?? ''
+  },
+)
 
 defineSlots<{
   column?: (props: { column: KanbanColumnDto }) => any
@@ -113,16 +125,12 @@ const selectedColumn = ref<KanbanColumnDto | null>(null)
 
 const loadTags = async (): Promise<void> => {
   try {
-    const tags = await kanbanApi.listTags()
+    const tags = await kanbanApi.listTags(props.board.id)
     availableTags.value = tags || []
   } catch (err) {
     notify.error(err, 'Unable to fetch tags')
   }
 }
-
-onMounted(() => {
-  loadTags()
-})
 
 watch(
   () => props.board.columns,
@@ -153,6 +161,213 @@ const columnRegistry = computed<KanbanColumnSummary[]>(() => {
 })
 
 const sameId = (a: string | number, b: string | number): boolean => String(a) === String(b)
+
+const findColumn = (columnId: string | number) =>
+  localColumns.value.find(col => sameId(col.id, columnId))
+
+const findTaskLocation = (taskId: string | number) => {
+  for (const column of localColumns.value) {
+    const index = column.tasks.findIndex(task => sameId(task.id, taskId))
+
+    if (index !== -1) {
+      return {
+        column,
+        index,
+        task: column.tasks[index]!,
+      }
+    }
+  }
+
+  return undefined
+}
+
+const upsertTask = (incoming: KanbanTaskDto): void => {
+  const existing = findTaskLocation(incoming.id)
+  const destination = findColumn(incoming.columnId)
+
+  if (!destination) return
+
+  if (existing) {
+    existing.column.tasks.splice(existing.index, 1)
+  }
+
+  const position = Math.max(
+    0,
+    Math.min(incoming.position, destination.tasks.length),
+  )
+
+  destination.tasks.splice(position, 0, {
+    ...existing?.task,
+    ...incoming,
+    columnId: destination.id,
+  })
+
+  reindexTasks(destination.tasks)
+
+  if (existing && existing.column !== destination) {
+    reindexTasks(existing.column.tasks)
+  }
+}
+
+const applyTaskMove = (
+  incoming: KanbanTaskDto,
+  destinationColumnId: string | number,
+  position: number,
+): void => {
+  const destination = findColumn(destinationColumnId)
+  if (!destination) return
+
+  const existing = findTaskLocation(incoming.id)
+
+  if (existing) {
+    existing.column.tasks.splice(existing.index, 1)
+    reindexTasks(existing.column.tasks)
+  }
+
+  const updatedTask = {
+    ...existing?.task,
+    ...incoming,
+    columnId: destination.id,
+  }
+
+  const targetPosition = Math.max(
+    0,
+    Math.min(position, destination.tasks.length),
+  )
+
+  destination.tasks.splice(targetPosition, 0, updatedTask)
+  reindexTasks(destination.tasks)
+}
+
+
+const handleBoardEvent = (event: BoardEvent): void => {
+  const data = event.data
+
+  switch (event.type) {
+    case 'board.updated': {
+      if (data.board) {
+        boardTitle.value = data.board.title
+        boardDescription.value = data.board.description
+      }
+      break
+    }
+
+    case 'board.deleted': {
+      void navigateTo('/boards')
+      break
+    }
+
+    case 'board.access_revoked': {
+      const auth = useAuthStore()
+
+      if (String(data.userId) === String(auth.user?.id)) {
+        void navigateTo('/boards')
+      }
+      break
+    }
+
+    case 'column.created': {
+      const incoming = data.column as KanbanColumnDto
+
+      if (!findColumn(incoming.id)) {
+        localColumns.value.push({
+          ...incoming,
+          tasks: incoming.tasks ?? [],
+        })
+      }
+      break
+    }
+
+    case 'column.updated': {
+      const incoming = data.column as KanbanColumnDto
+      const existing = findColumn(incoming.id)
+
+      if (existing) {
+        Object.assign(existing, incoming)
+      }
+      break
+    }
+
+    case 'column.deleted': {
+      localColumns.value = localColumns.value.filter(
+        column => !sameId(column.id, data.columnId),
+      )
+      break
+    }
+
+    case 'task.created': {
+      upsertTask(data.task as KanbanTaskDto)
+      break
+    }
+
+    case 'task.updated': {
+      const incoming = data.task as KanbanTaskDto
+      const existing = findTaskLocation(incoming.id)
+
+      if (existing) {
+        Object.assign(existing.task, incoming)
+      } else {
+        upsertTask(incoming)
+      }
+      break
+    }
+
+    case 'task.deleted': {
+      const existing = findTaskLocation(data.taskId)
+
+      if (existing) {
+        existing.column.tasks.splice(existing.index, 1)
+        reindexTasks(existing.column.tasks)
+      }
+      break
+    }
+
+    case 'task.moved': {
+      applyTaskMove(
+        data.task as KanbanTaskDto,
+        data.destinationColumnId,
+        data.position,
+      )
+      break
+    }
+
+    case 'task.timer_updated': {
+      const existing = findTaskLocation(data.taskId)
+
+      if (existing) {
+        existing.task.timer = {
+          ...existing.task.timer,
+          ...data.timer,
+          taskId: data.taskId,
+        }
+      }
+      break
+    }
+  }
+}
+
+// initialize SSE board event handling
+const boardEvents = useBoardEvents({
+  boardId: props.board.id,
+  onEvent: handleBoardEvent,
+  onReconnect: async () => {
+    await refreshNuxtData()
+  },
+})
+
+watch(
+  () => props.board.id,
+  () => loadTags(),
+  { immediate: true },
+)
+
+onMounted(() => {
+  void boardEvents.connect()
+})
+
+onBeforeUnmount(() => {
+  boardEvents.stop()
+})
 
 const reindexTasks = (tasks: KanbanTaskDto[]): void => {
   tasks.forEach((t, i) => {
@@ -298,19 +513,31 @@ const handleCreateTask = async (
         if (taskInCol) break
       }
     }
-    if (taskInCol && createdTask) {
-      taskInCol.id = createdTask.id
-      if (createdTask.columnId != null) {
-        taskInCol.columnId = createdTask.columnId
-      }
-      if (createdTask.position !== undefined) {
-        taskInCol.position = createdTask.position
-      }
-      if (createdTask.priority !== undefined) {
-        taskInCol.priority = createdTask.priority
-      }
-      if (createdTask.tags !== undefined) {
-        taskInCol.tags = createdTask.tags
+    if (createdTask) {
+      const alreadyReceived = findTaskLocation(createdTask.id)
+      const optimisticLocation = findTaskLocation(tempId)
+
+      if (optimisticLocation && alreadyReceived) {
+        // SSE already inserted the real task.
+        // Remove the temporary optimistic task.
+        optimisticLocation.column.tasks.splice(
+          optimisticLocation.index,
+          1,
+        )
+
+        reindexTasks(optimisticLocation.column.tasks)
+      } else if (optimisticLocation) {
+        // API response arrived before the SSE event.
+        // Replace the temporary ID with the real ID.
+        optimisticLocation.task.id = createdTask.id
+        optimisticLocation.task.columnId =
+          createdTask.columnId ?? optimisticLocation.task.columnId
+        optimisticLocation.task.position =
+          createdTask.position ?? optimisticLocation.task.position
+        optimisticLocation.task.priority =
+          createdTask.priority ?? optimisticLocation.task.priority
+        optimisticLocation.task.tags =
+          createdTask.tags ?? optimisticLocation.task.tags
       }
     }
   } catch (err) {
@@ -724,10 +951,14 @@ const openEditColumnDialog = (column: KanbanColumnDto) => {
 }
 
 const handleColumnCreated = (column: KanbanColumnDto) => {
-  localColumns.value.push({
-    ...column,
-    tasks: column.tasks ?? [],
-  })
+  const existing = findColumn(column.id)
+
+  if (!existing) {
+    localColumns.value.push({
+      ...column,
+      tasks: column.tasks ?? [],
+    })
+  }
 
   notify.success('Column created.')
 }
