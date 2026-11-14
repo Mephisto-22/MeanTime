@@ -211,7 +211,7 @@
                 for="task-recurrence-toggle"
                 class="text-sm font-semibold text-surface-900 dark:text-surface-100 cursor-pointer select-none"
               >
-                Recurrence Schedule
+                Repeat on schedule
               </label>
               <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
                 Repeat this task automatically on a defined cadence
@@ -513,7 +513,12 @@ import type {
   KanbanColumnSummary,
   RecurrenceCadence,
 } from '~/api/kanban'
-import { kanbanContextKey, TASK_PRIORITY_CONFIG } from '~/api/kanban'
+import {
+  kanbanContextKey,
+  TASK_PRIORITY_CONFIG,
+  TASK_CADENCE_OPTIONS,
+  TASK_WEEKDAY_OPTIONS,
+} from '~/api/kanban'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
 import { useAuthStore } from '~/stores/auth'
 import DatePicker from 'primevue/datepicker'
@@ -572,21 +577,8 @@ const selectedDaysOfWeek = ref<number[]>([0])
 const dayOfMonth = ref<number | null>(1)
 const timeOfDay = ref('00:00')
 
-const cadenceOptions: Array<{ label: string; value: RecurrenceCadence }> = [
-  { label: 'Daily', value: 'DAILY' },
-  { label: 'Weekly', value: 'WEEKLY' },
-  { label: 'Monthly', value: 'MONTHLY' },
-]
-
-const weekdayOptions = [
-  { label: 'Mon', value: 0 },
-  { label: 'Tue', value: 1 },
-  { label: 'Wed', value: 2 },
-  { label: 'Thu', value: 3 },
-  { label: 'Fri', value: 4 },
-  { label: 'Sat', value: 5 },
-  { label: 'Sun', value: 6 },
-]
+const cadenceOptions = TASK_CADENCE_OPTIONS
+const weekdayOptions = TASK_WEEKDAY_OPTIONS
 
 const toggleDayOfWeek = (dayVal: number) => {
   const idx = selectedDaysOfWeek.value.indexOf(dayVal)
@@ -665,8 +657,8 @@ const onTimePickerBlur = () => {
 const monthDayPickerValue = computed({
   get: (): Date | null => {
     if (!dayOfMonth.value) return null
-    const d = new Date()
-    d.setDate(Math.min(Math.max(dayOfMonth.value, 1), 31))
+    // Anchor to a 31-day month (January 2024) to prevent month overflow on day 29, 30, or 31 in short months
+    const d = new Date(2024, 0, Math.min(Math.max(dayOfMonth.value, 1), 31))
     return d
   },
   set: (val: Date | null) => {
@@ -959,12 +951,49 @@ const cancelSaveScope = () => {
   isConfirmingSaveScope.value = false
 }
 
+const hasCoreMetadataChanged = computed(() => {
+  if (!props.task) return true
+  // Title
+  if (trimmedTitle.value !== (props.task.title ?? '').trim()) return true
+  // Description
+  if (description.value.trim() !== (props.task.description ?? '').trim()) return true
+  // Priority
+  if (priority.value !== (props.task.priority ?? null)) return true
+  // Tags
+  const currentTagIds = attachedTags.value.map(t => String(t.id)).sort().join(',')
+  const originalTagIds = (props.task.tags ?? []).map(t => String(t.id)).sort().join(',')
+  if (currentTagIds !== originalTagIds) return true
+  // Timer mode / duration
+  const origTimer = props.task.timer
+  const curTimer = timerState.value
+  const origTimerMode = origTimer?.mode ?? 'NONE'
+  const curTimerMode = curTimer?.mode ?? 'NONE'
+  if (origTimerMode !== curTimerMode) return true
+  if (curTimerMode !== 'NONE') {
+    if ((origTimer?.targetDurationSeconds ?? null) !== (curTimer?.targetDurationSeconds ?? null)) return true
+  }
+  // Recurrence schedule
+  const origRec = props.task.recurringTask
+  if (isRecurring.value) {
+    if (!origRec) return true
+    if (recurrenceCadence.value !== origRec.cadence) return true
+    if (recurrenceCadence.value === 'WEEKLY') {
+      const curDays = [...selectedDaysOfWeek.value].sort().join(',')
+      const origDays = [...(origRec.daysOfWeek ?? [])].sort().join(',')
+      if (curDays !== origDays) return true
+    }
+    if (recurrenceCadence.value === 'MONTHLY' && dayOfMonth.value !== origRec.dayOfMonth) return true
+    if ((timeOfDay.value || '00:00') !== (origRec.timeOfDay ? origRec.timeOfDay.slice(0, 5) : '00:00')) return true
+  }
+  return false
+})
+
 const save = () => {
   if (isSaveDisabled.value || isConfirmingDelete.value || isConfirmingSaveScope.value) {
     return
   }
-  // When editing an existing recurring task and recurrence was not toggled off, prompt user for scope
-  if (props.mode === 'edit' && isRecurringTask.value && isRecurring.value) {
+  // When editing an existing recurring task and core metadata actually changed, prompt user for scope
+  if (props.mode === 'edit' && isRecurringTask.value && isRecurring.value && hasCoreMetadataChanged.value) {
     isConfirmingSaveScope.value = true
     return
   }

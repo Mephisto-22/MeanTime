@@ -15,6 +15,7 @@ from kanban.models import (
     Tag,
     Task,
     TaskPriority,
+    TaskTimer,
     TimerMode,
 )
 
@@ -389,3 +390,125 @@ class RecurringTaskApiTests(TestCase):
             **self.other_auth,
         )
         self.assertEqual(res_patch.status_code, 404)
+
+    def test_recurrence_input_schema_validation(self):
+        """Invalid time_of_day, days_of_week, day_of_month, or long timezone return 422 Unprocessable Entity."""
+        # Invalid time of day
+        res = self.client.post(
+            f"/api/kanban/columns/{self.col_todo.id}/tasks",
+            data=json.dumps({
+                "title": "Invalid Time",
+                "recurrence": {"time_of_day": "99:99"},
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # Invalid day of week (must be 0..6)
+        res = self.client.post(
+            f"/api/kanban/columns/{self.col_todo.id}/tasks",
+            data=json.dumps({
+                "title": "Invalid Weekday",
+                "recurrence": {"days_of_week": [7]},
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # Invalid day of month (must be 1..31)
+        res = self.client.post(
+            f"/api/kanban/columns/{self.col_todo.id}/tasks",
+            data=json.dumps({
+                "title": "Invalid DOM",
+                "recurrence": {"day_of_month": 32},
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # Long timezone name (> 63 chars)
+        res = self.client.post(
+            f"/api/kanban/columns/{self.col_todo.id}/tasks",
+            data=json.dumps({
+                "title": "Invalid TZ",
+                "recurrence": {"timezone": "A" * 65},
+            }),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 422)
+
+    def test_monthly_recurring_task_defaults_day_of_month_preventing_drift(self):
+        """When creating a monthly recurring task without day_of_month, it defaults to the current day."""
+        payload = {
+            "title": "Monthly Routine",
+            "recurrence": {
+                "cadence": "MONTHLY",
+                "time_of_day": "08:00:00",
+                "timezone": "UTC",
+            },
+        }
+        response = self.client.post(
+            f"/api/kanban/columns/{self.col_todo.id}/tasks",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        rec_id = data["recurring_task"]["id"]
+        rec = RecurringTask.objects.get(id=rec_id)
+        self.assertIsNotNone(rec.day_of_month)
+        self.assertEqual(rec.day_of_month, timezone.now().astimezone(timezone.get_current_timezone()).day)
+
+    def test_update_task_clears_timer_when_mode_is_none(self):
+        """Setting timer_mode to NONE in task update removes the TaskTimer row."""
+        task = Task.objects.create(
+            column=self.col_todo,
+            title="Task with timer",
+            position=0,
+        )
+        TaskTimer.objects.create(
+            task=task,
+            mode=TimerMode.COUNT_DOWN,
+            target_duration_seconds=1800,
+        )
+
+        response = self.client.patch(
+            f"/api/kanban/tasks/{task.id}",
+            data=json.dumps({"timer_mode": "NONE"}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(TaskTimer.objects.filter(task=task).exists())
+
+    def test_delete_recurring_task_blueprint(self):
+        """Calling DELETE /api/kanban/recurring-tasks/{id} deletes the blueprint while keeping occurrences intact."""
+        rec = RecurringTask.objects.create(
+            board=self.board,
+            creator=self.user,
+            title="Blueprint to delete",
+            cadence=RecurrenceCadence.DAILY,
+            next_run_at=timezone.now(),
+        )
+        task = Task.objects.create(
+            column=self.col_todo,
+            recurring_task=rec,
+            title="Spawned task",
+            position=0,
+        )
+
+        response = self.client.delete(
+            f"/api/kanban/recurring-tasks/{rec.id}",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RecurringTask.objects.filter(id=rec.id).exists())
+
+        task.refresh_from_db()
+        self.assertIsNone(task.recurring_task)
+        self.assertEqual(task.title, "Spawned task")

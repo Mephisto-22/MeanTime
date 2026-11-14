@@ -288,8 +288,12 @@ const handleCreateTask = async (
     const createPayload: any = {
       title: payload.title,
       description: payload.description,
-      priority: payload.priority,
-      tagIds: payload.tagIds,
+    }
+    if (payload.priority !== undefined) {
+      createPayload.priority = payload.priority
+    }
+    if (payload.tagIds !== undefined) {
+      createPayload.tagIds = payload.tagIds
     }
     if (payload.recurrence) {
       createPayload.recurrence = payload.recurrence
@@ -547,9 +551,9 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
     if (savePayload.recurrence) {
       updateTaskPayload.recurrence = savePayload.recurrence
     }
-    if (savePayload.timer?.mode && savePayload.timer.mode !== 'NONE') {
+    if (savePayload.timer?.mode !== undefined) {
       updateTaskPayload.timerMode = savePayload.timer.mode
-      updateTaskPayload.targetDurationSeconds = savePayload.timer.targetDurationSeconds
+      updateTaskPayload.targetDurationSeconds = savePayload.timer.targetDurationSeconds ?? null
     }
     await handleUpdateTask(savePayload.taskId, updateTaskPayload)
 
@@ -558,30 +562,11 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       try {
         await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
         const target = findTaskById(savePayload.taskId)
-        if (target) {
-          if (target.recurringTask) {
-            target.recurringTask.isActive = false
-          }
-          target.recurringTaskId = null
+        if (target && target.recurringTask) {
+          target.recurringTask.isActive = false
         }
       } catch (err) {
         notify.error(err, 'Unable to deactivate recurring schedule')
-      }
-    }
-
-    if (savePayload.timer) {
-      try {
-        const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
-        const targetTask = findTaskById(savePayload.taskId)
-        if (targetTask && updatedTimer) {
-          targetTask.timer = {
-            ...targetTask.timer,
-            ...updatedTimer,
-            taskId: savePayload.taskId,
-          }
-        }
-      } catch (err) {
-        notify.error(err, 'Unable to update timer configuration')
       }
     }
   }

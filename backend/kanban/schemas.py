@@ -58,6 +58,39 @@ class TaskTimeEntryOut(Schema):
     created_at: datetime
 
 # Recurrence schemas
+def _validate_days_of_week(v):
+    if v is not None:
+        for day in v:
+            if not isinstance(day, int) or day < 0 or day > 6:
+                raise ValueError("days_of_week entries must be integers from 0 (Monday) to 6 (Sunday)")
+    return v
+
+def _validate_day_of_month(v):
+    if v is not None and (v < 1 or v > 31):
+        raise ValueError("day_of_month must be an integer between 1 and 31")
+    return v
+
+def _validate_time_of_day(v):
+    if v is not None:
+        parts = v.strip().split(":")
+        if len(parts) not in (2, 3):
+            raise ValueError("time_of_day must be formatted as HH:MM or HH:MM:SS")
+        try:
+            h = int(parts[0])
+            m = int(parts[1])
+            s = int(parts[2]) if len(parts) == 3 else 0
+            if not (0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59):
+                raise ValueError()
+        except ValueError:
+            raise ValueError("time_of_day must be a valid time of day (00:00 to 23:59)")
+    return v
+
+def _validate_timezone(v):
+    if v is not None and len(v.strip()) > 63:
+        raise ValueError("timezone name cannot exceed 63 characters")
+    return v
+
+
 class RecurringTaskIn(Schema):
     """Payload expected when configuring recurrence."""
     cadence: RecurrenceCadence = RecurrenceCadence.DAILY
@@ -65,6 +98,26 @@ class RecurringTaskIn(Schema):
     day_of_month: int | None = None
     time_of_day: str = "00:00"
     timezone: str | None = None
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, v):
+        return _validate_days_of_week(v)
+
+    @field_validator("day_of_month")
+    @classmethod
+    def validate_day_of_month(cls, v):
+        return _validate_day_of_month(v)
+
+    @field_validator("time_of_day")
+    @classmethod
+    def validate_time_of_day(cls, v):
+        return _validate_time_of_day(v)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        return _validate_timezone(v)
 
 class RecurringTaskPatchIn(Schema):
     """Payload expected for partially updating a recurring task schedule or template."""
@@ -80,6 +133,26 @@ class RecurringTaskPatchIn(Schema):
     tag_ids: list[int] | None = None
     default_timer_mode: TimerMode | None = None
     target_duration_seconds: int | None = None
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, v):
+        return _validate_days_of_week(v)
+
+    @field_validator("day_of_month")
+    @classmethod
+    def validate_day_of_month(cls, v):
+        return _validate_day_of_month(v)
+
+    @field_validator("time_of_day")
+    @classmethod
+    def validate_time_of_day(cls, v):
+        return _validate_time_of_day(v)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        return _validate_timezone(v)
 
 class RecurringTaskOut(Schema):
     """Shape of a recurring task returned to clients."""
@@ -173,6 +246,7 @@ class TaskUpdateIn(Schema):
     tag_ids: list[int] | None = None
     timer_mode: TimerMode | None = None
     target_duration_seconds: int | None = None
+    recurring_task_id: int | None = None
     apply_to_future: bool = False
     recurrence: RecurringTaskPatchIn | None = None
 

@@ -376,7 +376,7 @@ describe('Task Component DOM Suite', () => {
       expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(false)
     })
 
-    it('does not render recurring badge icon when recurringTask has isActive === false', () => {
+    it('renders recurring badge icon even when recurringTask has isActive === false (deactivated routine)', () => {
       const { wrapper } = mountTask({
         task: createTaskFixture({
           recurringTaskId: 'rec-789',
@@ -391,7 +391,7 @@ describe('Task Component DOM Suite', () => {
           },
         } as any),
       })
-      expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(true)
     })
   })
 })

@@ -6,6 +6,7 @@ import { defineComponent, h, inject } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kanbanApi, kanbanContextKey } from '~/api/kanban'
 import Board from '~/components/kanban/Board.vue'
+import TaskDialog from '~/components/kanban/TaskDialog.vue'
 import { createBoardFixture, createColumnFixture, createTaskFixture, createTagFixture } from '../fixtures/kanban'
 
 const DialogStub = {
@@ -664,9 +665,9 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     } as any)
 
     const wrapper = mountBoard(board)
-    const boardVm = wrapper.vm as any
+    const taskDialog = wrapper.findComponent(TaskDialog)
 
-    await boardVm.handleSaveTask({
+    taskDialog.vm.$emit('save', {
       mode: 'edit',
       taskId: 'task-recur-1',
       title: 'Recurring Task Title',
@@ -680,6 +681,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
         timezone: 'UTC',
       },
     })
+    await flushPromises()
 
     expect(updateSpy).toHaveBeenCalledWith('task-recur-1', expect.objectContaining({
       title: 'Recurring Task Title',
@@ -689,7 +691,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       }),
     }))
 
-    const taskOnBoard = boardVm.localColumns[0].tasks[0]
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
     expect(taskOnBoard.recurringTaskId).toBe('rec-101')
     expect(taskOnBoard.recurringTask?.cadence).toBe('DAILY')
     expect(taskOnBoard.recurringTask?.isActive).toBe(true)
@@ -733,17 +735,32 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       title: 'Recurring Task',
       position: 0,
       columnId: 'col-1',
-      recurringTaskId: null,
-      recurringTask: null,
+      recurringTaskId: 'rec-202',
+      recurringTask: {
+        id: 'rec-202',
+        boardId: 1,
+        creatorId: 1,
+        title: 'Recurring Task',
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00:00',
+        timezone: 'UTC',
+        defaultTimerMode: 'NONE',
+        isActive: false,
+        nextRunAt: '2026-11-15T09:00:00Z',
+        createdAt: '2026-11-14T00:00:00Z',
+        updatedAt: '2026-11-14T00:00:00Z',
+      },
       tags: [],
     } as any)
 
     const updateRecSpy = vi.spyOn(kanbanApi, 'updateRecurringTask').mockResolvedValue({} as any)
 
     const wrapper = mountBoard(board)
-    const boardVm = wrapper.vm as any
+    const taskDialog = wrapper.findComponent(TaskDialog)
 
-    await boardVm.handleSaveTask({
+    taskDialog.vm.$emit('save', {
       mode: 'edit',
       taskId: 'task-recur-2',
       title: 'Recurring Task',
@@ -752,9 +769,11 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       recurringTaskId: 'rec-202',
       recurrence: null,
     })
+    await flushPromises()
 
     expect(updateRecSpy).toHaveBeenCalledWith('rec-202', { isActive: false })
-    const taskOnBoard = boardVm.localColumns[0].tasks[0]
-    expect(taskOnBoard.recurringTaskId).toBeNull()
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
+    expect(taskOnBoard.recurringTaskId).toBe('rec-202')
+    expect(taskOnBoard.recurringTask?.isActive).toBe(false)
   })
 })

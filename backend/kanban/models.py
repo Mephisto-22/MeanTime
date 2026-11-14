@@ -105,7 +105,9 @@ class RecurringTask(models.Model):
     )
     creator = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="recurring_tasks",
     )
     title = models.CharField(max_length=200)
@@ -159,6 +161,53 @@ class RecurringTask(models.Model):
             day_of_month=self.day_of_month,
             after=after,
         )
+
+    def update_schedule(self, **fields) -> bool:
+        """
+        Update recurrence schedule fields and recalculate next_run_at if schedule changed.
+        Returns True if schedule changed and next_run_at was recalculated.
+        """
+        from kanban.recurrence import parse_time_of_day
+
+        schedule_changed = False
+        for field in ("cadence", "days_of_week", "day_of_month", "time_of_day", "timezone"):
+            if field in fields and fields[field] is not None:
+                new_val = fields[field]
+                if field == "cadence" and hasattr(new_val, "value"):
+                    new_val = new_val.value
+                elif field == "time_of_day" and isinstance(new_val, str):
+                    new_val = parse_time_of_day(new_val)
+
+                if getattr(self, field) != new_val:
+                    setattr(self, field, new_val)
+                    schedule_changed = True
+
+        if "is_active" in fields and fields["is_active"] is not None:
+            was_active = self.is_active
+            self.is_active = fields["is_active"]
+            # If re-activating a schedule that fell behind in the past, recalculate next_run_at
+            if not was_active and self.is_active and self.next_run_at <= timezone.now():
+                schedule_changed = True
+
+        if schedule_changed:
+            self.next_run_at = self.calculate_next_run()
+
+        return schedule_changed
+
+    def update_template(self, **fields) -> None:
+        """Update template properties (title, description, priority, timer)."""
+        if "title" in fields and fields["title"] is not None:
+            self.title = fields["title"]
+        if "description" in fields and fields["description"] is not None:
+            self.description = fields["description"]
+        if "priority" in fields:
+            p = fields["priority"]
+            self.priority = p.value if hasattr(p, "value") else p
+        if "default_timer_mode" in fields and fields["default_timer_mode"] is not None:
+            m = fields["default_timer_mode"]
+            self.default_timer_mode = m.value if hasattr(m, "value") else str(m)
+        if "target_duration_seconds" in fields:
+            self.target_duration_seconds = fields["target_duration_seconds"]
 
 
 

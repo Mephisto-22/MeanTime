@@ -519,6 +519,9 @@ describe('TaskDialog Component DOM Suite', () => {
       const toggle = wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]')
       expect(toggle.element.checked).toBe(true)
 
+      // Edit task title (core metadata edit)
+      await wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]').setValue('Updated Task Title')
+
       // Try to submit form
       await wrapper.find('form').trigger('submit.prevent')
 
@@ -545,12 +548,44 @@ describe('TaskDialog Component DOM Suite', () => {
         mode: 'edit',
         task: recurringTask,
       })
+      await wrapper2.find<HTMLInputElement>('[data-testid="task-title-input"]').setValue('Updated Task Title 2')
       await wrapper2.find('form').trigger('submit.prevent')
       await wrapper2.find('[data-testid="task-save-scope-future-button"]').trigger('click')
 
       expect(wrapper2.emitted('save')).toHaveLength(1)
       const saveFuture = wrapper2.emitted('save')![0][0] as TaskDialogSavePayload
       expect(saveFuture.applyToFuture).toBe(true)
+    })
+
+    it('recurrence save scope: submitting without core metadata edits saves directly without confirmation modal', async () => {
+      const recurringTask = createTaskFixture({
+        id: 't-recurring-unmodified',
+        title: 'Original Title',
+        recurringTaskId: 'rec-1',
+        recurringTask: {
+          id: 'rec-1',
+          cadence: 'DAILY',
+          daysOfWeek: [],
+          dayOfMonth: null,
+          timeOfDay: '00:00:00',
+          timezone: 'UTC',
+          isActive: true,
+        },
+      } as any)
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+
+      // Submit without modifying core metadata
+      await wrapper.find('form').trigger('submit.prevent')
+
+      // Directly emits save with applyToFuture: false, without opening scope modal
+      expect(wrapper.find('[data-testid="task-save-scope-confirmation"]').exists()).toBe(false)
+      expect(wrapper.emitted('save')).toHaveLength(1)
+      const payload = wrapper.emitted('save')![0][0] as TaskDialogSavePayload
+      expect(payload.applyToFuture).toBe(false)
     })
 
     it('recurrence delete flow: deleting recurring task shows two delete options', async () => {

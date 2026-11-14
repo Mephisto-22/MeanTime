@@ -85,6 +85,22 @@ export const TASK_PRIORITY_CONFIG = {
 
 export const DEFAULT_TASK_PRIORITY_BORDER_CLASS = 'border-l-4 border-l-transparent'
 
+export const TASK_CADENCE_OPTIONS: Array<{ label: string; value: RecurrenceCadence }> = [
+  { label: 'Daily', value: 'DAILY' },
+  { label: 'Weekly', value: 'WEEKLY' },
+  { label: 'Monthly', value: 'MONTHLY' },
+]
+
+export const TASK_WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: 'Mon', value: 0 },
+  { label: 'Tue', value: 1 },
+  { label: 'Wed', value: 2 },
+  { label: 'Thu', value: 3 },
+  { label: 'Fri', value: 4 },
+  { label: 'Sat', value: 5 },
+  { label: 'Sun', value: 6 },
+]
+
 export const TIMER_MODE_CONFIG = {
   NONE: { label: 'None' },
   COUNT_DOWN: { label: 'Count down' },
@@ -301,6 +317,10 @@ export class KanbanApi {
 
   updateRecurringTask(recurringTaskId: string | number, payload: Partial<RecurringTaskDto>): Promise<RecurringTaskDto> {
     return apiService.patch<RecurringTaskDto>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`, payload)
+  }
+
+  deleteRecurringTask(recurringTaskId: string | number): Promise<SuccessResponse> {
+    return apiService.delete<SuccessResponse>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`)
   }
 
   // -----------------

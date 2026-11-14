@@ -158,10 +158,7 @@ const hasDescription = computed(() => {
 })
 
 const isRecurring = computed(() => {
-  if (props.task.recurringTask) {
-    return props.task.recurringTask.isActive !== false
-  }
-  return Boolean(props.task.recurringTaskId)
+  return Boolean(props.task.recurringTaskId || props.task.recurringTask)
 })
 
 const priorityConfig = computed(() => {

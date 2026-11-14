@@ -4,7 +4,7 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
-from django.db import connection, transaction
+from django.db import connection, transaction, models
 from django.utils import timezone
 
 from kanban.models import BoardColumn, Task, TaskTimer, TimerMode, TimerState, RecurringTask
@@ -99,58 +99,58 @@ def spawn_due_recurring_tasks(as_of: datetime | None = None) -> int:
     )
 
     for rec_task in due_schedules:
-        leftmost_column = (
-            BoardColumn.objects.filter(board=rec_task.board)
-            .order_by("position", "id")
-            .first()
-        )
-        if leftmost_column is None:
-            logger.warning(
-                "RecurringTask %s (id=%s) has no columns on board %s; skipping.",
-                rec_task.title,
-                rec_task.id,
-                rec_task.board_id,
-            )
-            continue
-
-        with transaction.atomic():
-            # Get existing active tasks in the leftmost column
-            existing_active_tasks = list(
-                Task.objects.active()
-                .filter(column=leftmost_column)
+        try:
+            leftmost_column = (
+                BoardColumn.objects.filter(board=rec_task.board)
                 .order_by("position", "id")
+                .first()
             )
-            # Shift existing active tasks downward in reverse order to prevent position collisions
-            for i in range(len(existing_active_tasks) - 1, -1, -1):
-                existing_active_tasks[i].position = i + 1
-                existing_active_tasks[i].save(update_fields=["position"])
+            if leftmost_column is None:
+                logger.warning(
+                    "RecurringTask %s (id=%s) has no columns on board %s; skipping.",
+                    rec_task.title,
+                    rec_task.id,
+                    rec_task.board_id,
+                )
+                continue
 
-            # Create new occurrence at position 0
-            new_task = Task.objects.create(
-                column=leftmost_column,
-                recurring_task=rec_task,
-                title=rec_task.title,
-                description=rec_task.description,
-                priority=rec_task.priority,
-                position=0,
-                column_activity_at=now,
-            )
-            # Copy tags
-            new_task.tags.set(rec_task.tags.all())
+            with transaction.atomic():
+                # Lock the column row against concurrent modifications
+                locked_column = BoardColumn.objects.select_for_update().get(id=leftmost_column.id)
 
-            # Copy timer configuration if mode is not NONE
-            if rec_task.default_timer_mode != TimerMode.NONE:
-                TaskTimer.objects.create(
-                    task=new_task,
-                    mode=rec_task.default_timer_mode,
-                    target_duration_seconds=rec_task.target_duration_seconds,
-                    state=TimerState.IDLE,
+                # Shift existing active tasks downward atomically (using deferred unique constraint)
+                Task.objects.filter(column=locked_column, archived_at__isnull=True).update(
+                    position=models.F("position") + 1
                 )
 
-            # Advance next_run_at
-            rec_task.next_run_at = rec_task.calculate_next_run(after=now)
-            rec_task.save(update_fields=["next_run_at", "updated_at"])
-            spawned_total += 1
+                # Create new occurrence at position 0
+                new_task = Task.objects.create(
+                    column=locked_column,
+                    recurring_task=rec_task,
+                    title=rec_task.title,
+                    description=rec_task.description,
+                    priority=rec_task.priority,
+                    position=0,
+                    column_activity_at=now,
+                )
+                # Copy tags
+                new_task.tags.set(rec_task.tags.all())
+
+                # Copy timer configuration if mode is not NONE
+                if rec_task.default_timer_mode != TimerMode.NONE:
+                    TaskTimer.objects.create(
+                        task=new_task,
+                        mode=rec_task.default_timer_mode,
+                        target_duration_seconds=rec_task.target_duration_seconds,
+                        state=TimerState.IDLE,
+                    )
+
+                # Advance next_run_at
+                rec_task.next_run_at = rec_task.calculate_next_run(after=now)
+                rec_task.save(update_fields=["next_run_at", "updated_at"])
+                spawned_total += 1
+        except Exception:
+            logger.exception("Failed to spawn occurrence for recurring task id=%s", rec_task.id)
 
     if spawned_total > 0:
         logger.info("Spawned %d recurring tasks.", spawned_total)
