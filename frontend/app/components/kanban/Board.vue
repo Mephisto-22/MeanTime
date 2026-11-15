@@ -241,6 +241,14 @@ const applyTaskMove = (
 
 
 const handleBoardEvent = (event: BoardEvent): void => {
+  const auth = useAuthStore()
+
+  // ignore events published by the currently authenticated user as their UI is already
+  // updated through local state
+  if (String(event.actorId) === String(auth.user?.id)) {
+    return
+  }
+
   const data = event.data
 
   switch (event.type) {

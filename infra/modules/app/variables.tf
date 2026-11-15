@@ -71,7 +71,7 @@ variable "task_cpu" {
 }
 
 variable "task_memory" {
-  description = "Memory in MiB for the whole task, shared by all three containers."
+  description = "Memory in MiB for the whole task, shared by all four containers."
   type        = number
   default     = 1024
 }

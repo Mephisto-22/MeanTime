@@ -876,8 +876,12 @@ def delete_time_entry(request, entry_id: int):
 # Tag Endpoints
 # ------------------
 @router.get("/tags", response=list[TagOut])
-def list_tags(request, board_id: int):
+def list_tags(request, board_id: int = None):
     """List tags belonging to participants of an accessible board."""
+    
+    if board_id is None:
+        return Tag.objects.filter(user=request.auth)
+    
     board = get_accessible_board(request.auth, board_id)
 
     return Tag.objects.filter(

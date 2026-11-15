@@ -1,5 +1,5 @@
-# MeanTime on ECS Fargate: one service running one task with three containers
-# (frontend, backend, db) that share the task's network and reach each other
+# MeanTime on ECS Fargate: one service running one task with four containers
+# (frontend, backend, db, redis) that share the task's network and reach each other
 # on localhost.
 # The database is a container whose files are on EFS, in the base layer's
 # file system, so the data survives the task restarting or this layer being
@@ -225,6 +225,26 @@ resource "aws_ecs_task_definition" "this" {
       }
     },
     {
+      name      = "redis"
+      image     = "redis:alpine"
+      essential = true
+
+      healthCheck = {
+        command     = ["CMD", "redis-cli", "ping"]
+        interval    = 5
+        timeout     = 3
+        retries     = 5
+        startPeriod = 5
+      }
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options   = merge(local.log_options, {
+          "awslogs-stream-prefix" = "redis"
+        })
+      }
+    },
+    {
       name      = "backend"
       image     = local.backend_image
       essential = true
@@ -233,6 +253,8 @@ resource "aws_ecs_task_definition" "this" {
         { name = "POSTGRES_USER", value = local.db_user },
         { name = "POSTGRES_HOST", value = "localhost" },
         { name = "POSTGRES_PORT", value = "5432" },
+        { name = "REDIS_HOST", value = "localhost" },
+        { name = "REDIS_PORT", value = "6379" },
         # Requests reach Django only through the frontend's proxy on localhost.
         { name = "DJANGO_ALLOWED_HOSTS", value = "localhost,127.0.0.1" },
         # The address people open the app at, for links and the Google
@@ -250,6 +272,7 @@ resource "aws_ecs_task_definition" "this" {
       ]
       dependsOn = [
         { containerName = "db", condition = "HEALTHY" },
+        { containerName = "redis", condition = "HEALTHY" },
       ]
       healthCheck = {
         command     = ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
