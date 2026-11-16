@@ -187,15 +187,15 @@ def dispatch_due_date_reminders(as_of: datetime | None = None) -> int:
             if collab.email:
                 recipients.add(collab.email)
 
-        formatted_deadline = (
-            task.due_at.strftime("%Y-%m-%d %H:%M UTC") if task.due_at else "No deadline"
+        formatted_due_date = (
+            task.due_at.strftime("%Y-%m-%d %H:%M UTC") if task.due_at else "No due date"
         )
         board_url = f"{settings.FRONTEND_URL}/boards/{board.id}"
         subject = f"Reminder: Task '{task.title}' is due soon on {board.title}"
         body = (
             f"Hello,\n\n"
             f"This is a reminder that the task '{task.title}' on board '{board.title}' "
-            f"is due at {formatted_deadline}.\n\n"
+            f"is due at {formatted_due_date}.\n\n"
             f"View board: {board_url}\n"
         )
 

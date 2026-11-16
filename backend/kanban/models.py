@@ -291,17 +291,8 @@ class Task(models.Model):
             expected_reminder_at = None
 
         recalculated = False
-        if self.pk is None or (getattr(self, "_state", None) and self._state.adding):
-            self.reminder_at = expected_reminder_at
-            if self.reminder_at is not None:
-                if self.reminder_at <= timezone.now():
-                    self.reminder_sent_at = timezone.now()
-                else:
-                    self.reminder_sent_at = None
-            else:
-                self.reminder_sent_at = None
-            recalculated = True
-        elif expected_reminder_at != self.reminder_at:
+        is_new = self.pk is None or bool(getattr(self, "_state", None) and self._state.adding)
+        if is_new or expected_reminder_at != self.reminder_at:
             self.reminder_at = expected_reminder_at
             if self.reminder_at is not None:
                 if self.reminder_at <= timezone.now():

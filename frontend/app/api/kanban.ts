@@ -148,21 +148,13 @@ export const TASK_WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
 
 export const REMINDER_PRESET_OPTIONS: Array<{ label: string; value: number | null; shortLabel: string }> = [
   { label: 'None (No reminder)', value: null, shortLabel: 'Off' },
-  { label: 'At deadline (0m)', value: 0, shortLabel: 'At due' },
+  { label: 'At due date (0m)', value: 0, shortLabel: 'At due' },
   { label: '15 minutes before', value: 900, shortLabel: '15m' },
   { label: '1 hour before', value: 3600, shortLabel: '1h' },
   { label: '2 hours before', value: 7200, shortLabel: '2h' },
   { label: '1 day before', value: 86400, shortLabel: '1d' },
   { label: '2 days before', value: 172800, shortLabel: '2d' },
-  { label: 'Custom offset...', value: -1, shortLabel: 'Custom' },
 ]
-
-export const QUICK_DUE_DATE_PRESETS = [
-  { label: 'Today', key: 'today' },
-  { label: 'Tomorrow', key: 'tomorrow' },
-  { label: 'In 3 days', key: 'in3days' },
-  { label: 'Next week', key: 'nextweek' },
-] as const
 
 export const TIMER_MODE_CONFIG = {
   NONE: { label: 'None' },

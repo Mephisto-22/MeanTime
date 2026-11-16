@@ -67,7 +67,7 @@ class TaskDueDateModelTests(TestCase):
         self.assertIsNone(task.reminder_at)
         self.assertIsNone(task.reminder_sent_at)
 
-    def test_extending_deadline_resets_reminder_sent_at(self):
+    def test_extending_due_at_resets_reminder_sent_at(self):
         """Extending a task's due date into the future resets reminder_sent_at to None."""
         initial_due = timezone.now() + timedelta(hours=1)
         task = Task.objects.create(

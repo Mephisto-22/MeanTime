@@ -195,7 +195,7 @@
         />
       </div>
 
-      <!-- Scheduling & Deadlines Grid: Due Date (Left) & Recurrence (Right) -->
+      <!-- Scheduling & Due Dates Grid: Due Date (Left) & Recurrence (Right) -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
         <!-- Due Date & Collaborator Reminder Section -->
         <KanbanTaskDueDateSection
@@ -1047,16 +1047,6 @@ const hasCoreMetadataChanged = computed(() => {
     }
     if (recurrenceCadence.value === 'MONTHLY' && dayOfMonth.value !== origRec.dayOfMonth) return true
     if ((timeOfDay.value || '00:00') !== (origRec.timeOfDay ? origRec.timeOfDay.slice(0, 5) : '00:00')) return true
-  }
-
-  // Due date & reminder changes
-  const origDue = props.task.dueAt ?? (props.task as any)?.due_at ?? null
-  const origReminder = props.task.reminderOffsetSeconds ?? (props.task as any)?.reminder_offset_seconds ?? null
-  if (isDueDateEnabled.value) {
-    if (!origDue) return true
-    if (origReminder !== reminderOffsetSeconds.value) return true
-  } else {
-    if (origDue) return true
   }
 
   return false

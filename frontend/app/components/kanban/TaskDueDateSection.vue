@@ -18,14 +18,14 @@
               Due date
             </Label>
             <span
-              v-if="formattedActiveDeadline"
+              v-if="formattedActiveDueDate"
               class="inline-flex items-center gap-1 rounded bg-primary-100/70 dark:bg-primary-950/80 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 text-[10px] font-mono font-medium"
             >
-              {{ formattedActiveDeadline }}
+              {{ formattedActiveDueDate }}
             </span>
           </div>
           <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
-            Target completion & collaborator dispatch
+            Due date & collaborator dispatch
           </p>
         </div>
       </div>
@@ -47,7 +47,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <div class="flex flex-col gap-1">
           <Label for="task-due-date-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-            Target date
+            Due date
           </Label>
           <DatePicker
             id="task-due-date-input"
@@ -65,7 +65,7 @@
 
         <div class="flex flex-col gap-1">
           <Label for="task-due-time-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-            Target time
+            Due time
           </Label>
           <DatePicker
             id="task-due-time-input"
@@ -147,7 +147,7 @@
         </div>
 
         <div v-else class="text-[11px] text-surface-400 italic pt-0.5">
-          No automated email will be sent for this deadline.
+          No automated email will be sent for this due date.
         </div>
       </div>
     </div>
@@ -263,22 +263,26 @@ const reminderOffsetModel = computed({
   set: (val: number | null) => emit('update:reminderOffsetSeconds', val),
 })
 
-const formattedActiveDeadline = computed(() => {
-  if (!props.dueDate) return null
+const formattedActiveDueDate = computed(() => {
+  if (!props.enabled || !props.dueDate) return null
   const d = new Date(props.dueDate)
-  const month = d.toLocaleString('en-US', { month: 'short' })
-  const day = d.getDate()
+  if (isNaN(d.getTime())) return null
+  const month = d.toLocaleString('en-US', { month: 'short', timeZone: props.userTimezone })
+  const day = d.toLocaleDateString('en-US', { day: 'numeric', timeZone: props.userTimezone })
   return `${month} ${day}, ${props.dueTime || '17:00'}`
 })
 
 const computedDispatchTimestamp = computed(() => {
-  if (!props.dueDate || props.reminderOffsetSeconds === null) return null
+  if (!props.enabled || !props.dueDate || props.reminderOffsetSeconds === null) return null
   const d = new Date(props.dueDate)
+  if (isNaN(d.getTime())) return null
   const [h, m] = props.dueTime.split(':').map((n) => parseInt(n, 10))
   d.setHours(h ?? 17, m ?? 0, 0, 0)
 
   const dispatchMs = d.getTime() - props.reminderOffsetSeconds * 1000
   const dispatchDate = new Date(dispatchMs)
-  return `${dispatchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${String(dispatchDate.getHours()).padStart(2, '0')}:${String(dispatchDate.getMinutes()).padStart(2, '0')}`
+  const datePart = dispatchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: props.userTimezone })
+  const timePart = dispatchDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: props.userTimezone })
+  return `${datePart} at ${timePart}`
 })
 </script>

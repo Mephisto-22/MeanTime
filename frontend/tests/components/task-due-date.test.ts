@@ -1,23 +1,22 @@
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import { describe, expect, it, vi } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
 import Task from '~/components/kanban/Task.vue'
+import Board from '~/components/kanban/Board.vue'
 import {
+  createBoardFixture,
+  createColumnFixture,
   createTaskFixture,
+  DialogStub,
   ToggleSwitchStub,
   InputNumberStub,
   InputMaskStub,
   DatePickerStub,
 } from '../fixtures'
-import { kanbanContextKey, TASK_DUE_DATE_STATUS_CONFIG } from '~/api/kanban'
-
-const DialogStub = {
-  name: 'Dialog',
-  props: ['visible', 'header'],
-  template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
-}
+import { kanbanApi, kanbanContextKey, TASK_DUE_DATE_STATUS_CONFIG } from '~/api/kanban'
 
 const SelectStub = {
   name: 'Select',
@@ -133,7 +132,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
     it('populates existing due date and reminder in edit mode', () => {
       const task = createTaskFixture({
         id: 'task-with-due',
-        title: 'Task with Deadline',
+        title: 'Task with Due Date',
         dueAt: '2026-11-20T17:00:00.000Z',
         reminderOffsetSeconds: 3600,
       })
@@ -148,7 +147,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
     it('toggling collaborator reminder off hides reminder interval select', async () => {
       const task = createTaskFixture({
         id: 'task-with-due',
-        title: 'Task with Deadline',
+        title: 'Task with Due Date',
         dueAt: '2026-11-20T17:00:00.000Z',
         reminderOffsetSeconds: 3600,
       })
@@ -197,7 +196,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
     it('clearing an existing due date in edit mode emits null values', async () => {
       const task = createTaskFixture({
         id: 'task-with-due',
-        title: 'Task with Deadline',
+        title: 'Task with Due Date',
         dueAt: '2026-11-20T17:00:00.000Z',
         reminderOffsetSeconds: 3600,
       })
@@ -224,7 +223,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
     })
   })
 
-  describe('Task Card Visual Indicators', () => {
+  describe('Task Visual Indicators', () => {
     it('omits due date badge when task has no due date', () => {
       const { wrapper } = mountTask({
         task: createTaskFixture({ dueAt: null, due_at: null }),
@@ -233,7 +232,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(wrapper.find('[data-testid="task-due-date-badge"]').exists()).toBe(false)
     })
 
-    it('renders overdue badge when deadline is in the past', () => {
+    it('renders overdue badge when due date is in the past', () => {
       const pastDate = new Date(Date.now() - 2 * 3600 * 1000).toISOString()
       const { wrapper } = mountTask({
         task: createTaskFixture({ dueAt: pastDate }),
@@ -245,7 +244,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(badge.classes()).toContain('text-red-700')
     })
 
-    it('renders due soon badge when deadline is within 24 hours', () => {
+    it('renders due soon badge when due date is within 24 hours', () => {
       const dueSoonDate = new Date(Date.now() + 4 * 3600 * 1000).toISOString()
       const { wrapper } = mountTask({
         task: createTaskFixture({ dueAt: dueSoonDate }),
@@ -257,7 +256,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(badge.classes()).toContain('text-amber-700')
     })
 
-    it('renders upcoming badge when deadline is more than 24 hours away', () => {
+    it('renders upcoming badge when due date is more than 24 hours away', () => {
       const upcomingDate = new Date(Date.now() + 48 * 3600 * 1000).toISOString()
       const { wrapper } = mountTask({
         task: createTaskFixture({ dueAt: upcomingDate }),
@@ -267,6 +266,100 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(badge.exists()).toBe(true)
       expect(badge.attributes('data-status')).toBe('upcoming')
       expect(badge.classes()).toContain('text-surface-600')
+    })
+  })
+
+  describe('Board Task Due Date Orchestration', () => {
+    it('creates a task with due_at and reminder_offset_seconds and reconciles optimistic state', async () => {
+      const board = createBoardFixture({
+        columns: [createColumnFixture({ id: 'col-1', tasks: [] })],
+      })
+
+      const createSpy = vi.spyOn(kanbanApi, 'createTask').mockResolvedValue({
+        id: 888,
+        title: 'Task with Due Date',
+        description: 'Testing due date creation',
+        position: 0,
+        columnId: 'col-1',
+        dueAt: '2026-11-25T17:00:00.000Z',
+        due_at: '2026-11-25T17:00:00.000Z',
+        reminderOffsetSeconds: 3600,
+        reminder_offset_seconds: 3600,
+      } as any)
+
+      const wrapper = mount(Board, {
+        props: { board },
+        global: {
+          plugins: [PrimeVue, ToastService],
+          stubs: { Dialog: DialogStub },
+        },
+      })
+      const boardVm = wrapper.vm as any
+
+      await boardVm.handleSaveTask({
+        title: 'Task with Due Date',
+        description: 'Testing due date creation',
+        mode: 'create',
+        columnId: 'col-1',
+        dueAt: '2026-11-25T17:00:00.000Z',
+        reminderOffsetSeconds: 3600,
+      })
+
+      expect(createSpy).toHaveBeenCalledWith('col-1', expect.objectContaining({
+        title: 'Task with Due Date',
+        due_at: '2026-11-25T17:00:00.000Z',
+        reminder_offset_seconds: 3600,
+      }))
+
+      const colTasks = boardVm.localColumns[0].tasks
+      expect(colTasks).toHaveLength(1)
+      expect(colTasks[0].id).toBe(888)
+      expect(colTasks[0].dueAt).toBe('2026-11-25T17:00:00.000Z')
+      expect(colTasks[0].reminderOffsetSeconds).toBe(3600)
+    })
+
+    it('updates an existing task with due_at and reminder_offset_seconds', async () => {
+      const existingTask = createTaskFixture({
+        id: 'task-100',
+        columnId: 'col-1',
+        title: 'Existing Task',
+      })
+      const board = createBoardFixture({
+        columns: [createColumnFixture({ id: 'col-1', tasks: [existingTask] })],
+      })
+
+      const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+        ...existingTask,
+        dueAt: '2026-11-30T17:00:00.000Z',
+        due_at: '2026-11-30T17:00:00.000Z',
+        reminderOffsetSeconds: 7200,
+        reminder_offset_seconds: 7200,
+      } as any)
+
+      const wrapper = mount(Board, {
+        props: { board },
+        global: {
+          plugins: [PrimeVue, ToastService],
+          stubs: { Dialog: DialogStub },
+        },
+      })
+      const boardVm = wrapper.vm as any
+
+      await boardVm.handleSaveTask({
+        mode: 'edit',
+        taskId: 'task-100',
+        columnId: 'col-1',
+        title: 'Updated Task',
+        description: '',
+        dueAt: '2026-11-30T17:00:00.000Z',
+        reminderOffsetSeconds: 7200,
+      })
+
+      expect(updateSpy).toHaveBeenCalledWith('task-100', expect.objectContaining({
+        title: 'Updated Task',
+        due_at: '2026-11-30T17:00:00.000Z',
+        reminder_offset_seconds: 7200,
+      }))
     })
   })
 })
