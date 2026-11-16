@@ -832,7 +832,7 @@ const syncFormWithProps = () => {
         }
     timeEntriesState.value = props.task.timeEntries ? [...props.task.timeEntries] : []
 
-    const dueRaw = props.task.dueAt ?? (props.task as any)?.due_at
+    const dueRaw = props.task.dueAt
     if (dueRaw) {
       isDueDateEnabled.value = true
       const parsed = new Date(dueRaw)
@@ -844,8 +844,7 @@ const syncFormWithProps = () => {
       } else {
         dueTimeValue.value = '17:00'
       }
-      reminderOffsetSeconds.value =
-        props.task.reminderOffsetSeconds ?? (props.task as any)?.reminder_offset_seconds ?? 3600
+      reminderOffsetSeconds.value = props.task.reminderOffsetSeconds ?? 3600
     } else {
       isDueDateEnabled.value = false
       dueDateValue.value = null
@@ -1102,16 +1101,11 @@ const executeSave = (applyToFuture = false) => {
     const d = new Date(dueDateValue.value)
     const [h, m] = dueTimeValue.value.split(':').map((n) => parseInt(n, 10))
     d.setHours(h ?? 17, m ?? 0, 0, 0)
-    const iso = d.toISOString()
-    payload.dueAt = iso
-    payload.due_at = iso
+    payload.dueAt = d.toISOString()
     payload.reminderOffsetSeconds = reminderOffsetSeconds.value
-    payload.reminder_offset_seconds = reminderOffsetSeconds.value
-  } else if (props.mode === 'edit' && (props.task?.dueAt || (props.task as any)?.due_at)) {
+  } else if (props.mode === 'edit' && props.task?.dueAt) {
     payload.dueAt = null
-    payload.due_at = null
     payload.reminderOffsetSeconds = null
-    payload.reminder_offset_seconds = null
   }
 
   emit('save', payload)

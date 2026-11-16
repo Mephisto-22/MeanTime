@@ -181,7 +181,7 @@ const isRecurring = computed(() => {
   return Boolean(props.task.recurringTaskId || props.task.recurringTask)
 })
 
-const rawDueAt = computed(() => props.task.dueAt ?? (props.task as any)?.due_at)
+const rawDueAt = computed(() => props.task.dueAt)
 
 const hasDueDate = computed(() => Boolean(rawDueAt.value))
 

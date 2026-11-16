@@ -163,7 +163,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(wrapper.find('[data-testid="task-reminder-select"]').exists()).toBe(false)
     })
 
-    it('submitting with due date enabled emits dueAt, due_at, reminderOffsetSeconds in save payload', async () => {
+    it('submitting with due date enabled emits dueAt and reminderOffsetSeconds in save payload', async () => {
       const wrapper = mountTaskDialog({ mode: 'create' })
       await wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]').setValue('Deliver Due Date Feature')
 
@@ -187,10 +187,8 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
 
       const payload = saveEmits![0][0] as any
       expect(payload.dueAt).toBeDefined()
-      expect(payload.due_at).toBeDefined()
       expect(typeof payload.dueAt).toBe('string')
       expect(payload.reminderOffsetSeconds).toBe(3600)
-      expect(payload.reminder_offset_seconds).toBe(3600)
     })
 
     it('clearing an existing due date in edit mode emits null values', async () => {
@@ -217,16 +215,14 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(saveEmits).toBeDefined()
       const payload = saveEmits![0][0] as any
       expect(payload.dueAt).toBeNull()
-      expect(payload.due_at).toBeNull()
       expect(payload.reminderOffsetSeconds).toBeNull()
-      expect(payload.reminder_offset_seconds).toBeNull()
     })
   })
 
   describe('Task Visual Indicators', () => {
     it('omits due date badge when task has no due date', () => {
       const { wrapper } = mountTask({
-        task: createTaskFixture({ dueAt: null, due_at: null }),
+        task: createTaskFixture({ dueAt: null }),
       })
 
       expect(wrapper.find('[data-testid="task-due-date-badge"]').exists()).toBe(false)
@@ -270,7 +266,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
   })
 
   describe('Board Task Due Date Orchestration', () => {
-    it('creates a task with due_at and reminder_offset_seconds and reconciles optimistic state', async () => {
+    it('creates a task with dueAt and reminderOffsetSeconds and reconciles optimistic state', async () => {
       const board = createBoardFixture({
         columns: [createColumnFixture({ id: 'col-1', tasks: [] })],
       })
@@ -282,9 +278,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
         position: 0,
         columnId: 'col-1',
         dueAt: '2026-11-25T17:00:00.000Z',
-        due_at: '2026-11-25T17:00:00.000Z',
         reminderOffsetSeconds: 3600,
-        reminder_offset_seconds: 3600,
       } as any)
 
       const wrapper = mount(Board, {
@@ -307,8 +301,8 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
 
       expect(createSpy).toHaveBeenCalledWith('col-1', expect.objectContaining({
         title: 'Task with Due Date',
-        due_at: '2026-11-25T17:00:00.000Z',
-        reminder_offset_seconds: 3600,
+        dueAt: '2026-11-25T17:00:00.000Z',
+        reminderOffsetSeconds: 3600,
       }))
 
       const colTasks = boardVm.localColumns[0].tasks
@@ -318,7 +312,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(colTasks[0].reminderOffsetSeconds).toBe(3600)
     })
 
-    it('updates an existing task with due_at and reminder_offset_seconds', async () => {
+    it('updates an existing task with dueAt and reminderOffsetSeconds', async () => {
       const existingTask = createTaskFixture({
         id: 'task-100',
         columnId: 'col-1',
@@ -331,9 +325,7 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
         ...existingTask,
         dueAt: '2026-11-30T17:00:00.000Z',
-        due_at: '2026-11-30T17:00:00.000Z',
         reminderOffsetSeconds: 7200,
-        reminder_offset_seconds: 7200,
       } as any)
 
       const wrapper = mount(Board, {
@@ -357,8 +349,8 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
 
       expect(updateSpy).toHaveBeenCalledWith('task-100', expect.objectContaining({
         title: 'Updated Task',
-        due_at: '2026-11-30T17:00:00.000Z',
-        reminder_offset_seconds: 7200,
+        dueAt: '2026-11-30T17:00:00.000Z',
+        reminderOffsetSeconds: 7200,
       }))
     })
   })

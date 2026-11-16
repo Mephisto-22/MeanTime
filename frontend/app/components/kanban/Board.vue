@@ -509,10 +509,8 @@ const handleCreateTask = async (
     columnId,
     priority: payload.priority ?? null,
     tags: payload.tags ?? [],
-    dueAt: payload.dueAt ?? payload.due_at ?? null,
-    due_at: payload.due_at ?? payload.dueAt ?? null,
-    reminderOffsetSeconds: payload.reminderOffsetSeconds ?? payload.reminder_offset_seconds ?? null,
-    reminder_offset_seconds: payload.reminder_offset_seconds ?? payload.reminderOffsetSeconds ?? null,
+    dueAt: payload.dueAt ?? null,
+    reminderOffsetSeconds: payload.reminderOffsetSeconds ?? null,
     recurringTaskId: null,
     recurringTask: null,
   }
@@ -529,11 +527,11 @@ const handleCreateTask = async (
     if (payload.tagIds !== undefined) {
       createPayload.tagIds = payload.tagIds
     }
-    if (payload.dueAt !== undefined || payload.due_at !== undefined) {
-      createPayload.due_at = payload.dueAt ?? payload.due_at
+    if (payload.dueAt !== undefined) {
+      createPayload.dueAt = payload.dueAt
     }
-    if (payload.reminderOffsetSeconds !== undefined || payload.reminder_offset_seconds !== undefined) {
-      createPayload.reminder_offset_seconds = payload.reminderOffsetSeconds ?? payload.reminder_offset_seconds
+    if (payload.reminderOffsetSeconds !== undefined) {
+      createPayload.reminderOffsetSeconds = payload.reminderOffsetSeconds
     }
     if (payload.recurrence) {
       createPayload.recurrence = payload.recurrence
@@ -571,13 +569,11 @@ const handleCreateTask = async (
           createdTask.priority ?? optimisticLocation.task.priority
         optimisticLocation.task.tags =
           createdTask.tags ?? optimisticLocation.task.tags
-        if (createdTask.dueAt !== undefined || createdTask.due_at !== undefined) {
-          optimisticLocation.task.dueAt = createdTask.dueAt ?? createdTask.due_at
-          optimisticLocation.task.due_at = createdTask.due_at ?? createdTask.dueAt
+        if (createdTask.dueAt !== undefined) {
+          optimisticLocation.task.dueAt = createdTask.dueAt
         }
-        if (createdTask.reminderOffsetSeconds !== undefined || createdTask.reminder_offset_seconds !== undefined) {
-          optimisticLocation.task.reminderOffsetSeconds = createdTask.reminderOffsetSeconds ?? createdTask.reminder_offset_seconds
-          optimisticLocation.task.reminder_offset_seconds = createdTask.reminder_offset_seconds ?? createdTask.reminderOffsetSeconds
+        if (createdTask.reminderOffsetSeconds !== undefined) {
+          optimisticLocation.task.reminderOffsetSeconds = createdTask.reminderOffsetSeconds
         }
         if (createdTask.recurringTaskId !== undefined) {
           optimisticLocation.task.recurringTaskId = createdTask.recurringTaskId
@@ -619,22 +615,18 @@ const applyTaskUpdates = (
     tags?: TagDto[]
     timer?: TaskTimerDto | null
     dueAt?: string | null
-    due_at?: string | null
     reminderOffsetSeconds?: number | null
-    reminder_offset_seconds?: number | null
   },
 ): void => {
   if (source.title !== undefined) target.title = source.title
   if (source.description !== undefined) target.description = source.description
   if (source.priority !== undefined) target.priority = source.priority
   if (source.tags !== undefined) target.tags = source.tags
-  if (source.dueAt !== undefined || source.due_at !== undefined) {
-    target.dueAt = source.dueAt ?? source.due_at ?? null
-    target.due_at = source.due_at ?? source.dueAt ?? null
+  if (source.dueAt !== undefined) {
+    target.dueAt = source.dueAt ?? null
   }
-  if (source.reminderOffsetSeconds !== undefined || source.reminder_offset_seconds !== undefined) {
-    target.reminderOffsetSeconds = source.reminderOffsetSeconds ?? source.reminder_offset_seconds ?? null
-    target.reminder_offset_seconds = source.reminder_offset_seconds ?? source.reminderOffsetSeconds ?? null
+  if (source.reminderOffsetSeconds !== undefined) {
+    target.reminderOffsetSeconds = source.reminderOffsetSeconds ?? null
   }
   if (source.timer !== undefined) {
     if (source.timer === null || source.timer.mode === 'NONE') {
@@ -716,11 +708,11 @@ const handleUpdateTask = async (
     if (payload.tagIds !== undefined) {
       updatePayload.tagIds = payload.tagIds
     }
-    if ((payload as any).dueAt !== undefined || (payload as any).due_at !== undefined) {
-      updatePayload.due_at = (payload as any).dueAt ?? (payload as any).due_at
+    if (payload.dueAt !== undefined) {
+      updatePayload.dueAt = payload.dueAt
     }
-    if ((payload as any).reminderOffsetSeconds !== undefined || (payload as any).reminder_offset_seconds !== undefined) {
-      updatePayload.reminder_offset_seconds = (payload as any).reminderOffsetSeconds ?? (payload as any).reminder_offset_seconds
+    if (payload.reminderOffsetSeconds !== undefined) {
+      updatePayload.reminderOffsetSeconds = payload.reminderOffsetSeconds
     }
     if ((payload as any).applyToFuture !== undefined) {
       updatePayload.applyToFuture = (payload as any).applyToFuture
@@ -824,10 +816,8 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       priority: savePayload.priority,
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
-      dueAt: savePayload.dueAt ?? savePayload.due_at,
-      due_at: savePayload.due_at ?? savePayload.dueAt,
-      reminderOffsetSeconds: savePayload.reminderOffsetSeconds ?? savePayload.reminder_offset_seconds,
-      reminder_offset_seconds: savePayload.reminder_offset_seconds ?? savePayload.reminderOffsetSeconds,
+      dueAt: savePayload.dueAt,
+      reminderOffsetSeconds: savePayload.reminderOffsetSeconds,
       recurrence: savePayload.recurrence,
       timer: savePayload.timer,
     })
@@ -842,13 +832,11 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       applyToFuture: savePayload.applyToFuture,
       timer: savePayload.timer,
     }
-    if (savePayload.dueAt !== undefined || savePayload.due_at !== undefined) {
-      updateTaskPayload.dueAt = savePayload.dueAt ?? savePayload.due_at
-      updateTaskPayload.due_at = savePayload.due_at ?? savePayload.dueAt
+    if (savePayload.dueAt !== undefined) {
+      updateTaskPayload.dueAt = savePayload.dueAt
     }
-    if (savePayload.reminderOffsetSeconds !== undefined || savePayload.reminder_offset_seconds !== undefined) {
-      updateTaskPayload.reminderOffsetSeconds = savePayload.reminderOffsetSeconds ?? savePayload.reminder_offset_seconds
-      updateTaskPayload.reminder_offset_seconds = savePayload.reminder_offset_seconds ?? savePayload.reminderOffsetSeconds
+    if (savePayload.reminderOffsetSeconds !== undefined) {
+      updateTaskPayload.reminderOffsetSeconds = savePayload.reminderOffsetSeconds
     }
     if (savePayload.recurrence) {
       updateTaskPayload.recurrence = savePayload.recurrence

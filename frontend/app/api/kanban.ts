@@ -208,13 +208,9 @@ export interface KanbanTaskDto {
   tags?: TagDto[]
   tagIds?: Array<string | number>
   dueAt?: string | null
-  due_at?: string | null
   reminderOffsetSeconds?: number | null
-  reminder_offset_seconds?: number | null
   reminderAt?: string | null
-  reminder_at?: string | null
   reminderSentAt?: string | null
-  reminder_sent_at?: string | null
 }
 
 export interface KanbanColumnDto {
@@ -272,9 +268,7 @@ export interface TaskDialogSavePayload {
   recurringTaskId?: number | string | null
   applyToFuture?: boolean
   dueAt?: string | null
-  due_at?: string | null
   reminderOffsetSeconds?: number | null
-  reminder_offset_seconds?: number | null
 }
 
 export interface KanbanContext {

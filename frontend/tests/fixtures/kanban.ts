@@ -29,13 +29,9 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     recurringTaskId: overrides.recurringTaskId,
     recurringTask: overrides.recurringTask,
     dueAt: overrides.dueAt,
-    due_at: overrides.due_at,
     reminderOffsetSeconds: overrides.reminderOffsetSeconds,
-    reminder_offset_seconds: overrides.reminder_offset_seconds,
     reminderAt: overrides.reminderAt,
-    reminder_at: overrides.reminder_at,
     reminderSentAt: overrides.reminderSentAt,
-    reminder_sent_at: overrides.reminder_sent_at,
   }
 }
 
