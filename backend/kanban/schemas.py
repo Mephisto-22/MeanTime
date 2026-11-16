@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
+from typing import Literal
 from users.schemas import UserOut
 from .models import TaskPriority, TimerMode, TimerState, RecurrenceCadence
 
@@ -335,6 +336,7 @@ class TaskMoveIn(Schema):
 class BoardShareIn(Schema):
     """Payload expected when sharing a board with a friend."""
     friend_id: int
+    role: Literal["EDITOR", "VIEWER"] = "EDITOR"
 
 
 # Tag Schemas

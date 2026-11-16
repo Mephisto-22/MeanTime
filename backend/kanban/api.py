@@ -560,7 +560,7 @@ def delete_board(request, board_id: int):
 
 @router.post("/boards/{board_id}/collaborators")
 def share_board(request, board_id: int, payload: BoardShareIn):
-    """Share a board with an accepted friend."""
+    """Share a board with an accepted friend, or update their role if they are already a collaborator."""
 
     # only the board owner can manage collaborators
     board = get_owned_board(request.auth, board_id)
@@ -572,7 +572,14 @@ def share_board(request, board_id: int, payload: BoardShareIn):
     if not request.auth.is_friends_with(friend):
         raise HttpError(403, "You can only share boards with accepted friends.")
 
-    # grant the friend access
+    # Create or update the collaborator's membership and role.
+    BoardMembership.objects.update_or_create(
+        board=board,
+        user=friend,
+        defaults={"role": payload.role},
+    )
+
+    # Keep the legacy relationship synchronized during migration.
     board.collaborators.add(friend)
 
     return {"success": True, "message": "Board shared successfully."}
@@ -588,7 +595,16 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     collaborator = get_object_or_404(User, id=collaborator_id)
 
     # Verify that the user currently has access.
-    if not board.collaborators.filter(id=collaborator.id).exists():
+    membership_exists = BoardMembership.objects.filter(
+        board=board,
+        user=collaborator,
+    ).exists()
+
+    legacy_relationship_exists = board.collaborators.filter(
+        id=collaborator.id
+    ).exists()
+
+    if not membership_exists and not legacy_relationship_exists:
         raise HttpError(404, "User is not a collaborator on this board.")
 
     # only the owner can remove other collaborators
@@ -596,7 +612,12 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     if request.auth != board.owner and request.auth.id != collaborator_id:
         raise HttpError(403, "You can only remove yourself from a shared board.")
 
-    # remove the relationship from the many-to-many table
+    # remove the relationship
+    BoardMembership.objects.filter(
+        board=board,
+        user=collaborator,
+    ).delete()
+
     board.collaborators.remove(collaborator)
 
     # publish collaborator removal event. This goes to everyone subscribed to the board,

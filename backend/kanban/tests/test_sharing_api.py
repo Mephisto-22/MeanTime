@@ -2,7 +2,7 @@
 import json
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
-from kanban.models import Board, BoardColumn, Task
+from kanban.models import Board, BoardColumn, Task, BoardMembership
 from users.models import Friendship, FriendshipStatus, UserBlock
 
 User = get_user_model()
@@ -124,3 +124,76 @@ class BoardSharingApiTests(TestCase):
         )
         self.assertEqual(del_res.status_code, 200)
         self.assertFalse(TaskTimeEntry.objects.filter(id=entry.id).exists())
+
+    def test_owner_can_share_board_with_viewer_role(self):
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board.id}/collaborators",
+            data=json.dumps({
+                "friend_id": self.friend.id,
+                "role": "VIEWER",
+            }),
+            content_type="application/json",
+            **self.auth_headers("owner@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        membership = BoardMembership.objects.get(
+            board=self.board,
+            user=self.friend,
+        )
+
+        self.assertEqual(membership.role, BoardMembership.Role.VIEWER)
+
+    def test_sharing_board_defaults_to_editor_role(self):
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board.id}/collaborators",
+            data=json.dumps({
+                "friend_id": self.friend.id,
+            }),
+            content_type="application/json",
+            **self.auth_headers("owner@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        membership = BoardMembership.objects.get(
+            board=self.board,
+            user=self.friend,
+        )
+
+        self.assertEqual(membership.role, BoardMembership.Role.EDITOR)
+
+    def test_owner_can_change_role_when_sharing_existing_collaborator(self):
+        BoardMembership.objects.create(
+            board=self.board,
+            user=self.friend,
+            role=BoardMembership.Role.EDITOR,
+        )
+
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board.id}/collaborators",
+            data=json.dumps({
+                "friend_id": self.friend.id,
+                "role": "VIEWER",
+            }),
+            content_type="application/json",
+            **self.auth_headers("owner@example.com"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            BoardMembership.objects.filter(
+                board=self.board,
+                user=self.friend,
+            ).count(),
+            1,
+        )
+
+        membership = BoardMembership.objects.get(
+            board=self.board,
+            user=self.friend,
+        )
+
+        self.assertEqual(membership.role, BoardMembership.Role.VIEWER)
