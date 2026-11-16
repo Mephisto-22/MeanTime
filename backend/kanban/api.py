@@ -14,6 +14,7 @@ from ninja import Router
 from users.models import UserBlock
 from .models import (
     Board,
+    BoardMembership,
     BoardColumn,
     Task,
     TaskTimer,
@@ -84,7 +85,7 @@ def get_accessible_boards(user):
     )
 
     return Board.objects.filter(
-        Q(owner=user) | Q(collaborators=user)
+        Q(owner=user) | Q(collaborators=user) | Q(memberships__user=user)
     ).annotate(owner_blocked_user=Exists(owner_blocked_user),
                user_blocked_owner=Exists(user_blocked_owner),
                is_owner=Case(
@@ -96,6 +97,24 @@ def get_accessible_boards(user):
         owner_blocked_user=False,
         user_blocked_owner=False,
     ).distinct()
+
+def get_editable_boards(user):
+    """
+    Return boards the user can modify:
+    boards they own or boards where they have the EDITOR role.
+    """
+
+    return (
+        get_accessible_boards(user)
+        .filter(
+            Q(owner=user)
+            | Q(
+                memberships__user=user,
+                memberships__role=BoardMembership.Role.EDITOR,
+            )
+        )
+        .distinct()
+    )
 
 def session_already_recorded(task, started_at) -> bool:
     """Return whether a time entry already exists for this timer session.
@@ -188,7 +207,7 @@ def get_board_queryset(user):
     return (
         get_accessible_boards(user)
         .select_related("owner")
-        .prefetch_related("collaborators", Prefetch("columns", queryset=col_qs))
+        .prefetch_related("collaborators", "memberships__user", Prefetch("columns", queryset=col_qs))
     )
 
 def get_owned_board(user, board_id: int) -> Board:
@@ -228,6 +247,46 @@ def get_accessible_recurring_task(user, recurring_task_id: int) -> RecurringTask
     return get_object_or_404(
         RecurringTask.objects.select_related("board").prefetch_related("tags").filter(
             board__in=get_accessible_boards(user)
+        ),
+        id=recurring_task_id,
+    )
+
+def get_editable_board(user, board_id: int) -> Board:
+    """Retrieve a board the user can modify."""
+    return get_object_or_404(
+        get_editable_boards(user),
+        id=board_id,
+    )
+
+def get_editable_column(user, column_id: int) -> BoardColumn:
+    """Retrieve a column on a board the user can modify."""
+    return get_object_or_404(
+        BoardColumn.objects.filter(
+            board__in=get_editable_boards(user)
+        ),
+        id=column_id,
+    )
+
+def get_editable_task(user, task_id: int) -> Task:
+    """Retrieve a task on a board the user can modify."""
+    return get_object_or_404(
+        Task.objects.select_related(
+            "column__board",
+            "recurring_task",
+            "timer",
+        ).filter(
+            column__board__in=get_editable_boards(user)
+        ),
+        id=task_id,
+    )
+
+def get_editable_recurring_task(user, recurring_task_id: int) -> RecurringTask:
+    """Retrieve a recurring task on a board the user can modify."""
+    return get_object_or_404(
+        RecurringTask.objects.select_related("board")
+        .prefetch_related("tags")
+        .filter(
+            board__in=get_editable_boards(user)
         ),
         id=recurring_task_id,
     )
