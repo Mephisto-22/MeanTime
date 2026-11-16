@@ -512,3 +512,31 @@ class RecurringTaskApiTests(TestCase):
         task.refresh_from_db()
         self.assertIsNone(task.recurring_task)
         self.assertEqual(task.title, "Spawned task")
+
+    def test_recurring_task_out_allows_null_creator(self):
+        """When creator user account is deleted/SET_NULL, task responses serialize without 500."""
+        rec = RecurringTask.objects.create(
+            board=self.board,
+            creator=None,
+            title="Orphaned Routine",
+            cadence=RecurrenceCadence.DAILY,
+            next_run_at=timezone.now(),
+        )
+        task = Task.objects.create(
+            column=self.col_todo,
+            recurring_task=rec,
+            title="Routine Occurrence",
+            position=0,
+        )
+
+        response = self.client.get(
+            f"/api/kanban/boards/{self.board.id}/tasks",
+            **self.auth,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        task_data = next((t for t in data if t["id"] == task.id), None)
+        self.assertIsNotNone(task_data)
+        self.assertIsNotNone(task_data.get("recurring_task"))
+        self.assertIsNone(task_data["recurring_task"]["creator_id"])
+

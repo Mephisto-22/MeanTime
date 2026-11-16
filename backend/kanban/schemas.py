@@ -158,7 +158,7 @@ class RecurringTaskOut(Schema):
     """Shape of a recurring task returned to clients."""
     id: int
     board_id: int
-    creator_id: int
+    creator_id: int | None = None
     title: str
     description: str = ""
     priority: TaskPriority | None = None

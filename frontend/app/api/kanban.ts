@@ -18,7 +18,7 @@ export interface RecurrenceIn {
 export interface RecurringTaskDto {
   id: number | string
   boardId: number | string
-  creatorId: number | string
+  creatorId: number | string | null
   title: string
   description?: string
   priority?: TaskPriorityType
