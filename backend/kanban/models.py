@@ -62,6 +62,39 @@ class Board(models.Model):
     def __str__(self):
         return self.title
 
+class BoardMembership(models.Model):
+    class Role(models.TextChoices):
+        EDITOR = "EDITOR", "Editor"
+        VIEWER = "VIEWER", "Viewer"
+
+    board = models.ForeignKey(
+        to=Board,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="board_memberships"
+    )
+    role = models.CharField(
+        max_length=10,
+        choices=Role.choices,
+        default=Role.EDITOR,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["board", "user"],
+                name="unique_board_membership",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.board} ({self.role})"
+
 class BoardColumn(models.Model):
     board = models.ForeignKey(
         to=Board,
