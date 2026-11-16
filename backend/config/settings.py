@@ -1,8 +1,11 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR.parent / ".env")
 
 # Read required environment variables without default fallback credentials
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
@@ -11,6 +14,11 @@ db_user = os.environ.get("POSTGRES_USER")
 db_password = os.environ.get("POSTGRES_PASSWORD")
 db_host = os.environ.get("POSTGRES_HOST")
 db_port = os.environ.get("POSTGRES_PORT")
+
+# Redis configuration
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 missing_vars = [
     var for var, val in [

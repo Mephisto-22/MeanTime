@@ -1,4 +1,5 @@
 """ASGI config for MeanTime project."""
+import atexit
 import logging
 import os
 from django.core.asgi import get_asgi_application
@@ -9,7 +10,9 @@ django_application = get_asgi_application()
 logger = logging.getLogger(__name__)
 
 from kanban.scheduler import start_scheduler, stop_scheduler
+from kanban.events.publisher import close_redis_client
 
+atexit.register(close_redis_client)
 
 async def application(scope, receive, send):
     """

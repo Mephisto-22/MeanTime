@@ -847,11 +847,28 @@ watch(
 )
 
 watch(
+  () => props.task?.timer,
+  (timer) => {
+    if (!props.visible || !timer) return
+    timerState.value = { ...timer }
+  },
+)
+
+watch(
   () => props.task,
   () => {
     if (props.visible) {
       syncFormWithProps()
     }
+  },
+)
+
+watch(
+  () => props.task?.timeEntries,
+  (entries) => {
+    if (!props.visible || !entries) return
+
+    timeEntriesState.value = [...entries]
   },
 )
 

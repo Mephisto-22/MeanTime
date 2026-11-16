@@ -1,0 +1,39 @@
+from datetime import datetime, timezone
+from enum import StrEnum
+from typing import Any
+from uuid import uuid4
+
+from pydantic import BaseModel, Field
+
+class BoardEventType(StrEnum):
+    """Event types broadcast to Kanban board subscribers."""
+
+    BOARD_UPDATED = "board.updated"
+    BOARD_DELETED = "board.deleted"
+    BOARD_ACCESS_REVOKED = "board.access_revoked"
+
+    COLUMN_CREATED = "column.created"
+    COLUMN_UPDATED = "column.updated"
+    COLUMN_DELETED = "column.deleted"
+
+    TASK_CREATED = "task.created"
+    TASK_UPDATED = "task.updated"
+    TASK_DELETED = "task.deleted"
+    TASK_MOVED = "task.moved"
+
+    TASK_TIMER_UPDATED = "task.timer_updated"
+    TIME_ENTRY_CREATED = "time_entry.created"
+    TIME_ENTRY_UPDATED = "time_entry.updated"
+    TIME_ENTRY_DELETED = "time_entry.deleted"
+
+class BoardEvent(BaseModel):
+    """Common structure for all Kanban board events."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    type: BoardEventType
+    board_id: int
+    actor_id: int
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    data: dict[str, Any] = Field(default_factory=dict)
