@@ -20,8 +20,9 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <Skeleton width="5rem" height="2rem" border-radius="6px" />
-          <Skeleton width="4rem" height="2rem" border-radius="6px" />
+          <Skeleton width="7rem" height="2rem" border-radius="6px" />
+          <Skeleton width="7rem" height="2rem" border-radius="6px" />
+          <Skeleton width="7rem" height="2rem" border-radius="6px" />
         </div>
       </div>
     </div>
@@ -95,6 +96,7 @@
             severity="secondary"
             variant="outlined"
             size="small"
+            class="w-28"
             :data-testid="'share-board-button-' + friend.id"
             @click="openShareDialog(friend)"
           />
@@ -103,14 +105,16 @@
             severity="danger"
             variant="outlined"
             size="small"
+            class="w-28"
             :data-testid="'unfriend-button-' + friend.id"
             @click="openUnfriendDialog(friend)"
           />
           <Button
             label="Block"
             severity="secondary"
-            variant="text"
+            variant="outlined"
             size="small"
+            class="w-28"
             :data-testid="'block-button-' + friend.id"
             @click="openBlockDialog(friend)"
           />

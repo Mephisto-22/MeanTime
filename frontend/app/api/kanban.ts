@@ -6,6 +6,35 @@ import { apiService } from '~/services/ApiService'
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
 export type TimerMode = 'NONE' | 'COUNT_UP' | 'COUNT_DOWN'
 export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
+export type RecurrenceCadence = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+
+export interface RecurrenceIn {
+  cadence: RecurrenceCadence
+  daysOfWeek?: number[]
+  dayOfMonth?: number | null
+  timeOfDay?: string
+  timezone?: string
+}
+
+export interface RecurringTaskDto {
+  id: number | string
+  boardId: number | string
+  creatorId: number | string | null
+  title: string
+  description?: string
+  priority?: TaskPriorityType
+  cadence: RecurrenceCadence
+  daysOfWeek: number[]
+  dayOfMonth?: number | null
+  timeOfDay: string
+  timezone: string
+  defaultTimerMode: TimerMode
+  targetDurationSeconds?: number | null
+  isActive: boolean
+  nextRunAt: string
+  createdAt?: string
+  updatedAt?: string
+}
 
 export interface TaskTimerDto {
   id?: number
@@ -23,6 +52,7 @@ export interface TaskTimeEntryDto {
   id: number | string
   taskId: number | string
   userId?: number | string
+  user?: UserOut | null
   startedAt: string
   endedAt?: string | null
   durationSeconds: number
@@ -55,6 +85,22 @@ export const TASK_PRIORITY_CONFIG = {
 } as const
 
 export const DEFAULT_TASK_PRIORITY_BORDER_CLASS = 'border-l-4 border-l-transparent'
+
+export const TASK_CADENCE_OPTIONS: Array<{ label: string; value: RecurrenceCadence }> = [
+  { label: 'Daily', value: 'DAILY' },
+  { label: 'Weekly', value: 'WEEKLY' },
+  { label: 'Monthly', value: 'MONTHLY' },
+]
+
+export const TASK_WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: 'Mon', value: 0 },
+  { label: 'Tue', value: 1 },
+  { label: 'Wed', value: 2 },
+  { label: 'Thu', value: 3 },
+  { label: 'Fri', value: 4 },
+  { label: 'Sat', value: 5 },
+  { label: 'Sun', value: 6 },
+]
 
 export const TIMER_MODE_CONFIG = {
   NONE: { label: 'None' },
@@ -93,10 +139,17 @@ export interface KanbanTaskDto {
   id: string | number
   title: string
   description?: string
-  position: number
+  position: number | null
   columnId: string | number
+  columnActivityAt?: string
+  archivedAt?: string | null
+  recurringTaskId?: number | string | null
+  recurringTask?: RecurringTaskDto | null
+  recurrence?: RecurrenceIn | null
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
+  /** Sum of the task's time entry durations, in seconds. */
+  totalSeconds?: number
   priority?: TaskPriorityType
   tags?: TagDto[]
   tagIds?: Array<string | number>
@@ -107,6 +160,7 @@ export interface KanbanColumnDto {
   title: string
   position: number
   boardId: string | number
+  autoClearDurationSeconds?: number | null
   tasks: KanbanTaskDto[]
 }
 
@@ -152,21 +206,27 @@ export interface TaskDialogSavePayload {
   priority?: TaskPriorityType
   tags?: TagDto[]
   tagIds?: Array<string | number>
+  recurrence?: RecurrenceIn | null
+  recurringTaskId?: number | string | null
+  applyToFuture?: boolean
 }
 
 export interface KanbanContext {
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
+  isShared?: ComputedRef<boolean>
+  boardMembers?: ComputedRef<UserOut[]>
   createTag?: (payload: { name: string } | string) => Promise<TagDto>
   moveTask: (req: TaskMoveContext) => Promise<void> | void
   openCreateTaskDialog: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void
   createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
-  updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
-  deleteTask: (taskId: string | number) => Promise<void> | void
+  updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto> & { applyToFuture?: boolean }) => Promise<void> | void
+  deleteTask: (taskId: string | number, options?: { cancelRecurrence?: boolean }) => Promise<void> | void
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
   pauseTimer?: (taskId: string | number) => void
   stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+  setTaskTotal?: (taskId: string | number, totalSeconds: number) => void
   onTimerExpired?: (task: KanbanTaskDto, entry: TaskTimeEntryDto) => void
   boardChat?: BoardChatComposable
 }
@@ -236,12 +296,29 @@ export class KanbanApi {
     return apiService.patch<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}`, payload)
   }
 
-  deleteTask(taskId: string | number): Promise<SuccessResponse> {
+  deleteTask(taskId: string | number, options?: { cancelRecurrence?: boolean }): Promise<SuccessResponse> {
+    if (options?.cancelRecurrence !== undefined) {
+      return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`, undefined, {
+        query: { cancel_recurrence: options.cancelRecurrence },
+      })
+    }
     return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`)
   }
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -------------------------
+  // Recurring Task Endpoints
+  // -------------------------
+
+  updateRecurringTask(recurringTaskId: string | number, payload: Partial<RecurringTaskDto>): Promise<RecurringTaskDto> {
+    return apiService.patch<RecurringTaskDto>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`, payload)
+  }
+
+  deleteRecurringTask(recurringTaskId: string | number): Promise<SuccessResponse> {
+    return apiService.delete<SuccessResponse>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`)
   }
 
   // -----------------
@@ -276,8 +353,8 @@ export class KanbanApi {
   // Tag Endpoints
   // -----------------
 
-  listTags(): Promise<TagDto[]> {
-    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
+  listTags(boardId: string | number): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags?board_id=${boardId}`)
   }
 
   createTag(payload: { name: string }): Promise<TagDto> {

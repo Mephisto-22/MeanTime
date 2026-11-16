@@ -24,6 +24,10 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     description: overrides.description,
     priority: overrides.priority,
     tags: overrides.tags,
+    timer: overrides.timer,
+    totalSeconds: overrides.totalSeconds,
+    recurringTaskId: overrides.recurringTaskId,
+    recurringTask: overrides.recurringTask,
   }
 }
 
@@ -34,6 +38,7 @@ export function createColumnFixture(overrides: Partial<KanbanColumnDto> = {}): K
     title: overrides.title ?? `Column ${id}`,
     position: overrides.position ?? 0,
     boardId: overrides.boardId ?? 'board-1',
+    autoClearDurationSeconds: overrides.autoClearDurationSeconds ?? null,
     tasks: overrides.tasks ?? [],
   }
 }

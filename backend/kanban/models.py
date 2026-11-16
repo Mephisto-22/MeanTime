@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class TaskPriority(models.TextChoices):
     LOW = "LOW", "Low"
@@ -69,6 +70,11 @@ class BoardColumn(models.Model):
     )
     title = models.CharField(max_length=100)
     position = models.PositiveIntegerField(default=0) # horizontal position L -> R
+    auto_clear_duration_seconds = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        default=None,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -85,7 +91,139 @@ class BoardColumn(models.Model):
     def __str__(self):
         return f"{self.board.title} = {self.title}"
 
+class RecurrenceCadence(models.TextChoices):
+    DAILY = "DAILY", "Daily"
+    WEEKLY = "WEEKLY", "Weekly"
+    MONTHLY = "MONTHLY", "Monthly"
+
+
+class RecurringTask(models.Model):
+    board = models.ForeignKey(
+        to=Board,
+        on_delete=models.CASCADE,
+        related_name="recurring_tasks",
+    )
+    creator = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recurring_tasks",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    priority = models.CharField(
+        max_length=10,
+        choices=TaskPriority.choices,
+        default=None,
+        null=True,
+        blank=True,
+    )
+    tags = models.ManyToManyField(
+        to=Tag,
+        blank=True,
+        related_name="recurring_tasks",
+    )
+    cadence = models.CharField(
+        max_length=20,
+        choices=RecurrenceCadence.choices,
+        default=RecurrenceCadence.DAILY,
+    )
+    days_of_week = models.JSONField(default=list, blank=True)
+    day_of_month = models.PositiveSmallIntegerField(null=True, blank=True, default=None)
+    time_of_day = models.TimeField(default="00:00:00")
+    timezone = models.CharField(max_length=63, default="UTC")
+    default_timer_mode = models.CharField(
+        max_length=20,
+        choices=TimerMode.choices,
+        default=TimerMode.NONE,
+    )
+    target_duration_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
+    is_active = models.BooleanField(default=True)
+    next_run_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"Recurring: {self.title} ({self.cadence})"
+
+    def calculate_next_run(self, after: datetime | None = None) -> datetime:
+        from kanban.recurrence import calculate_next_run_at
+
+        return calculate_next_run_at(
+            cadence=self.cadence,
+            time_of_day=self.time_of_day,
+            timezone_name=self.timezone,
+            days_of_week=self.days_of_week,
+            day_of_month=self.day_of_month,
+            after=after,
+        )
+
+    def update_schedule(self, **fields) -> bool:
+        """
+        Update recurrence schedule fields and recalculate next_run_at if schedule changed.
+        Returns True if schedule changed and next_run_at was recalculated.
+        """
+        from kanban.recurrence import parse_time_of_day
+
+        schedule_changed = False
+        for field in ("cadence", "days_of_week", "day_of_month", "time_of_day", "timezone"):
+            if field in fields and fields[field] is not None:
+                new_val = fields[field]
+                if field == "cadence" and hasattr(new_val, "value"):
+                    new_val = new_val.value
+                elif field == "time_of_day" and isinstance(new_val, str):
+                    new_val = parse_time_of_day(new_val)
+
+                if getattr(self, field) != new_val:
+                    setattr(self, field, new_val)
+                    schedule_changed = True
+
+        if "is_active" in fields and fields["is_active"] is not None:
+            was_active = self.is_active
+            self.is_active = fields["is_active"]
+            # If re-activating a schedule that fell behind in the past, recalculate next_run_at
+            if not was_active and self.is_active and self.next_run_at <= timezone.now():
+                schedule_changed = True
+
+        if schedule_changed:
+            self.next_run_at = self.calculate_next_run()
+
+        return schedule_changed
+
+    def update_template(self, **fields) -> None:
+        """Update template properties (title, description, priority, timer)."""
+        if "title" in fields and fields["title"] is not None:
+            self.title = fields["title"]
+        if "description" in fields and fields["description"] is not None:
+            self.description = fields["description"]
+        if "priority" in fields:
+            p = fields["priority"]
+            self.priority = p.value if hasattr(p, "value") else p
+        if "default_timer_mode" in fields and fields["default_timer_mode"] is not None:
+            m = fields["default_timer_mode"]
+            self.default_timer_mode = m.value if hasattr(m, "value") else str(m)
+        if "target_duration_seconds" in fields:
+            self.target_duration_seconds = fields["target_duration_seconds"]
+
+
+
+class TaskQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(archived_at__isnull=True)
+
+    def archived(self):
+        return self.filter(archived_at__isnull=False)
+
+class TaskManager(models.Manager.from_queryset(TaskQuerySet)):
+    pass
+
 class Task(models.Model):
+    objects = TaskManager()
+
     priority = models.CharField(
         max_length=10,
         choices=TaskPriority.choices,
@@ -103,9 +241,18 @@ class Task(models.Model):
         on_delete=models.CASCADE,
         related_name="tasks"
     )
+    recurring_task = models.ForeignKey(
+        to=RecurringTask,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="occurrences",
+    )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    position = models.PositiveIntegerField(default=0) # vertical position Top -> Bot
+    position = models.PositiveIntegerField(null=True, blank=True, default=0) # vertical position Top -> Bot
+    column_activity_at = models.DateTimeField(default=timezone.now)
+    archived_at = models.DateTimeField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -116,6 +263,13 @@ class Task(models.Model):
                 fields=["column", "position"],
                 name="unique_task_position_per_column",
                 deferrable=models.Deferrable.DEFERRED,
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(archived_at__isnull=True, position__isnull=False)
+                    | models.Q(archived_at__isnull=False, position__isnull=True)
+                ),
+                name="task_position_null_iff_archived",
             ),
         ]
 

@@ -114,4 +114,13 @@ describe('Production SSR Smoke Check', () => {
     expect(page.status).toBe(200)
     expect(await page.text()).toContain('Checking your reset link')
   })
+
+  it('renders public confirmation cards without a session', async () => {
+    const inbox = await request('/check-email')
+    expect(inbox.status).toBe(200)
+    expect(await inbox.text()).toContain('Check your email')
+    const confirmation = await request('/confirm-email')
+    expect(confirmation.status).toBe(200)
+    expect(await confirmation.text()).toContain('Confirming your email')
+  })
 })

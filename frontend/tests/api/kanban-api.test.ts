@@ -84,9 +84,20 @@ describe('KanbanApi Contract Suite', () => {
     await kanbanApi.deleteTask(505)
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505')
 
+    // 11b. deleteTask with cancelRecurrence
+    await kanbanApi.deleteTask(505, { cancelRecurrence: true })
+    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', undefined, { query: { cancel_recurrence: true } })
+
     // 12. moveTask
     await kanbanApi.moveTask(505, { toColumnId: 102, targetPosition: 1 })
     expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { toColumnId: 102, targetPosition: 1 })
+  })
+
+  it('routes RecurringTask methods to correct paths, verbs, and payloads', async () => {
+    const patchSpy = vi.spyOn(apiService, 'patch').mockResolvedValue({} as any)
+
+    await kanbanApi.updateRecurringTask(42, { isActive: false })
+    expect(patchSpy).toHaveBeenLastCalledWith('/api/kanban/recurring-tasks/42', { isActive: false })
   })
 
   it('routes Tag methods to correct paths, verbs, and payloads', async () => {
@@ -94,8 +105,8 @@ describe('KanbanApi Contract Suite', () => {
     const postSpy = vi.spyOn(apiService, 'post').mockResolvedValue({} as any)
 
     // 13. listTags
-    await kanbanApi.listTags()
-    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/tags')
+    await kanbanApi.listTags(42)
+    expect(getSpy).toHaveBeenLastCalledWith('/api/kanban/tags?board_id=42')
 
     // 14. createTag
     await kanbanApi.createTag({ name: 'Urgent' })
@@ -154,7 +165,7 @@ describe('KanbanApi Contract Suite', () => {
     expect(moveCall.options.body).toEqual({ to_column_id: 2, target_position: 0 })
 
     // TAG LIST (GET)
-    await kanbanApi.listTags()
+    await kanbanApi.listTags(42)
     const tagListCall = fetchCalls[fetchCalls.length - 1]
     expect(tagListCall.options.method).toBe('GET')
     expect(tagListCall.options.headers.Authorization).toBe('Bearer valid-bearer-token')

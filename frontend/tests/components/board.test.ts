@@ -6,6 +6,7 @@ import { defineComponent, h, inject } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kanbanApi, kanbanContextKey } from '~/api/kanban'
 import Board from '~/components/kanban/Board.vue'
+import TaskDialog from '~/components/kanban/TaskDialog.vue'
 import { createBoardFixture, createColumnFixture, createTaskFixture, createTagFixture } from '../fixtures/kanban'
 
 const DialogStub = {
@@ -583,5 +584,301 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
       description: 'Initial Description',
     })
     expect(boardVm.localColumns[0].tasks[0].title).toBe('Updated Title')
+  })
+
+  it('editing a column preserves existing client-side tasks', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          title: 'To Do',
+          tasks: [
+            createTaskFixture({
+              id: 'task-1',
+              title: 'Active Task 1',
+              columnId: 'col-1',
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const wrapper = mountBoard(board)
+    const boardVm = wrapper.vm as any
+
+    boardVm.handleColumnUpdated({
+      id: 'col-1',
+      title: 'To Do Updated',
+      position: 0,
+      boardId: board.id,
+      autoClearDurationSeconds: 86400,
+      tasks: [],
+    })
+
+    expect(boardVm.localColumns[0].title).toBe('To Do Updated')
+    expect(boardVm.localColumns[0].autoClearDurationSeconds).toBe(86400)
+    expect(boardVm.localColumns[0].tasks).toHaveLength(1)
+    expect(boardVm.localColumns[0].tasks[0].id).toBe('task-1')
+  })
+
+  it('saving an edited task with recurrence configures recurrence and updates task recurrence state', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-recur-1',
+              title: 'Regular Task',
+              columnId: 'col-1',
+              recurringTaskId: null,
+              recurringTask: null,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    const updateSpy = vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+      id: 'task-recur-1',
+      title: 'Recurring Task Title',
+      position: 0,
+      columnId: 'col-1',
+      recurringTaskId: 'rec-101',
+      recurringTask: {
+        id: 'rec-101',
+        boardId: board.id,
+        creatorId: 1,
+        title: 'Recurring Task Title',
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00:00',
+        timezone: 'UTC',
+        defaultTimerMode: 'NONE',
+        isActive: true,
+        nextRunAt: '2026-11-15T09:00:00Z',
+        createdAt: '2026-11-14T00:00:00Z',
+        updatedAt: '2026-11-14T00:00:00Z',
+      },
+      tags: [],
+    } as any)
+
+    const wrapper = mountBoard(board)
+    const taskDialog = wrapper.findComponent(TaskDialog)
+
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-recur-1',
+      title: 'Recurring Task Title',
+      description: '',
+      columnId: 'col-1',
+      recurrence: {
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00',
+        timezone: 'UTC',
+      },
+    })
+    await flushPromises()
+
+    expect(updateSpy).toHaveBeenCalledWith('task-recur-1', expect.objectContaining({
+      title: 'Recurring Task Title',
+      recurrence: expect.objectContaining({
+        cadence: 'DAILY',
+        timeOfDay: '09:00',
+      }),
+    }))
+
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
+    expect(taskOnBoard.recurringTaskId).toBe('rec-101')
+    expect(taskOnBoard.recurringTask?.cadence).toBe('DAILY')
+    expect(taskOnBoard.recurringTask?.isActive).toBe(true)
+  })
+
+  it('saving an existing recurring task with recurrence toggled off deactivates recurring schedule', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-recur-2',
+              title: 'Recurring Task',
+              columnId: 'col-1',
+              recurringTaskId: 'rec-202',
+              recurringTask: {
+                id: 'rec-202',
+                boardId: 1,
+                creatorId: 1,
+                title: 'Recurring Task',
+                cadence: 'DAILY',
+                daysOfWeek: [],
+                dayOfMonth: null,
+                timeOfDay: '09:00:00',
+                timezone: 'UTC',
+                defaultTimerMode: 'NONE',
+                isActive: true,
+                nextRunAt: '2026-11-15T09:00:00Z',
+                createdAt: '2026-11-14T00:00:00Z',
+                updatedAt: '2026-11-14T00:00:00Z',
+              },
+            } as any),
+          ],
+        }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue({
+      id: 'task-recur-2',
+      title: 'Recurring Task',
+      position: 0,
+      columnId: 'col-1',
+      recurringTaskId: 'rec-202',
+      recurringTask: {
+        id: 'rec-202',
+        boardId: 1,
+        creatorId: 1,
+        title: 'Recurring Task',
+        cadence: 'DAILY',
+        daysOfWeek: [],
+        dayOfMonth: null,
+        timeOfDay: '09:00:00',
+        timezone: 'UTC',
+        defaultTimerMode: 'NONE',
+        isActive: false,
+        nextRunAt: '2026-11-15T09:00:00Z',
+        createdAt: '2026-11-14T00:00:00Z',
+        updatedAt: '2026-11-14T00:00:00Z',
+      },
+      tags: [],
+    } as any)
+
+    const updateRecSpy = vi.spyOn(kanbanApi, 'updateRecurringTask').mockResolvedValue({} as any)
+
+    const wrapper = mountBoard(board)
+    const taskDialog = wrapper.findComponent(TaskDialog)
+
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-recur-2',
+      title: 'Recurring Task',
+      description: '',
+      columnId: 'col-1',
+      recurringTaskId: 'rec-202',
+      recurrence: null,
+    })
+    await flushPromises()
+
+    expect(updateRecSpy).toHaveBeenCalledWith('rec-202', { isActive: false })
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
+    expect(taskOnBoard.recurringTaskId).toBe('rec-202')
+    expect(taskOnBoard.recurringTask?.isActive).toBe(false)
+  })
+
+  it('optimistically updates task timer when switching between stopwatch, countdown, and none', async () => {
+    const board = createBoardFixture({
+      columns: [
+        createColumnFixture({
+          id: 'col-1',
+          tasks: [
+            createTaskFixture({
+              id: 'task-timer-1',
+              title: 'Task without timer',
+              columnId: 'col-1',
+              timer: null,
+            }),
+          ],
+        }),
+      ],
+    })
+
+    vi.spyOn(kanbanApi, 'updateTask').mockImplementation(async (taskId, payload) => {
+      return {
+        id: taskId,
+        title: payload.title ?? 'Task',
+        columnId: 'col-1',
+        timer: (payload as any).timerMode && (payload as any).timerMode !== 'NONE'
+          ? {
+              taskId,
+              mode: (payload as any).timerMode,
+              targetDurationSeconds: (payload as any).targetDurationSeconds ?? null,
+              state: 'IDLE',
+              startedAt: null,
+              elapsedSeconds: 0,
+            }
+          : null,
+      } as any
+    })
+
+    const wrapper = mountBoard(board)
+    const taskDialog = wrapper.findComponent(TaskDialog)
+
+    // 1. Switch to stopwatch (COUNT_UP)
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with stopwatch',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'COUNT_UP',
+        targetDurationSeconds: null,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    const taskOnBoard = (wrapper.vm as any).localColumns[0].tasks[0]
+    expect(taskOnBoard.timer).not.toBeNull()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_UP')
+
+    await flushPromises()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_UP')
+
+    // 2. Switch to countdown (COUNT_DOWN) with 25 minutes
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with countdown',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'COUNT_DOWN',
+        targetDurationSeconds: 1500,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_DOWN')
+    expect(taskOnBoard.timer?.targetDurationSeconds).toBe(1500)
+
+    await flushPromises()
+    expect(taskOnBoard.timer?.mode).toBe('COUNT_DOWN')
+
+    // 3. Switch to NONE
+    taskDialog.vm.$emit('save', {
+      mode: 'edit',
+      taskId: 'task-timer-1',
+      title: 'Task with no timer',
+      columnId: 'col-1',
+      timer: {
+        taskId: 'task-timer-1',
+        mode: 'NONE',
+        targetDurationSeconds: null,
+        state: 'IDLE',
+        startedAt: null,
+        elapsedSeconds: 0,
+      },
+    })
+
+    expect(taskOnBoard.timer).toBeNull()
+
+    await flushPromises()
+    expect(taskOnBoard.timer).toBeNull()
   })
 })

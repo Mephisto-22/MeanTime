@@ -29,6 +29,7 @@ class FriendSchemaTests(TestCase):
     def test_friend_request_out_and_list_out(self):
         user_data = {
             "id": 2,
+            "is_verified": True,
             "email": "bob@example.com",
             "display_name": "Bob",
             "timezone": "UTC",

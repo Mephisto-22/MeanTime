@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
 import ChatSidebar from '~/components/chat/ChatSidebar.vue'
 import Board from '~/components/kanban/Board.vue'
-import { kanbanContextKey, type KanbanBoardDto } from '~/api/kanban'
+import { kanbanApi, kanbanContextKey, type KanbanBoardDto } from '~/api/kanban'
 import { chatApi, type MessageOut } from '~/api/chat'
 import type { BoardChatComposable } from '~/composables/useBoardChat'
 import { useAuthStore } from '~/stores/auth'
@@ -127,6 +127,7 @@ function mountChatSidebar(
 describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([])
     const authStore = useAuthStore()
     authStore.user = {
       id: 1,

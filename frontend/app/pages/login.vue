@@ -13,6 +13,7 @@
           <GoogleSignInButton />
           <div class="flex flex-col gap-2 pt-2 text-sm text-surface-600 dark:text-surface-400">
             <NuxtLink to="/forgot-password" class="auth-link">Forgot your password?</NuxtLink>
+            <NuxtLink to="/check-email" class="auth-link">Need to confirm your email?</NuxtLink>
             <p>
               Need an account?
               <NuxtLink to="/register" class="auth-link">Register</NuxtLink>
