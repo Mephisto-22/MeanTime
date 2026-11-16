@@ -20,6 +20,7 @@
     "@primeicons/vue": "^8.0.2",
     "@primeuix/themes": "^3.0.1",
     "@primevue/nuxt-module": "^5.0.2",
+    "chart.js": "^4.6.1",
     "nuxt": "^4.5.2",
     "pinia": "^4.0.3",
     "primeicons": "^8.0.2",
