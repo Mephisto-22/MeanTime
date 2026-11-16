@@ -1,9 +1,11 @@
 import { mount } from '@vue/test-utils'
+import { reactive, nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
 import { createTaskFixture, createTagFixture } from '../fixtures/kanban'
 import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
+import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 
 const DialogStub = {
   name: 'Dialog',
@@ -419,4 +421,47 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(suggestions).toHaveLength(2)
     expect(suggestions.some(s => s.text().includes('Frontend'))).toBe(false)
   })
+
+  it('updates TaskTimerEditor when the task timer changes while the dialog is open', async () => {
+    const task = reactive({
+      id: 'timer-task-1',
+      title: 'Timer task',
+      description: '',
+      priority: null,
+      columnId: 'col-1',
+      tags: [],
+      timeEntries: [],
+      timer: {
+        taskId: 'timer-task-1',
+        mode: 'COUNT_UP',
+        targetDurationSeconds: null,
+        state: 'RUNNING',
+        startedAt: '2026-11-15T10:00:00.000Z',
+        elapsedSeconds: 120,
+      },
+    }) as any
+
+    const wrapper = mountTaskDialog({
+      mode: 'edit',
+      task,
+    })
+
+    const timerEditor = wrapper.findComponent(TaskTimerEditor)
+
+    expect(timerEditor.exists()).toBe(true)
+    expect(timerEditor.props('timer').state).toBe('RUNNING')
+
+    // Simulate the board receiving a timer update from the server.
+    task.timer = {
+      ...task.timer,
+      state: 'IDLE',
+      startedAt: null,
+      elapsedSeconds: 120,
+    }
+
+    await nextTick()
+
+    expect(timerEditor.props('timer').state).toBe('IDLE')
+    expect(timerEditor.props('timer').startedAt).toBeNull()
+})
 })
