@@ -22,16 +22,6 @@
           <div class="flex items-center gap-3">
             <slot name="actions" />
             <Button
-              v-if="isSharedBoard"
-              data-testid="board-chat-button"
-              label="Chat"
-              icon="pi pi-comments"
-              severity="secondary"
-              outlined
-              class="h-fit shrink-0"
-              @click="boardChat.toggle()"
-            />
-            <Button
               data-testid="add-column-button"
               label="Add Column"
               icon="pi pi-plus"

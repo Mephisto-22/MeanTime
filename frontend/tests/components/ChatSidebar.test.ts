@@ -10,6 +10,7 @@ import { kanbanContextKey, type KanbanBoardDto } from '~/api/kanban'
 import { chatApi, type MessageOut } from '~/api/chat'
 import type { BoardChatComposable } from '~/composables/useBoardChat'
 import { useAuthStore } from '~/stores/auth'
+import { DialogStub } from '../fixtures/kanban'
 
 const DrawerStub = {
   name: 'Drawer',
@@ -30,12 +31,6 @@ const DrawerStub = {
 const ScrollPanelStub = {
   name: 'ScrollPanel',
   template: `<div class="p-scrollpanel"><slot /></div>`,
-}
-
-const DialogStub = {
-  name: 'Dialog',
-  props: ['visible', 'header'],
-  template: `<div v-if="visible" class="p-dialog"><slot /><slot name="footer" /></div>`,
 }
 
 const mockMessages: MessageOut[] = [
@@ -67,13 +62,11 @@ function createMockBoardChat(
   const messages = ref<MessageOut[]>(overrides.messages ?? [])
   const isOpen = ref(overrides.isOpen ?? false)
   const loading = ref(overrides.loading ?? false)
-  const isPolling = ref(false)
 
   return {
     messages,
     isOpen,
     loading,
-    isPolling,
     loadHistory: vi.fn().mockResolvedValue(undefined),
     pollMessages: vi.fn().mockResolvedValue(undefined),
     sendMessage: vi.fn().mockImplementation(async (text: string) => {
@@ -237,7 +230,7 @@ describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
     expect(boardChat.close).toHaveBeenCalledTimes(1)
   })
 
-  it('Board.vue hides Chat button and ChatSidebar when board is not shared (collaborators is empty)', () => {
+  it('Board.vue hides ChatSidebar when board is not shared (collaborators is empty)', () => {
     const soloBoard: KanbanBoardDto = {
       id: 50,
       title: 'Personal Board',
@@ -264,7 +257,7 @@ describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
     expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(false)
   })
 
-  it('Board.vue renders Chat button and ChatSidebar when board is shared (collaborators.length > 0) and clicking toolbar Chat button toggles drawer', async () => {
+  it('Board.vue renders ChatSidebar when board is shared (collaborators.length > 0) and clicking floating dock button opens drawer', async () => {
     vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValue([...mockMessages])
 
     const sharedBoard: KanbanBoardDto = {
@@ -296,11 +289,11 @@ describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
       },
     })
 
-    const chatBtn = wrapper.find('[data-testid="board-chat-button"]')
-    expect(chatBtn.exists()).toBe(true)
-    expect(wrapper.find('[data-testid="chat-dock-button"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="board-chat-button"]').exists()).toBe(false)
+    const dockBtn = wrapper.find('[data-testid="chat-dock-button"]')
+    expect(dockBtn.exists()).toBe(true)
 
-    await chatBtn.trigger('click')
+    await dockBtn.trigger('click')
     expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain(
       'Team Board',

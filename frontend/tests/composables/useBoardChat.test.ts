@@ -39,7 +39,6 @@ describe('useBoardChat Composable Suite', () => {
       expect(chat.messages.value).toEqual([])
       expect(chat.isOpen.value).toBe(false)
       expect(chat.loading.value).toBe(false)
-      expect(chat.isPolling.value).toBe(false)
     })
     scope.stop()
   })
@@ -158,7 +157,31 @@ describe('useBoardChat Composable Suite', () => {
       expect(getSpy).toHaveBeenCalledTimes(1)
       resolvePoll?.([])
       await Promise.all([p1, p2])
-      expect(chat.isPolling.value).toBe(false)
+
+      // Subsequent poll after completion should execute normally
+      getSpy.mockResolvedValueOnce([])
+      await chat.pollMessages()
+      expect(getSpy).toHaveBeenCalledTimes(2)
+    })
+    scope.stop()
+  })
+
+  it('toggling isOpen.value directly reactively triggers loadHistory and starts/stops polling', async () => {
+    const getSpy = vi
+      .spyOn(chatApi, 'getBoardMessages')
+      .mockResolvedValue([...mockMessagesBoard1])
+
+    const scope = effectScope()
+    await scope.run(async () => {
+      const chat = useBoardChat(10)
+      chat.isOpen.value = true
+      await vi.advanceTimersByTimeAsync(0)
+      expect(getSpy).toHaveBeenCalledWith(10)
+      expect(chat.messages.value).toEqual(mockMessagesBoard1)
+
+      chat.isOpen.value = false
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(getSpy).toHaveBeenCalledTimes(1)
     })
     scope.stop()
   })
@@ -235,6 +258,46 @@ describe('useBoardChat Composable Suite', () => {
       await nextTick()
       await vi.advanceTimersByTimeAsync(0)
 
+      expect(getSpy).toHaveBeenLastCalledWith(99)
+      expect(chat.messages.value).toEqual(board2Messages)
+    })
+    scope.stop()
+  })
+
+  it('switching boardId while drawer is closed invalidates cached messages and loads new board history upon reopening', async () => {
+    const board2Messages: MessageOut[] = [
+      {
+        id: 20,
+        board_id: 99,
+        sender_id: 4,
+        sender_name: 'Dave',
+        content: 'Board 99 message',
+        created_at: '2026-11-13T13:00:00Z',
+      },
+    ]
+    const getSpy = vi
+      .spyOn(chatApi, 'getBoardMessages')
+      .mockImplementation(async (id) =>
+        Number(id) === 10 ? [...mockMessagesBoard1] : [...board2Messages],
+      )
+
+    const boardId = ref<number>(10)
+    const scope = effectScope()
+    await scope.run(async () => {
+      const chat = useBoardChat(boardId)
+      chat.open()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(chat.messages.value).toEqual(mockMessagesBoard1)
+
+      chat.close()
+      boardId.value = 99
+      await nextTick()
+
+      expect(chat.messages.value).toEqual([])
+      expect(chat.loading.value).toBe(false)
+
+      chat.open()
+      await vi.advanceTimersByTimeAsync(0)
       expect(getSpy).toHaveBeenLastCalledWith(99)
       expect(chat.messages.value).toEqual(board2Messages)
     })

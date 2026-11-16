@@ -89,11 +89,4 @@ def send_board_message(
         content=text,
     )
 
-    return 201, {
-        "id": msg.id,
-        "board_id": msg.board_id,
-        "sender_id": user.id,
-        "sender_name": user.display_name,
-        "content": msg.content,
-        "created_at": msg.created_at,
-    }
+    return 201, _serialize_message(msg)

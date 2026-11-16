@@ -13,7 +13,6 @@ export interface BoardChatComposable {
   messages: Ref<MessageOut[]>
   isOpen: Ref<boolean>
   loading: Ref<boolean>
-  isPolling: Ref<boolean>
   loadHistory: () => Promise<void>
   pollMessages: () => Promise<void>
   sendMessage: (content: string) => Promise<MessageOut | undefined>
@@ -31,6 +30,7 @@ export function useBoardChat(
   const loading = ref(false)
   const isPolling = ref(false)
   let pollingTimer: ReturnType<typeof setInterval> | null = null
+  let requestToken = 0
 
   function appendUniqueMessages(incoming: MessageOut[]) {
     if (!incoming || incoming.length === 0) return
@@ -47,13 +47,14 @@ export function useBoardChat(
     const targetId = toValue(boardId)
     if (targetId === undefined || targetId === null || targetId === '') return
 
+    const token = ++requestToken
     loading.value = true
     try {
       const history = await chatApi.getBoardMessages(targetId)
-      if (String(toValue(boardId)) !== String(targetId)) return
+      if (token !== requestToken || String(toValue(boardId)) !== String(targetId)) return
       messages.value = history || []
     } finally {
-      if (String(toValue(boardId)) === String(targetId)) {
+      if (token === requestToken && String(toValue(boardId)) === String(targetId)) {
         loading.value = false
       }
     }
@@ -110,15 +111,11 @@ export function useBoardChat(
   }
 
   function open(): void {
-    if (isOpen.value) return
     isOpen.value = true
-    loadHistory().catch(() => {})
-    startPolling()
   }
 
   function close(): void {
     isOpen.value = false
-    stopPolling()
   }
 
   function toggle(): void {
@@ -129,17 +126,26 @@ export function useBoardChat(
     }
   }
 
-  watch(isOpen, (openState) => {
-    if (!openState) {
-      stopPolling()
-    }
-  })
+  watch(
+    isOpen,
+    (openState) => {
+      if (openState) {
+        loadHistory().catch(() => {})
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    },
+    { flush: 'sync' },
+  )
 
   watch(
     () => toValue(boardId),
     (newId, oldId) => {
       if (String(newId) === String(oldId)) return
+      requestToken += 1
       messages.value = []
+      loading.value = false
       stopPolling()
       if (isOpen.value) {
         loadHistory().catch(() => {})
@@ -158,7 +164,6 @@ export function useBoardChat(
     messages,
     isOpen,
     loading,
-    isPolling,
     loadHistory,
     pollMessages,
     sendMessage,
