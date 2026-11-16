@@ -84,9 +84,20 @@ describe('KanbanApi Contract Suite', () => {
     await kanbanApi.deleteTask(505)
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505')
 
+    // 11b. deleteTask with cancelRecurrence
+    await kanbanApi.deleteTask(505, { cancelRecurrence: true })
+    expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505', undefined, { query: { cancel_recurrence: true } })
+
     // 12. moveTask
     await kanbanApi.moveTask(505, { toColumnId: 102, targetPosition: 1 })
     expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/tasks/505/move', { toColumnId: 102, targetPosition: 1 })
+  })
+
+  it('routes RecurringTask methods to correct paths, verbs, and payloads', async () => {
+    const patchSpy = vi.spyOn(apiService, 'patch').mockResolvedValue({} as any)
+
+    await kanbanApi.updateRecurringTask(42, { isActive: false })
+    expect(patchSpy).toHaveBeenLastCalledWith('/api/kanban/recurring-tasks/42', { isActive: false })
   })
 
   it('routes Tag methods to correct paths, verbs, and payloads', async () => {

@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
-import { createTaskFixture, createTagFixture } from '../fixtures/kanban'
+import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub, InputMaskStub, DatePickerStub } from '../fixtures'
 import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
 
 const DialogStub = {
@@ -44,6 +44,10 @@ function mountTaskDialog(props: Record<string, any> = {}) {
       stubs: {
         Dialog: DialogStub,
         Select: SelectStub,
+        ToggleSwitch: ToggleSwitchStub,
+        InputNumber: InputNumberStub,
+        InputMask: InputMaskStub,
+        DatePicker: DatePickerStub,
       },
     },
   })
@@ -182,6 +186,9 @@ describe('TaskDialog Component DOM Suite', () => {
       priority: null,
       tags: [],
       tagIds: [],
+      recurrence: null,
+      recurringTaskId: null,
+      applyToFuture: false,
     })
     expect(wrapper.emitted('update:visible')?.[0]).toEqual([false])
   })
@@ -215,7 +222,7 @@ describe('TaskDialog Component DOM Suite', () => {
     await wrapper.find('[data-testid="task-delete-button"]').trigger('click')
     await wrapper.find('[data-testid="task-confirm-delete-button"]').trigger('click')
 
-    expect(wrapper.emitted('delete')?.[0]).toEqual(['task-to-delete'])
+    expect(wrapper.emitted('delete')?.[0]).toEqual(['task-to-delete', { cancelRecurrence: false }])
     expect(wrapper.emitted('update:visible')?.[0]).toEqual([false])
   })
 
@@ -418,5 +425,274 @@ describe('TaskDialog Component DOM Suite', () => {
     suggestions = wrapper.findAll('[data-testid="task-tag-suggestion"]')
     expect(suggestions).toHaveLength(2)
     expect(suggestions.some(s => s.text().includes('Frontend'))).toBe(false)
+  })
+
+  describe('Recurring Task Management (Ticket #252)', () => {
+    it('recurrence section: renders toggle switch defaulting to off, hiding controls', () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      expect(wrapper.find('[data-testid="task-dialog-recurrence-section"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="task-recurrence-toggle"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="task-recurrence-controls"]').exists()).toBe(false)
+    })
+
+    it('recurrence section: toggling recurrence on reveals controls defaulting to DAILY', async () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      const toggle = wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]')
+      await toggle.setValue(true)
+
+      expect(wrapper.find('[data-testid="task-recurrence-controls"]').exists()).toBe(true)
+      const cadenceSelect = wrapper.find<HTMLSelectElement>('[data-testid="task-cadence-select"]')
+      expect(cadenceSelect.exists()).toBe(true)
+      expect(cadenceSelect.element.value).toBe('DAILY')
+      expect(wrapper.find('[data-testid="task-weekdays-selector"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="task-day-of-month-input"]').exists()).toBe(false)
+    })
+
+    it('recurrence section: switching cadence to WEEKLY shows weekday selector chips and allows toggling days', async () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      await wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]').setValue(true)
+
+      const cadenceSelect = wrapper.find<HTMLSelectElement>('[data-testid="task-cadence-select"]')
+      await cadenceSelect.setValue('WEEKLY')
+
+      const weekdaysSelector = wrapper.find('[data-testid="task-weekdays-selector"]')
+      expect(weekdaysSelector.exists()).toBe(true)
+
+      // Toggle Tuesday (value 1)
+      const tuesdayChip = wrapper.find('[data-testid="weekday-chip-1"]')
+      expect(tuesdayChip.exists()).toBe(true)
+      await tuesdayChip.trigger('click')
+
+      // Save task with weekly recurrence
+      const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
+      await titleInput.setValue('Weekly Standup Task')
+      await wrapper.find('form').trigger('submit.prevent')
+
+      const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
+      expect(savePayload.recurrence).toBeDefined()
+      expect(savePayload.recurrence?.cadence).toBe('WEEKLY')
+      expect(savePayload.recurrence?.daysOfWeek).toContain(1)
+    })
+
+    it('recurrence section: switching cadence to MONTHLY shows day-of-month input', async () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      await wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]').setValue(true)
+
+      const cadenceSelect = wrapper.find<HTMLSelectElement>('[data-testid="task-cadence-select"]')
+      await cadenceSelect.setValue('MONTHLY')
+
+      const dayInput = wrapper.find<HTMLInputElement>('[data-testid="task-day-of-month-input"]')
+      expect(dayInput.exists()).toBe(true)
+      await dayInput.setValue('15')
+
+      const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
+      await titleInput.setValue('Monthly Review Task')
+      await wrapper.find('form').trigger('submit.prevent')
+
+      const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
+      expect(savePayload.recurrence?.cadence).toBe('MONTHLY')
+      expect(savePayload.recurrence?.dayOfMonth).toBe(15)
+    })
+
+    it('recurrence save scope: editing recurring task prompts for save scope modal', async () => {
+      const recurringTask = createTaskFixture({
+        id: 't-recurring',
+        title: 'Original Recurring Task',
+        recurringTaskId: 'rec-1',
+        recurringTask: {
+          id: 'rec-1',
+          cadence: 'DAILY',
+          daysOfWeek: [],
+          dayOfMonth: null,
+          timeOfDay: '09:00:00',
+          timezone: 'UTC',
+          isActive: true,
+        },
+      } as any)
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+
+      // Form loads with recurrence toggle on
+      const toggle = wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]')
+      expect(toggle.element.checked).toBe(true)
+
+      // Edit task title (core metadata edit)
+      await wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]').setValue('Updated Task Title')
+
+      // Try to submit form
+      await wrapper.find('form').trigger('submit.prevent')
+
+      // Save is NOT emitted yet; confirmation prompt appears
+      expect(wrapper.emitted('save')).toBeUndefined()
+      const scopeConfirmation = wrapper.find('[data-testid="task-save-scope-confirmation"]')
+      expect(scopeConfirmation.exists()).toBe(true)
+
+      // Clicking cancel on scope modal dismisses it
+      await wrapper.find('[data-testid="task-save-scope-cancel-button"]').trigger('click')
+      expect(wrapper.find('[data-testid="task-save-scope-confirmation"]').exists()).toBe(false)
+      expect(wrapper.emitted('save')).toBeUndefined()
+
+      // Re-trigger submit and click "Update this task only"
+      await wrapper.find('form').trigger('submit.prevent')
+      await wrapper.find('[data-testid="task-save-scope-this-button"]').trigger('click')
+
+      expect(wrapper.emitted('save')).toHaveLength(1)
+      const saveThisOnly = wrapper.emitted('save')![0][0] as TaskDialogSavePayload
+      expect(saveThisOnly.applyToFuture).toBe(false)
+
+      // Mount again to test "Update this and all future tasks"
+      const wrapper2 = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+      await wrapper2.find<HTMLInputElement>('[data-testid="task-title-input"]').setValue('Updated Task Title 2')
+      await wrapper2.find('form').trigger('submit.prevent')
+      await wrapper2.find('[data-testid="task-save-scope-future-button"]').trigger('click')
+
+      expect(wrapper2.emitted('save')).toHaveLength(1)
+      const saveFuture = wrapper2.emitted('save')![0][0] as TaskDialogSavePayload
+      expect(saveFuture.applyToFuture).toBe(true)
+    })
+
+    it('recurrence save scope: submitting without core metadata edits saves directly without confirmation modal', async () => {
+      const recurringTask = createTaskFixture({
+        id: 't-recurring-unmodified',
+        title: 'Original Title',
+        recurringTaskId: 'rec-1',
+        recurringTask: {
+          id: 'rec-1',
+          cadence: 'DAILY',
+          daysOfWeek: [],
+          dayOfMonth: null,
+          timeOfDay: '00:00:00',
+          timezone: 'UTC',
+          isActive: true,
+        },
+      } as any)
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+
+      // Submit without modifying core metadata
+      await wrapper.find('form').trigger('submit.prevent')
+
+      // Directly emits save with applyToFuture: false, without opening scope modal
+      expect(wrapper.find('[data-testid="task-save-scope-confirmation"]').exists()).toBe(false)
+      expect(wrapper.emitted('save')).toHaveLength(1)
+      const payload = wrapper.emitted('save')![0][0] as TaskDialogSavePayload
+      expect(payload.applyToFuture).toBe(false)
+    })
+
+    it('recurrence delete flow: deleting recurring task shows two delete options', async () => {
+      const recurringTask = createTaskFixture({
+        id: 't-recurring-del',
+        recurringTaskId: 'rec-1',
+        recurringTask: {
+          id: 'rec-1',
+          cadence: 'DAILY',
+          daysOfWeek: [],
+          dayOfMonth: null,
+          timeOfDay: '09:00:00',
+          timezone: 'UTC',
+          isActive: true,
+        },
+      } as any)
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+
+      await wrapper.find('[data-testid="task-delete-button"]').trigger('click')
+      expect(wrapper.find('[data-testid="task-delete-confirmation"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="task-delete-single-button"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="task-delete-cancel-recurrence-button"]').exists()).toBe(true)
+
+      // Test "Delete this task only"
+      await wrapper.find('[data-testid="task-delete-single-button"]').trigger('click')
+      expect(wrapper.emitted('delete')?.[0]).toEqual(['t-recurring-del', { cancelRecurrence: false }])
+
+      // Mount again to test "Delete this task and cancel recurrence"
+      const wrapper2 = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+      await wrapper2.find('[data-testid="task-delete-button"]').trigger('click')
+      await wrapper2.find('[data-testid="task-delete-cancel-recurrence-button"]').trigger('click')
+      expect(wrapper2.emitted('delete')?.[0]).toEqual(['t-recurring-del', { cancelRecurrence: true }])
+    })
+
+    it('recurrence toggle off: turning recurrence off on recurring task emits recurrence: null without prompting save scope modal', async () => {
+      const recurringTask = createTaskFixture({
+        id: 't-recurring-off',
+        recurringTaskId: 'rec-1',
+        recurringTask: {
+          id: 'rec-1',
+          cadence: 'DAILY',
+          daysOfWeek: [],
+          dayOfMonth: null,
+          timeOfDay: '09:00:00',
+          timezone: 'UTC',
+          isActive: true,
+        },
+      } as any)
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: recurringTask,
+      })
+
+      // Turn off toggle
+      await wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]').setValue(false)
+
+      // Submit
+      await wrapper.find('form').trigger('submit.prevent')
+
+      // Directly saves without scope confirmation modal
+      expect(wrapper.find('[data-testid="task-save-scope-confirmation"]').exists()).toBe(false)
+      expect(wrapper.emitted('save')).toHaveLength(1)
+      const payload = wrapper.emitted('save')![0][0] as TaskDialogSavePayload
+      expect(payload.recurrence).toBeNull()
+      expect(payload.recurringTaskId).toBe('rec-1')
+    })
+
+    it('recurrence UI: renders compact side-by-side cadence and masked time inputs, clamping invalid times', async () => {
+      const wrapper = mountTaskDialog({ mode: 'create' })
+      await wrapper.find<HTMLInputElement>('[data-testid="task-recurrence-toggle"]').setValue(true)
+
+      const controls = wrapper.find('[data-testid="task-recurrence-controls"]')
+      expect(controls.exists()).toBe(true)
+
+      // Cadence and Time inputs both exist in controls
+      const cadenceSelect = controls.find('[data-testid="task-cadence-select"]')
+      const timeInput = controls.find<HTMLInputElement>('[data-testid="task-time-of-day-input"]')
+      expect(cadenceSelect.exists()).toBe(true)
+      expect(timeInput.exists()).toBe(true)
+
+      // Test sliding segmented tabs for cadence
+      const weeklyTab = controls.findAll('button[role="tab"]').find(b => b.text().includes('Weekly'))
+      expect(weeklyTab).toBeDefined()
+      await weeklyTab!.trigger('click')
+      expect(wrapper.find('[data-testid="task-weekdays-selector"]').exists()).toBe(true)
+
+      // Test time masking and clamping invalid time (e.g. 25:99 -> 23:59)
+      await timeInput.setValue('25:99')
+      await timeInput.trigger('blur')
+      expect(timeInput.element.value).toBe('23:59')
+
+      // Save task with clamped time
+      const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
+      await titleInput.setValue('Masked Time Task')
+      await wrapper.find('form').trigger('submit.prevent')
+
+      const savePayload = wrapper.emitted('save')?.[0]?.[0] as TaskDialogSavePayload
+      expect(savePayload.recurrence?.timeOfDay).toBe('23:59')
+      expect(savePayload.recurrence?.cadence).toBe('WEEKLY')
+    })
   })
 })

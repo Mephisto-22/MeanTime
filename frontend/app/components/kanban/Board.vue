@@ -509,25 +509,33 @@ const handleCreateTask = async (
     columnId,
     priority: payload.priority ?? null,
     tags: payload.tags ?? [],
+    recurringTaskId: null,
+    recurringTask: null,
   }
   targetCol.tasks.push(optimisticTask)
 
   try {
-    const createdTask = await kanbanApi.createTask(columnId, {
+    const createPayload: any = {
       title: payload.title,
       description: payload.description,
-      priority: payload.priority,
-      tagIds: payload.tagIds,
-    })
+    }
+    if (payload.priority !== undefined) {
+      createPayload.priority = payload.priority
+    }
+    if (payload.tagIds !== undefined) {
+      createPayload.tagIds = payload.tagIds
+    }
+    if (payload.recurrence) {
+      createPayload.recurrence = payload.recurrence
+    }
+    if (payload.timer?.mode && payload.timer.mode !== 'NONE') {
+      createPayload.timerMode = payload.timer.mode
+      createPayload.targetDurationSeconds = payload.timer.targetDurationSeconds
+    }
+
+    const createdTask = await kanbanApi.createTask(columnId, createPayload)
     notify.success('Task created.')
 
-    let taskInCol = targetCol.tasks.find(t => sameId(t.id, tempId))
-    if (!taskInCol) {
-      for (const col of localColumns.value) {
-        taskInCol = col.tasks.find(t => sameId(t.id, tempId))
-        if (taskInCol) break
-      }
-    }
     if (createdTask) {
       const alreadyReceived = findTaskLocation(createdTask.id)
       const optimisticLocation = findTaskLocation(tempId)
@@ -553,6 +561,15 @@ const handleCreateTask = async (
           createdTask.priority ?? optimisticLocation.task.priority
         optimisticLocation.task.tags =
           createdTask.tags ?? optimisticLocation.task.tags
+        if (createdTask.recurringTaskId !== undefined) {
+          optimisticLocation.task.recurringTaskId = createdTask.recurringTaskId
+        }
+        if (createdTask.recurringTask !== undefined) {
+          optimisticLocation.task.recurringTask = createdTask.recurringTask
+        }
+        if (createdTask.timer !== undefined) {
+          optimisticLocation.task.timer = createdTask.timer
+        }
       }
     }
   } catch (err) {
@@ -582,12 +599,27 @@ const applyTaskUpdates = (
     description?: string
     priority?: TaskPriorityType
     tags?: TagDto[]
+    timer?: TaskTimerDto | null
   },
 ): void => {
   if (source.title !== undefined) target.title = source.title
   if (source.description !== undefined) target.description = source.description
   if (source.priority !== undefined) target.priority = source.priority
   if (source.tags !== undefined) target.tags = source.tags
+  if (source.timer !== undefined) {
+    if (source.timer === null || source.timer.mode === 'NONE') {
+      target.timer = null
+    } else {
+      target.timer = {
+        taskId: target.id,
+        mode: source.timer.mode,
+        targetDurationSeconds: source.timer.targetDurationSeconds ?? null,
+        state: source.timer.state ?? 'IDLE',
+        startedAt: source.timer.startedAt ?? null,
+        elapsedSeconds: source.timer.elapsedSeconds ?? target.timer?.elapsedSeconds ?? 0,
+      }
+    }
+  }
 }
 
 const handleUpdateTask = async (
@@ -654,6 +686,18 @@ const handleUpdateTask = async (
     if (payload.tagIds !== undefined) {
       updatePayload.tagIds = payload.tagIds
     }
+    if ((payload as any).applyToFuture !== undefined) {
+      updatePayload.applyToFuture = (payload as any).applyToFuture
+    }
+    if ((payload as any).recurrence !== undefined) {
+      updatePayload.recurrence = (payload as any).recurrence
+    }
+    if ((payload as any).timerMode !== undefined) {
+      updatePayload.timerMode = (payload as any).timerMode
+    }
+    if ((payload as any).targetDurationSeconds !== undefined) {
+      updatePayload.targetDurationSeconds = (payload as any).targetDurationSeconds
+    }
 
     const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
     let updated: KanbanTaskDto | undefined
@@ -678,6 +722,15 @@ const handleUpdateTask = async (
       if (updated.columnId != null) {
         targetTask.columnId = updated.columnId
       }
+      if (updated.recurringTaskId !== undefined) {
+        targetTask.recurringTaskId = updated.recurringTaskId
+      }
+      if (updated.recurringTask !== undefined) {
+        targetTask.recurringTask = updated.recurringTask
+      }
+      if (updated.timer !== undefined) {
+        targetTask.timer = updated.timer && updated.timer.mode !== 'NONE' ? updated.timer : null
+      }
     }
   } catch (err) {
     localColumns.value = columnsSnapshot
@@ -685,7 +738,10 @@ const handleUpdateTask = async (
   }
 }
 
-const handleDeleteTask = async (taskId: string | number): Promise<void> => {
+const handleDeleteTask = async (
+  taskId: string | number,
+  options?: { cancelRecurrence?: boolean },
+): Promise<void> => {
   let targetCol: KanbanColumnDto | undefined
   let targetIndex = -1
   let deletedTask: KanbanTaskDto | undefined
@@ -711,7 +767,7 @@ const handleDeleteTask = async (taskId: string | number): Promise<void> => {
   reindexTasks(targetCol.tasks)
 
   try {
-    await kanbanApi.deleteTask(taskId)
+    await kanbanApi.deleteTask(taskId, options)
     notify.success('Task deleted.')
   } catch (err) {
     // Restore task to original column and position
@@ -732,29 +788,39 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       priority: savePayload.priority,
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
+      recurrence: savePayload.recurrence,
+      timer: savePayload.timer,
     })
   } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
-    await handleUpdateTask(savePayload.taskId, {
+    const updateTaskPayload: any = {
       title: savePayload.title,
       description: savePayload.description,
       priority: savePayload.priority,
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
       columnId: savePayload.columnId,
-    })
-    if (savePayload.timer) {
+      applyToFuture: savePayload.applyToFuture,
+      timer: savePayload.timer,
+    }
+    if (savePayload.recurrence) {
+      updateTaskPayload.recurrence = savePayload.recurrence
+    }
+    if (savePayload.timer?.mode !== undefined) {
+      updateTaskPayload.timerMode = savePayload.timer.mode
+      updateTaskPayload.targetDurationSeconds = savePayload.timer.targetDurationSeconds ?? null
+    }
+    await handleUpdateTask(savePayload.taskId, updateTaskPayload)
+
+    // If recurrence was turned off on an existing recurring task, deactivate it
+    if (savePayload.recurrence === null && savePayload.recurringTaskId != null) {
       try {
-        const updatedTimer = await kanbanApi.updateTaskTimer(savePayload.taskId, savePayload.timer)
-        const targetTask = findTaskById(savePayload.taskId)
-        if (targetTask && updatedTimer) {
-          targetTask.timer = {
-            ...targetTask.timer,
-            ...updatedTimer,
-            taskId: savePayload.taskId,
-          }
+        await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
+        const target = findTaskById(savePayload.taskId)
+        if (target && target.recurringTask) {
+          target.recurringTask.isActive = false
         }
       } catch (err) {
-        notify.error(err, 'Unable to update timer configuration')
+        notify.error(err, 'Unable to deactivate recurring schedule')
       }
     }
   }
