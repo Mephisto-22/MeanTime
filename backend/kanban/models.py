@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -252,6 +253,10 @@ class Task(models.Model):
     description = models.TextField(blank=True)
     position = models.PositiveIntegerField(null=True, blank=True, default=0) # vertical position Top -> Bot
     column_activity_at = models.DateTimeField(default=timezone.now)
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True, default=None)
+    reminder_offset_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
+    reminder_at = models.DateTimeField(null=True, blank=True, db_index=True, default=None)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, default=None)
     archived_at = models.DateTimeField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -275,6 +280,42 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        if self.due_at is None:
+            self.reminder_offset_seconds = None
+
+        if self.due_at is not None and self.reminder_offset_seconds is not None:
+            expected_reminder_at = self.due_at - timedelta(seconds=self.reminder_offset_seconds)
+        else:
+            expected_reminder_at = None
+
+        recalculated = False
+        if self.pk is None or (getattr(self, "_state", None) and self._state.adding):
+            self.reminder_at = expected_reminder_at
+            if self.reminder_at is not None:
+                if self.reminder_at <= timezone.now():
+                    self.reminder_sent_at = timezone.now()
+                else:
+                    self.reminder_sent_at = None
+            else:
+                self.reminder_sent_at = None
+            recalculated = True
+        elif expected_reminder_at != self.reminder_at:
+            self.reminder_at = expected_reminder_at
+            if self.reminder_at is not None:
+                if self.reminder_at <= timezone.now():
+                    self.reminder_sent_at = timezone.now()
+                else:
+                    self.reminder_sent_at = None
+            else:
+                self.reminder_sent_at = None
+            recalculated = True
+
+        if recalculated and "update_fields" in kwargs and kwargs["update_fields"] is not None:
+            kwargs["update_fields"] = list(set(kwargs["update_fields"]) | {"reminder_at", "reminder_sent_at"})
+
+        super().save(*args, **kwargs)
 
 
 class TaskTimer(models.Model):
