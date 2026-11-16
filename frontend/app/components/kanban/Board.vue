@@ -193,7 +193,7 @@ const upsertTask = (incoming: KanbanTaskDto): void => {
 
   const position = Math.max(
     0,
-    Math.min(incoming.position, destination.tasks.length),
+    Math.min(incoming.position ?? destination.tasks.length, destination.tasks.length),
   )
 
   destination.tasks.splice(position, 0, {
