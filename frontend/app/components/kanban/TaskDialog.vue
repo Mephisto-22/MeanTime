@@ -195,154 +195,166 @@
         />
       </div>
 
-      <!-- Recurrence Section -->
-      <div
-        data-testid="task-dialog-recurrence-section"
-        class="flex flex-col gap-3 rounded-xl border border-surface-200/80 bg-surface-50/50 p-4 dark:border-surface-800 dark:bg-surface-900/40"
-      >
-        <!-- Header: Prominent Icon, Title, Subtitle & Toggle -->
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-200/70 text-surface-600 dark:bg-surface-800 dark:text-surface-300">
-              <i class="pi pi-sync text-sm" />
-            </div>
-            <div class="flex flex-col min-w-0">
-              <Label
-                for="task-recurrence-toggle"
-                class="text-sm font-semibold text-surface-900 dark:text-surface-100 cursor-pointer select-none"
-              >
-                Repeat on schedule
-              </Label>
-              <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
-                Repeat this task automatically on a defined cadence
-              </p>
-            </div>
-          </div>
+      <!-- Scheduling & Deadlines Grid: Due Date (Left) & Recurrence (Right) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        <!-- Due Date & Collaborator Reminder Section -->
+        <KanbanTaskDueDateSection
+          v-model:enabled="isDueDateEnabled"
+          v-model:due-date="dueDateValue"
+          v-model:due-time="dueTimeValue"
+          v-model:reminder-offset-seconds="reminderOffsetSeconds"
+          :user-timezone="userTimezone"
+        />
 
-          <ToggleSwitch
-            id="task-recurrence-toggle"
-            v-model="isRecurring"
-            data-testid="task-recurrence-toggle"
-          />
-        </div>
-
-        <!-- Controls: Sliding Select top-left on its own row, then Cadence Details & Masked Time below -->
+        <!-- Recurrence Section (Compacted horizontally without changing any components or logic) -->
         <div
-          v-if="isRecurring"
-          data-testid="task-recurrence-controls"
-          class="flex flex-col gap-3.5 pt-3 border-t border-surface-200/70 dark:border-surface-800"
+          data-testid="task-dialog-recurrence-section"
+          class="flex flex-col gap-3 rounded-xl border border-surface-200/80 bg-surface-50/50 p-4 dark:border-surface-800 dark:bg-surface-900/40 h-full"
         >
-          <!-- Row 1: Sliding Cadence Selector (Top-left, compact, on its own row) -->
-          <div class="flex flex-col gap-1 self-start">
-            <span class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-              Cadence
-            </span>
-            <div
-              class="inline-flex p-0.5 rounded-lg bg-surface-200/60 dark:bg-surface-800 border border-surface-300/60 dark:border-surface-700/60"
-              role="tablist"
-              aria-label="Cadence options"
-            >
-              <Button
-                v-for="opt in cadenceOptions"
-                :key="opt.value"
-                type="button"
-                role="tab"
-                size="small"
-                :aria-selected="recurrenceCadence === opt.value"
-                class="!py-1 !px-3 !text-xs !font-semibold !rounded-md transition-all cursor-pointer text-center select-none !border-0 shadow-none"
-                :class="recurrenceCadence === opt.value
-                  ? '!bg-surface-0 dark:!bg-surface-900 !text-surface-900 dark:!text-surface-0 shadow-xs'
-                  : '!bg-transparent !text-surface-500 hover:!text-surface-900 dark:hover:!text-surface-100'"
-                @click="recurrenceCadence = opt.value"
-              >
-                {{ opt.label }}
-              </Button>
+          <!-- Header: Prominent Icon, Title, Subtitle & Toggle -->
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-200/70 text-surface-600 dark:bg-surface-800 dark:text-surface-300">
+                <i class="pi pi-sync text-sm" />
+              </div>
+              <div class="flex flex-col min-w-0">
+                <Label
+                  for="task-recurrence-toggle"
+                  class="text-sm font-semibold text-surface-900 dark:text-surface-100 cursor-pointer select-none"
+                >
+                  Repeat on schedule
+                </Label>
+                <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
+                  Repeat this task automatically
+                </p>
+              </div>
             </div>
 
-            <!-- Accessible Select for assistive tech and test compatibility -->
-            <Select
-              id="task-cadence-select"
-              v-model="recurrenceCadence"
-              :options="cadenceOptions"
-              option-label="label"
-              option-value="value"
-              size="small"
-              data-testid="task-cadence-select"
-              class="sr-only"
-              aria-label="Cadence"
+            <ToggleSwitch
+              id="task-recurrence-toggle"
+              v-model="isRecurring"
+              data-testid="task-recurrence-toggle"
             />
           </div>
 
-          <!-- Row 2: Cadence-specific details on left + Time of Day on right -->
-          <div class="flex flex-wrap items-end justify-between gap-4">
-            <!-- Left side: WEEKLY chips, MONTHLY day-of-month, or DAILY indicator -->
-            <div v-if="recurrenceCadence === 'WEEKLY'" class="flex flex-col gap-1">
+          <!-- Controls: Sliding Select top-left on its own row, then Cadence Details & Masked Time below -->
+          <div
+            v-if="isRecurring"
+            data-testid="task-recurrence-controls"
+            class="flex flex-col gap-3 pt-3 border-t border-surface-200/70 dark:border-surface-800"
+          >
+            <!-- Row 1: Sliding Cadence Selector (Top-left, compact, on its own row) -->
+            <div class="flex flex-col gap-1 self-start">
               <span class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-                Repeat on days
+                Cadence
               </span>
-              <div data-testid="task-weekdays-selector" class="flex flex-wrap items-center gap-1">
+              <div
+                class="inline-flex p-0.5 rounded-lg bg-surface-200/60 dark:bg-surface-800 border border-surface-300/60 dark:border-surface-700/60"
+                role="tablist"
+                aria-label="Cadence options"
+              >
                 <Button
-                  v-for="day in weekdayOptions"
-                  :key="day.value"
+                  v-for="opt in cadenceOptions"
+                  :key="opt.value"
                   type="button"
+                  role="tab"
                   size="small"
-                  :severity="selectedDaysOfWeek.includes(day.value) ? 'primary' : 'secondary'"
-                  :variant="selectedDaysOfWeek.includes(day.value) ? undefined : 'outlined'"
-                  :data-testid="`weekday-chip-${day.value}`"
-                  class="!text-xs !py-1 !px-2.5 cursor-pointer font-medium"
-                  :class="selectedDaysOfWeek.includes(day.value) ? 'font-semibold shadow-xs' : ''"
-                  @click="toggleDayOfWeek(day.value)"
+                  :aria-selected="recurrenceCadence === opt.value"
+                  class="!py-1 !px-2.5 !text-xs !font-semibold !rounded-md transition-all cursor-pointer text-center select-none !border-0 shadow-none"
+                  :class="recurrenceCadence === opt.value
+                    ? '!bg-surface-0 dark:!bg-surface-900 !text-surface-900 dark:!text-surface-0 shadow-xs'
+                    : '!bg-transparent !text-surface-500 hover:!text-surface-900 dark:hover:!text-surface-100'"
+                  @click="recurrenceCadence = opt.value"
                 >
-                  {{ day.label }}
+                  {{ opt.label }}
                 </Button>
               </div>
+
+              <!-- Accessible Select for assistive tech and test compatibility -->
+              <Select
+                id="task-cadence-select"
+                v-model="recurrenceCadence"
+                :options="cadenceOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                data-testid="task-cadence-select"
+                class="sr-only"
+                aria-label="Cadence"
+              />
             </div>
 
-            <div v-else-if="recurrenceCadence === 'MONTHLY'" class="flex flex-col gap-1">
-              <Label for="task-day-of-month-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-                Day of month
-              </Label>
-              <div class="flex items-center gap-2">
+            <!-- Row 2: Cadence-specific details & Time of Day compacted -->
+            <div class="flex flex-col gap-3">
+              <!-- Left side: WEEKLY chips, MONTHLY day-of-month, or DAILY indicator -->
+              <div v-if="recurrenceCadence === 'WEEKLY'" class="flex flex-col gap-1">
+                <span class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                  Repeat on days
+                </span>
+                <div data-testid="task-weekdays-selector" class="flex flex-wrap items-center gap-1">
+                  <Button
+                    v-for="day in weekdayOptions"
+                    :key="day.value"
+                    type="button"
+                    size="small"
+                    :severity="selectedDaysOfWeek.includes(day.value) ? 'primary' : 'secondary'"
+                    :variant="selectedDaysOfWeek.includes(day.value) ? undefined : 'outlined'"
+                    :data-testid="`weekday-chip-${day.value}`"
+                    class="!text-xs !py-1 !px-2 cursor-pointer font-medium"
+                    :class="selectedDaysOfWeek.includes(day.value) ? 'font-semibold shadow-xs' : ''"
+                    @click="toggleDayOfWeek(day.value)"
+                  >
+                    {{ day.label }}
+                  </Button>
+                </div>
+              </div>
+
+              <div v-else-if="recurrenceCadence === 'MONTHLY'" class="flex flex-col gap-1">
+                <Label for="task-day-of-month-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                  Day of month
+                </Label>
+                <div class="flex items-center gap-2">
+                  <DatePicker
+                    id="task-day-of-month-input"
+                    v-model="monthDayPickerValue"
+                    dateFormat="d"
+                    showIcon
+                    iconDisplay="input"
+                    placeholder="1"
+                    size="small"
+                    data-testid="task-day-of-month-input"
+                    class="!w-24 text-xs font-medium"
+                  />
+                  <span class="text-xs text-surface-500 dark:text-surface-400">
+                    {{ ordinalDayString(dayOfMonth) }} of each month
+                  </span>
+                </div>
+              </div>
+
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400">
+                Repeats every calendar day
+              </div>
+
+              <!-- Right side: Time of Day DatePicker -->
+              <div class="flex flex-col gap-1 w-full max-w-[10rem]">
+                <Label for="task-time-of-day-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                  Time (HH:MM)
+                </Label>
                 <DatePicker
-                  id="task-day-of-month-input"
-                  v-model="monthDayPickerValue"
-                  dateFormat="d"
+                  id="task-time-of-day-input"
+                  v-model="timePickerValue"
+                  timeOnly
+                  hourFormat="24"
                   showIcon
                   iconDisplay="input"
-                  placeholder="1"
+                  placeholder="00:00"
                   size="small"
-                  data-testid="task-day-of-month-input"
-                  class="!w-28 text-xs font-medium"
+                  fluid
+                  data-testid="task-time-of-day-input"
+                  class="text-xs font-mono !h-[34px]"
+                  @blur="onTimePickerBlur"
                 />
-                <span class="text-xs text-surface-500 dark:text-surface-400">
-                  {{ ordinalDayString(dayOfMonth) }} of each month
-                </span>
               </div>
-            </div>
-
-            <div v-else class="text-xs text-surface-500 dark:text-surface-400 pb-1.5">
-              Repeats every calendar day
-            </div>
-
-            <!-- Right side: Time of Day DatePicker -->
-            <div class="flex flex-col gap-1 w-32 sm:w-36 shrink-0">
-              <Label for="task-time-of-day-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-                Time (HH:MM)
-              </Label>
-              <DatePicker
-                id="task-time-of-day-input"
-                v-model="timePickerValue"
-                timeOnly
-                hourFormat="24"
-                showIcon
-                iconDisplay="input"
-                placeholder="00:00"
-                size="small"
-                fluid
-                data-testid="task-time-of-day-input"
-                class="text-xs font-mono !h-[34px]"
-                @blur="onTimePickerBlur"
-              />
             </div>
           </div>
         </div>
@@ -524,6 +536,7 @@ import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
 import { useAuthStore } from '~/stores/auth'
 import DatePicker from 'primevue/datepicker'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
+import KanbanTaskDueDateSection from '~/components/kanban/TaskDueDateSection.vue'
 
 interface Props {
   visible?: boolean
@@ -566,6 +579,12 @@ const attachedTags = ref<TagDto[]>([])
 const tagInputText = ref('')
 const isConfirmingDelete = ref(false)
 const isConfirmingSaveScope = ref(false)
+
+// Due Date & Collaborator Reminder Form State
+const isDueDateEnabled = ref(false)
+const dueDateValue = ref<Date | null>(null)
+const dueTimeValue = ref('17:00')
+const reminderOffsetSeconds = ref<number | null>(3600)
 
 // Recurrence Form State
 const authStore = useAuthStore()
@@ -812,6 +831,27 @@ const syncFormWithProps = () => {
           elapsedSeconds: 0,
         }
     timeEntriesState.value = props.task.timeEntries ? [...props.task.timeEntries] : []
+
+    const dueRaw = props.task.dueAt ?? (props.task as any)?.due_at
+    if (dueRaw) {
+      isDueDateEnabled.value = true
+      const parsed = new Date(dueRaw)
+      dueDateValue.value = isNaN(parsed.getTime()) ? null : parsed
+      if (!isNaN(parsed.getTime())) {
+        const h = String(parsed.getHours()).padStart(2, '0')
+        const m = String(parsed.getMinutes()).padStart(2, '0')
+        dueTimeValue.value = `${h}:${m}`
+      } else {
+        dueTimeValue.value = '17:00'
+      }
+      reminderOffsetSeconds.value =
+        props.task.reminderOffsetSeconds ?? (props.task as any)?.reminder_offset_seconds ?? 3600
+    } else {
+      isDueDateEnabled.value = false
+      dueDateValue.value = null
+      dueTimeValue.value = '17:00'
+      reminderOffsetSeconds.value = 3600
+    }
   } else {
     title.value = ''
     description.value = ''
@@ -823,6 +863,11 @@ const syncFormWithProps = () => {
     selectedDaysOfWeek.value = [0]
     dayOfMonth.value = 1
     timeOfDay.value = '00:00'
+
+    isDueDateEnabled.value = false
+    dueDateValue.value = null
+    dueTimeValue.value = '17:00'
+    reminderOffsetSeconds.value = 3600
 
     timerState.value = {
       taskId: 'new-task',
@@ -1003,6 +1048,17 @@ const hasCoreMetadataChanged = computed(() => {
     if (recurrenceCadence.value === 'MONTHLY' && dayOfMonth.value !== origRec.dayOfMonth) return true
     if ((timeOfDay.value || '00:00') !== (origRec.timeOfDay ? origRec.timeOfDay.slice(0, 5) : '00:00')) return true
   }
+
+  // Due date & reminder changes
+  const origDue = props.task.dueAt ?? (props.task as any)?.due_at ?? null
+  const origReminder = props.task.reminderOffsetSeconds ?? (props.task as any)?.reminder_offset_seconds ?? null
+  if (isDueDateEnabled.value) {
+    if (!origDue) return true
+    if (origReminder !== reminderOffsetSeconds.value) return true
+  } else {
+    if (origDue) return true
+  }
+
   return false
 })
 
@@ -1051,6 +1107,23 @@ const executeSave = (applyToFuture = false) => {
   if (timeEntriesState.value && timeEntriesState.value.length > 0) {
     payload.timeEntries = timeEntriesState.value
   }
+
+  if (isDueDateEnabled.value && dueDateValue.value) {
+    const d = new Date(dueDateValue.value)
+    const [h, m] = dueTimeValue.value.split(':').map((n) => parseInt(n, 10))
+    d.setHours(h ?? 17, m ?? 0, 0, 0)
+    const iso = d.toISOString()
+    payload.dueAt = iso
+    payload.due_at = iso
+    payload.reminderOffsetSeconds = reminderOffsetSeconds.value
+    payload.reminder_offset_seconds = reminderOffsetSeconds.value
+  } else if (props.mode === 'edit' && (props.task?.dueAt || (props.task as any)?.due_at)) {
+    payload.dueAt = null
+    payload.due_at = null
+    payload.reminderOffsetSeconds = null
+    payload.reminder_offset_seconds = null
+  }
+
   emit('save', payload)
   isVisible.value = false
   isConfirmingSaveScope.value = false
@@ -1090,6 +1163,10 @@ defineExpose({
   removeTag,
   timerState,
   timeEntriesState,
+  isDueDateEnabled,
+  dueDateValue,
+  dueTimeValue,
+  reminderOffsetSeconds,
 })
 </script>
 
