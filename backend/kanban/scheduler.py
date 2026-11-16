@@ -4,17 +4,20 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
+from django.conf import settings
 from django.db import connection, transaction, models
 from django.utils import timezone
 
 from kanban.models import BoardColumn, Task, TaskTimer, TimerMode, TimerState, RecurringTask
 from kanban.recurrence import calculate_next_run_at
+from services.mail import send_transactional_email
 
 logger = logging.getLogger(__name__)
 
-# 64-bit integer constant for PostgreSQL advisory locking (Ticket #244/247)
+# 64-bit integer constant for PostgreSQL advisory locking (Ticket #244/247/258)
 AUTO_CLEAR_ADVISORY_LOCK_ID = 244244244
 RECURRING_TASKS_ADVISORY_LOCK_ID = 249251249
+DUE_DATE_REMINDERS_ADVISORY_LOCK_ID = 258260258
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -158,6 +161,64 @@ def spawn_due_recurring_tasks(as_of: datetime | None = None) -> int:
     return spawned_total
 
 
+def dispatch_due_date_reminders(as_of: datetime | None = None) -> int:
+    """
+    Query active tasks with reminder_at <= as_of and reminder_sent_at is null.
+    For each task, resolve recipients (board owner + active collaborators),
+    send discrete transactional emails, and record reminder_sent_at.
+    """
+    now = as_of or timezone.now()
+    dispatched_count = 0
+
+    due_tasks = list(
+        Task.objects.filter(
+            reminder_at__lte=now,
+            reminder_sent_at__isnull=True,
+            archived_at__isnull=True,
+        ).select_related("column__board__owner").prefetch_related("column__board__collaborators")
+    )
+
+    for task in due_tasks:
+        board = task.column.board
+        recipients = set()
+        if board.owner and getattr(board.owner, "is_active", True) and board.owner.email:
+            recipients.add(board.owner.email)
+        for collab in board.collaborators.filter(is_active=True):
+            if collab.email:
+                recipients.add(collab.email)
+
+        formatted_deadline = (
+            task.due_at.strftime("%Y-%m-%d %H:%M UTC") if task.due_at else "No deadline"
+        )
+        board_url = f"{settings.FRONTEND_URL}/boards/{board.id}"
+        subject = f"Reminder: Task '{task.title}' is due soon on {board.title}"
+        body = (
+            f"Hello,\n\n"
+            f"This is a reminder that the task '{task.title}' on board '{board.title}' "
+            f"is due at {formatted_deadline}.\n\n"
+            f"View board: {board_url}\n"
+        )
+
+        for recipient in recipients:
+            try:
+                send_transactional_email(subject, body, recipient)
+            except Exception:
+                logger.exception(
+                    "Failed to dispatch reminder email for task %s to %s",
+                    task.id,
+                    recipient,
+                )
+
+        task.reminder_sent_at = now
+        task.save(update_fields=["reminder_sent_at", "updated_at"])
+        dispatched_count += 1
+
+    if dispatched_count > 0:
+        logger.info("Dispatched due date reminders for %d tasks.", dispatched_count)
+
+    return dispatched_count
+
+
 @contextmanager
 def pg_advisory_lock_scope(lock_id: int):
     """
@@ -208,6 +269,18 @@ def run_auto_clear_job() -> int | None:
         return auto_clear_expired_tasks()
 
 
+def run_due_date_reminders_job() -> int | None:
+    """
+    Execute the collaborator reminder dispatch routine guarded by a PostgreSQL advisory lock.
+    Guarantees single-leader execution across multiple Uvicorn workers and dev reloader processes.
+    """
+    with pg_advisory_lock_scope(DUE_DATE_REMINDERS_ADVISORY_LOCK_ID) as acquired:
+        if not acquired:
+            logger.debug("Due date reminders advisory lock not acquired; another worker is currently executing.")
+            return None
+        return dispatch_due_date_reminders()
+
+
 def get_scheduler() -> BackgroundScheduler:
     """Return the global BackgroundScheduler instance, creating it if needed."""
     global _scheduler
@@ -241,8 +314,17 @@ def start_scheduler() -> BackgroundScheduler:
             max_instances=1,
             coalesce=True,
         )
+        scheduler.add_job(
+            run_due_date_reminders_job,
+            "interval",
+            seconds=60,
+            id="dispatch_due_date_reminders",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         scheduler.start()
-        logger.info("APScheduler started: auto-clear (5m) and recurring tasks (1m) scheduled.")
+        logger.info("APScheduler started: auto-clear (5m), recurring tasks (1m), and due date reminders (60s) scheduled.")
     return scheduler
 
 
