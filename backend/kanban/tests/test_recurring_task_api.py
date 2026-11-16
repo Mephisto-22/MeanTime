@@ -104,11 +104,10 @@ class RecurringTaskApiTests(TestCase):
         self.assertIsNotNone(rec.next_run_at)
 
     def test_create_task_via_board_endpoint_with_recurrence(self):
-        """Creating a task via board endpoint supports recurrence and column assignment."""
+        """Creating a task in a column supports recurrence."""
         payload = {
             "title": "Weekly Habit",
             "description": "Weekly review",
-            "column_id": self.col_done.id,
             "recurrence": {
                 "cadence": "WEEKLY",
                 "days_of_week": [0, 4],  # Monday, Friday
@@ -118,7 +117,7 @@ class RecurringTaskApiTests(TestCase):
         }
 
         response = self.client.post(
-            f"/api/kanban/boards/{self.board.id}/tasks",
+            f"/api/kanban/columns/{self.col_done.id}/tasks",
             data=json.dumps(payload),
             content_type="application/json",
             **self.auth,
@@ -530,12 +529,13 @@ class RecurringTaskApiTests(TestCase):
         )
 
         response = self.client.get(
-            f"/api/kanban/boards/{self.board.id}/tasks",
+            f"/api/kanban/boards/{self.board.id}",
             **self.auth,
         )
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        task_data = next((t for t in data if t["id"] == task.id), None)
+        board_data = response.json()
+        first_column = next(c for c in board_data["columns"] if c["id"] == self.col_todo.id)
+        task_data = next((t for t in first_column["tasks"] if t["id"] == task.id), None)
         self.assertIsNotNone(task_data)
         self.assertIsNotNone(task_data.get("recurring_task"))
         self.assertIsNone(task_data["recurring_task"]["creator_id"])
