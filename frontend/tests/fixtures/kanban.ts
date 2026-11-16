@@ -26,6 +26,8 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     tags: overrides.tags,
     timer: overrides.timer,
     totalSeconds: overrides.totalSeconds,
+    recurringTaskId: overrides.recurringTaskId,
+    recurringTask: overrides.recurringTask,
   }
 }
 

@@ -5,6 +5,35 @@ import { apiService } from '~/services/ApiService'
 export type TaskPriorityType = 'LOW' | 'MEDIUM' | 'HIGH' | null
 export type TimerMode = 'NONE' | 'COUNT_UP' | 'COUNT_DOWN'
 export type TimerState = 'IDLE' | 'RUNNING' | 'PAUSED'
+export type RecurrenceCadence = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+
+export interface RecurrenceIn {
+  cadence: RecurrenceCadence
+  daysOfWeek?: number[]
+  dayOfMonth?: number | null
+  timeOfDay?: string
+  timezone?: string
+}
+
+export interface RecurringTaskDto {
+  id: number | string
+  boardId: number | string
+  creatorId: number | string | null
+  title: string
+  description?: string
+  priority?: TaskPriorityType
+  cadence: RecurrenceCadence
+  daysOfWeek: number[]
+  dayOfMonth?: number | null
+  timeOfDay: string
+  timezone: string
+  defaultTimerMode: TimerMode
+  targetDurationSeconds?: number | null
+  isActive: boolean
+  nextRunAt: string
+  createdAt?: string
+  updatedAt?: string
+}
 
 export interface TaskTimerDto {
   id?: number
@@ -56,6 +85,22 @@ export const TASK_PRIORITY_CONFIG = {
 
 export const DEFAULT_TASK_PRIORITY_BORDER_CLASS = 'border-l-4 border-l-transparent'
 
+export const TASK_CADENCE_OPTIONS: Array<{ label: string; value: RecurrenceCadence }> = [
+  { label: 'Daily', value: 'DAILY' },
+  { label: 'Weekly', value: 'WEEKLY' },
+  { label: 'Monthly', value: 'MONTHLY' },
+]
+
+export const TASK_WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: 'Mon', value: 0 },
+  { label: 'Tue', value: 1 },
+  { label: 'Wed', value: 2 },
+  { label: 'Thu', value: 3 },
+  { label: 'Fri', value: 4 },
+  { label: 'Sat', value: 5 },
+  { label: 'Sun', value: 6 },
+]
+
 export const TIMER_MODE_CONFIG = {
   NONE: { label: 'None' },
   COUNT_DOWN: { label: 'Count down' },
@@ -97,6 +142,9 @@ export interface KanbanTaskDto {
   columnId: string | number
   columnActivityAt?: string
   archivedAt?: string | null
+  recurringTaskId?: number | string | null
+  recurringTask?: RecurringTaskDto | null
+  recurrence?: RecurrenceIn | null
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
   /** Sum of the task's time entry durations, in seconds. */
@@ -157,6 +205,9 @@ export interface TaskDialogSavePayload {
   priority?: TaskPriorityType
   tags?: TagDto[]
   tagIds?: Array<string | number>
+  recurrence?: RecurrenceIn | null
+  recurringTaskId?: number | string | null
+  applyToFuture?: boolean
 }
 
 export interface KanbanContext {
@@ -169,8 +220,8 @@ export interface KanbanContext {
   openCreateTaskDialog: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void
   createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
-  updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
-  deleteTask: (taskId: string | number) => Promise<void> | void
+  updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto> & { applyToFuture?: boolean }) => Promise<void> | void
+  deleteTask: (taskId: string | number, options?: { cancelRecurrence?: boolean }) => Promise<void> | void
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
   pauseTimer?: (taskId: string | number) => void
   stopTimer?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
@@ -243,12 +294,29 @@ export class KanbanApi {
     return apiService.patch<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}`, payload)
   }
 
-  deleteTask(taskId: string | number): Promise<SuccessResponse> {
+  deleteTask(taskId: string | number, options?: { cancelRecurrence?: boolean }): Promise<SuccessResponse> {
+    if (options?.cancelRecurrence !== undefined) {
+      return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`, undefined, {
+        query: { cancel_recurrence: options.cancelRecurrence },
+      })
+    }
     return apiService.delete<SuccessResponse>(`${this.endpoint}/tasks/${taskId}`)
   }
 
   moveTask(taskId: string | number, payload: TaskMoveRequest): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/tasks/${taskId}/move`, payload)
+  }
+
+  // -------------------------
+  // Recurring Task Endpoints
+  // -------------------------
+
+  updateRecurringTask(recurringTaskId: string | number, payload: Partial<RecurringTaskDto>): Promise<RecurringTaskDto> {
+    return apiService.patch<RecurringTaskDto>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`, payload)
+  }
+
+  deleteRecurringTask(recurringTaskId: string | number): Promise<SuccessResponse> {
+    return apiService.delete<SuccessResponse>(`${this.endpoint}/recurring-tasks/${recurringTaskId}`)
   }
 
   // -----------------

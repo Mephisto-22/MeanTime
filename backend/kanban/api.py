@@ -8,11 +8,26 @@ from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 from ninja import Router
 from users.models import UserBlock
-from .models import Board, BoardColumn, Task, TaskTimer, TaskTimeEntry, Tag, TimerMode, TimerState
+from .models import (
+    Board,
+    BoardColumn,
+    Task,
+    TaskTimer,
+    TaskTimeEntry,
+    Tag,
+    TimerMode,
+    TimerState,
+    RecurringTask,
+    RecurrenceCadence,
+)
+from .recurrence import calculate_next_run_at
 from .schemas import (
     TaskIn, 
     TaskOut, 
     TaskUpdateIn,
+    RecurringTaskIn,
+    RecurringTaskPatchIn,
+    RecurringTaskOut,
     BoardColumnIn, 
     BoardColumnOut,
     BoardColumnUpdateIn, 
@@ -136,7 +151,7 @@ def get_board_queryset(user):
     # Meta.ordering on aggregated queries, so the order is restated here.
     task_qs = (
         Task.objects.active()
-        .select_related("timer")
+        .select_related("timer", "recurring_task")
         .prefetch_related("tags")
         .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
         .order_by(*Task._meta.ordering)
@@ -174,11 +189,114 @@ def get_accessible_column(user, column_id: int) -> BoardColumn:
 def get_accessible_task(user, task_id: int) -> Task:
     """Retrieve a task on a board the user can access."""
     return get_object_or_404(
-        Task.objects.select_related("column__board").filter(
+        Task.objects.select_related("column__board", "recurring_task", "timer").filter(
             column__board__in=get_accessible_boards(user)
         ),
         id=task_id,
     )
+
+def get_accessible_recurring_task(user, recurring_task_id: int) -> RecurringTask:
+    """Retrieve a recurring task blueprint on a board the user can access."""
+    return get_object_or_404(
+        RecurringTask.objects.select_related("board").prefetch_related("tags").filter(
+            board__in=get_accessible_boards(user)
+        ),
+        id=recurring_task_id,
+    )
+
+def create_recurring_task_blueprint(
+    user,
+    board: Board,
+    title: str,
+    description: str,
+    priority: str | None,
+    cadence: str | RecurrenceCadence,
+    days_of_week: list[int],
+    day_of_month: int | None,
+    time_of_day: str,
+    timezone_name: str,
+    default_timer_mode: str | TimerMode,
+    target_duration_seconds: int | None,
+    tags=None,
+) -> RecurringTask:
+    """Colocated helper to initialize and persist a RecurringTask blueprint."""
+    cadence_val = cadence.value if hasattr(cadence, "value") else str(cadence)
+    timer_mode_val = default_timer_mode.value if hasattr(default_timer_mode, "value") else str(default_timer_mode)
+    priority_val = priority.value if hasattr(priority, "value") else priority
+
+    from kanban.recurrence import get_zone_info, parse_time_of_day
+    parsed_time_of_day = parse_time_of_day(time_of_day)
+
+    # When cadence is MONTHLY and day_of_month is omitted, anchor to the current day in user timezone
+    if cadence_val == RecurrenceCadence.MONTHLY and day_of_month is None:
+        tz = get_zone_info(timezone_name)
+        day_of_month = timezone.now().astimezone(tz).day
+
+    rec_task = RecurringTask(
+        board=board,
+        creator=user,
+        title=title,
+        description=description,
+        priority=priority_val,
+        cadence=cadence_val,
+        days_of_week=days_of_week,
+        day_of_month=day_of_month,
+        time_of_day=parsed_time_of_day,
+        timezone=timezone_name,
+        default_timer_mode=timer_mode_val,
+        target_duration_seconds=target_duration_seconds,
+        is_active=True,
+    )
+    rec_task.next_run_at = rec_task.calculate_next_run()
+    rec_task.save()
+    if tags is not None:
+        rec_task.tags.set(tags)
+    return rec_task
+
+def create_task_in_column(user, column: BoardColumn, payload: TaskIn) -> Task:
+    tags = get_available_board_tags(user, column.board, payload.tag_ids)
+    last = column.tasks.filter(archived_at__isnull=True).aggregate(m=Max("position"))["m"]
+
+    with transaction.atomic():
+        rec_task = None
+        if payload.recurrence is not None:
+            tz_name = payload.recurrence.timezone or getattr(user, "timezone", "UTC") or "UTC"
+            rec_task = create_recurring_task_blueprint(
+                user=user,
+                board=column.board,
+                title=payload.title,
+                description=payload.description,
+                priority=payload.priority,
+                cadence=payload.recurrence.cadence,
+                days_of_week=payload.recurrence.days_of_week,
+                day_of_month=payload.recurrence.day_of_month,
+                time_of_day=payload.recurrence.time_of_day,
+                timezone_name=tz_name,
+                default_timer_mode=payload.timer_mode or TimerMode.NONE,
+                target_duration_seconds=payload.target_duration_seconds,
+                tags=tags,
+            )
+
+        task = Task.objects.create(
+            column=column,
+            recurring_task=rec_task,
+            title=payload.title,
+            description=payload.description,
+            priority=payload.priority.value if payload.priority is not None else None,
+            position=0 if last is None else last + 1,
+            column_activity_at=timezone.now(),
+        )
+        task.tags.set(tags)
+
+        if payload.timer_mode is not None and payload.timer_mode != TimerMode.NONE:
+            TaskTimer.objects.create(
+                task=task,
+                mode=payload.timer_mode.value if hasattr(payload.timer_mode, "value") else str(payload.timer_mode),
+                target_duration_seconds=payload.target_duration_seconds,
+                state=TimerState.IDLE,
+            )
+
+    return task
 
 def get_owned_task(user, task_id: int) -> Task:
     """Retrieve a task belonging to the authenticated user."""
@@ -368,21 +486,7 @@ def delete_column(request, column_id: int):
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
     column = get_accessible_column(request.auth, column_id)
-    tags = get_available_board_tags(request.auth, column.board, payload.tag_ids)
-    last = column.tasks.filter(archived_at__isnull=True).aggregate(m=Max("position"))["m"]
-
-    with transaction.atomic():
-        task = Task.objects.create(
-            column=column,
-            title=payload.title,
-            description=payload.description,
-            priority=payload.priority.value if payload.priority is not None else None,
-            position=0 if last is None else last + 1,
-            column_activity_at=timezone.now(),
-        )
-        task.tags.set(tags)
-
-    return task
+    return create_task_in_column(request.auth, column, payload)
 
 @router.patch("/tasks/{task_id}", response=TaskOut)
 def update_task(request, task_id: int, payload: TaskUpdateIn):
@@ -390,11 +494,13 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
     task = get_accessible_task(request.auth, task_id)
     updates = payload.dict(exclude_unset=True) # get fields included in request
 
-    # get the owned tasks using the helper since tags are a
-    # relationship, not a normal task field
     tag_ids = updates.pop("tag_ids", None)
-    tags = None
+    apply_to_future = updates.pop("apply_to_future", False)
+    timer_mode = updates.pop("timer_mode", None)
+    target_duration_seconds = updates.pop("target_duration_seconds", None)
+    recurrence = updates.pop("recurrence", None)
 
+    tags = None
     if tag_ids is not None:
         tags = get_available_board_tags(request.auth, task.column.board, tag_ids)
 
@@ -413,16 +519,127 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
         if tags is not None:
             task.tags.set(tags)
 
+        # Handle timer update if provided
+        if timer_mode is not None or target_duration_seconds is not None:
+            if timer_mode == TimerMode.NONE:
+                TaskTimer.objects.filter(task=task).delete()
+                task.timer = None
+            else:
+                timer, _ = TaskTimer.objects.get_or_create(task=task)
+                if timer_mode is not None:
+                    timer.mode = timer_mode.value if hasattr(timer_mode, "value") else str(timer_mode)
+                if target_duration_seconds is not None:
+                    timer.target_duration_seconds = target_duration_seconds
+                timer.save()
+                task.timer = timer
+
+        # Handle explicit unlinking of recurrence if recurring_task_id is None in updates
+        if "recurring_task_id" in updates and updates["recurring_task_id"] is None:
+            task.recurring_task = None
+            task.save(update_fields=["recurring_task", "updated_at"])
+
+        # Handle recurrence if provided
+        if recurrence is not None:
+            rec_updates = recurrence if isinstance(recurrence, dict) else recurrence.dict(exclude_unset=True)
+            if task.recurring_task is None:
+                # Add recurrence to previously non-recurring task
+                tz_name = (
+                    rec_updates.get("timezone")
+                    or getattr(request.auth, "timezone", "UTC")
+                    or "UTC"
+                )
+                default_timer = TimerMode.NONE
+                timer_duration = None
+                if timer_mode is not None:
+                    default_timer = timer_mode
+                    timer_duration = target_duration_seconds
+                elif hasattr(task, "timer") and task.timer:
+                    default_timer = task.timer.mode
+                    timer_duration = task.timer.target_duration_seconds
+
+                rec = create_recurring_task_blueprint(
+                    user=request.auth,
+                    board=task.column.board,
+                    title=task.title,
+                    description=task.description,
+                    priority=task.priority,
+                    cadence=rec_updates.get("cadence", RecurrenceCadence.DAILY),
+                    days_of_week=rec_updates.get("days_of_week", []),
+                    day_of_month=rec_updates.get("day_of_month", None),
+                    time_of_day=rec_updates.get("time_of_day", "00:00"),
+                    timezone_name=tz_name,
+                    default_timer_mode=default_timer,
+                    target_duration_seconds=timer_duration,
+                    tags=tags if tags is not None else task.tags.all(),
+                )
+                task.recurring_task = rec
+                task.save(update_fields=["recurring_task", "column_activity_at", "updated_at"])
+            else:
+                # Update recurrence schedule on existing blueprint (update_schedule only recalculates next_run_at if fields changed)
+                rec = task.recurring_task
+                rec.update_schedule(**rec_updates)
+                rec.save()
+
+        # If apply_to_future is True and task is linked to RecurringTask, update template fields
+        if apply_to_future and task.recurring_task is not None:
+            rec = task.recurring_task
+            template_kwargs = {}
+            if "title" in updates:
+                template_kwargs["title"] = updates["title"]
+            if "description" in updates:
+                template_kwargs["description"] = updates["description"]
+            if "priority" in updates:
+                template_kwargs["priority"] = updates["priority"]
+            if timer_mode is not None:
+                template_kwargs["default_timer_mode"] = timer_mode
+            if target_duration_seconds is not None:
+                template_kwargs["target_duration_seconds"] = target_duration_seconds
+            rec.update_template(**template_kwargs)
+            if tags is not None:
+                rec.tags.set(tags)
+            rec.save()
+
     return task
 
 @router.delete("/tasks/{task_id}")
-def delete_task(request, task_id: int):
-    """Delete a task."""
+def delete_task(request, task_id: int, cancel_recurrence: bool = False):
+    """Delete a task. If cancel_recurrence=True and task is recurring, deactivates the recurrence schedule."""
     task = get_accessible_task(request.auth, task_id)
     column = task.column
     with transaction.atomic():
+        if cancel_recurrence and task.recurring_task is not None:
+            task.recurring_task.is_active = False
+            task.recurring_task.save(update_fields=["is_active", "updated_at"])
         task.delete()
         _reindex(list(column.tasks.filter(archived_at__isnull=True)))
+    return {"success": True}
+
+@router.patch("/recurring-tasks/{recurring_task_id}", response=RecurringTaskOut)
+def update_recurring_task(request, recurring_task_id: int, payload: RecurringTaskPatchIn):
+    """Update fields or toggle is_active for a recurring task blueprint."""
+    rec = get_accessible_recurring_task(request.auth, recurring_task_id)
+    updates = payload.dict(exclude_unset=True)
+
+    tag_ids = updates.pop("tag_ids", None)
+    tags = None
+    if tag_ids is not None:
+        tags = get_available_board_tags(request.auth, rec.board, tag_ids)
+
+    with transaction.atomic():
+        rec.update_schedule(**updates)
+        rec.update_template(**updates)
+        rec.save()
+        if tags is not None:
+            rec.tags.set(tags)
+
+    return rec
+
+@router.delete("/recurring-tasks/{recurring_task_id}")
+def delete_recurring_task(request, recurring_task_id: int):
+    """Delete a recurring task blueprint, leaving past spawned task occurrences intact."""
+    rec = get_accessible_recurring_task(request.auth, recurring_task_id)
+    with transaction.atomic():
+        rec.delete()
     return {"success": True}
 
 @router.post("/tasks/{task_id}/move", response=TaskOut)

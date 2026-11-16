@@ -5,7 +5,7 @@ from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
 from users.schemas import UserOut
-from .models import TaskPriority, TimerMode, TimerState
+from .models import TaskPriority, TimerMode, TimerState, RecurrenceCadence
 
 # Timer schemas
 class TaskTimerOut(Schema):
@@ -57,6 +57,130 @@ class TaskTimeEntryOut(Schema):
     note: str
     created_at: datetime
 
+# Recurrence schemas
+def _validate_days_of_week(v):
+    if v is not None:
+        for day in v:
+            if not isinstance(day, int) or day < 0 or day > 6:
+                raise ValueError("days_of_week entries must be integers from 0 (Monday) to 6 (Sunday)")
+    return v
+
+def _validate_day_of_month(v):
+    if v is not None and (v < 1 or v > 31):
+        raise ValueError("day_of_month must be an integer between 1 and 31")
+    return v
+
+def _validate_time_of_day(v):
+    if v is not None:
+        parts = v.strip().split(":")
+        if len(parts) not in (2, 3):
+            raise ValueError("time_of_day must be formatted as HH:MM or HH:MM:SS")
+        try:
+            h = int(parts[0])
+            m = int(parts[1])
+            s = int(parts[2]) if len(parts) == 3 else 0
+            if not (0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59):
+                raise ValueError()
+        except ValueError:
+            raise ValueError("time_of_day must be a valid time of day (00:00 to 23:59)")
+    return v
+
+def _validate_timezone(v):
+    if v is not None and len(v.strip()) > 63:
+        raise ValueError("timezone name cannot exceed 63 characters")
+    return v
+
+
+class RecurringTaskIn(Schema):
+    """Payload expected when configuring recurrence."""
+    cadence: RecurrenceCadence = RecurrenceCadence.DAILY
+    days_of_week: list[int] = []
+    day_of_month: int | None = None
+    time_of_day: str = "00:00"
+    timezone: str | None = None
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, v):
+        return _validate_days_of_week(v)
+
+    @field_validator("day_of_month")
+    @classmethod
+    def validate_day_of_month(cls, v):
+        return _validate_day_of_month(v)
+
+    @field_validator("time_of_day")
+    @classmethod
+    def validate_time_of_day(cls, v):
+        return _validate_time_of_day(v)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        return _validate_timezone(v)
+
+class RecurringTaskPatchIn(Schema):
+    """Payload expected for partially updating a recurring task schedule or template."""
+    is_active: bool | None = None
+    cadence: RecurrenceCadence | None = None
+    days_of_week: list[int] | None = None
+    day_of_month: int | None = None
+    time_of_day: str | None = None
+    timezone: str | None = None
+    title: str | None = None
+    description: str | None = None
+    priority: TaskPriority | None = None
+    tag_ids: list[int] | None = None
+    default_timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, v):
+        return _validate_days_of_week(v)
+
+    @field_validator("day_of_month")
+    @classmethod
+    def validate_day_of_month(cls, v):
+        return _validate_day_of_month(v)
+
+    @field_validator("time_of_day")
+    @classmethod
+    def validate_time_of_day(cls, v):
+        return _validate_time_of_day(v)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        return _validate_timezone(v)
+
+class RecurringTaskOut(Schema):
+    """Shape of a recurring task returned to clients."""
+    id: int
+    board_id: int
+    creator_id: int | None = None
+    title: str
+    description: str = ""
+    priority: TaskPriority | None = None
+    cadence: RecurrenceCadence
+    days_of_week: list[int] = []
+    day_of_month: int | None = None
+    time_of_day: str
+    timezone: str
+    default_timer_mode: TimerMode
+    target_duration_seconds: int | None = None
+    is_active: bool
+    next_run_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    @staticmethod
+    def resolve_time_of_day(obj):
+        if hasattr(obj.time_of_day, "strftime"):
+            return obj.time_of_day.strftime("%H:%M:%S")
+        return str(obj.time_of_day)
+
+
 # Task schemas
 class TaskIn(Schema):
     """Payload expected when creating a task."""
@@ -64,6 +188,10 @@ class TaskIn(Schema):
     description: str = ""
     priority: TaskPriority | None = None
     tag_ids: list[int] = []
+    timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    column_id: int | None = None
+    recurrence: RecurringTaskIn | None = None
 
 class TaskOut(Schema):
     """Shape of the task returned to clients."""
@@ -75,6 +203,8 @@ class TaskOut(Schema):
     column_id: int
     column_activity_at: datetime | None = None
     archived_at: datetime | None = None
+    recurring_task_id: int | None = None
+    recurring_task: RecurringTaskOut | None = None
     tags: list[TagOut]
     timer: TaskTimerOut | None = None
     total_seconds: int = 0
@@ -82,9 +212,19 @@ class TaskOut(Schema):
     updated_at: datetime
 
     @staticmethod
+    def resolve_recurring_task(obj):
+        try:
+            return obj.recurring_task
+        except Exception:
+            return None
+
+    @staticmethod
     def resolve_timer(obj):
         try:
-            return obj.timer
+            t = getattr(obj, "timer", None)
+            if t is not None and getattr(t, "mode", None) != TimerMode.NONE:
+                return t
+            return None
         except Exception:
             return None
 
@@ -107,6 +247,11 @@ class TaskUpdateIn(Schema):
     description: str | None = None
     priority: TaskPriority | None = None
     tag_ids: list[int] | None = None
+    timer_mode: TimerMode | None = None
+    target_duration_seconds: int | None = None
+    recurring_task_id: int | None = None
+    apply_to_future: bool = False
+    recurrence: RecurringTaskPatchIn | None = None
 
 # Column Schemas
 class BoardColumnIn(Schema):
@@ -143,7 +288,7 @@ class BoardColumnOut(Schema):
         if tasks_manager is not None and hasattr(tasks_manager, "filter"):
             return (
                 tasks_manager.filter(archived_at__isnull=True)
-                .select_related("timer")
+                .select_related("timer", "recurring_task")
                 .prefetch_related("tags")
                 .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
                 .order_by("position", "id")

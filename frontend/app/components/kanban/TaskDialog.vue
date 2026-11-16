@@ -195,6 +195,159 @@
         />
       </div>
 
+      <!-- Recurrence Section -->
+      <div
+        data-testid="task-dialog-recurrence-section"
+        class="flex flex-col gap-3 rounded-xl border border-surface-200/80 bg-surface-50/50 p-4 dark:border-surface-800 dark:bg-surface-900/40"
+      >
+        <!-- Header: Prominent Icon, Title, Subtitle & Toggle -->
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-200/70 text-surface-600 dark:bg-surface-800 dark:text-surface-300">
+              <i class="pi pi-sync text-sm" />
+            </div>
+            <div class="flex flex-col min-w-0">
+              <Label
+                for="task-recurrence-toggle"
+                class="text-sm font-semibold text-surface-900 dark:text-surface-100 cursor-pointer select-none"
+              >
+                Repeat on schedule
+              </Label>
+              <p class="text-xs text-surface-500 dark:text-surface-400 truncate">
+                Repeat this task automatically on a defined cadence
+              </p>
+            </div>
+          </div>
+
+          <ToggleSwitch
+            id="task-recurrence-toggle"
+            v-model="isRecurring"
+            data-testid="task-recurrence-toggle"
+          />
+        </div>
+
+        <!-- Controls: Sliding Select top-left on its own row, then Cadence Details & Masked Time below -->
+        <div
+          v-if="isRecurring"
+          data-testid="task-recurrence-controls"
+          class="flex flex-col gap-3.5 pt-3 border-t border-surface-200/70 dark:border-surface-800"
+        >
+          <!-- Row 1: Sliding Cadence Selector (Top-left, compact, on its own row) -->
+          <div class="flex flex-col gap-1 self-start">
+            <span class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+              Cadence
+            </span>
+            <div
+              class="inline-flex p-0.5 rounded-lg bg-surface-200/60 dark:bg-surface-800 border border-surface-300/60 dark:border-surface-700/60"
+              role="tablist"
+              aria-label="Cadence options"
+            >
+              <Button
+                v-for="opt in cadenceOptions"
+                :key="opt.value"
+                type="button"
+                role="tab"
+                size="small"
+                :aria-selected="recurrenceCadence === opt.value"
+                class="!py-1 !px-3 !text-xs !font-semibold !rounded-md transition-all cursor-pointer text-center select-none !border-0 shadow-none"
+                :class="recurrenceCadence === opt.value
+                  ? '!bg-surface-0 dark:!bg-surface-900 !text-surface-900 dark:!text-surface-0 shadow-xs'
+                  : '!bg-transparent !text-surface-500 hover:!text-surface-900 dark:hover:!text-surface-100'"
+                @click="recurrenceCadence = opt.value"
+              >
+                {{ opt.label }}
+              </Button>
+            </div>
+
+            <!-- Accessible Select for assistive tech and test compatibility -->
+            <Select
+              id="task-cadence-select"
+              v-model="recurrenceCadence"
+              :options="cadenceOptions"
+              option-label="label"
+              option-value="value"
+              size="small"
+              data-testid="task-cadence-select"
+              class="sr-only"
+              aria-label="Cadence"
+            />
+          </div>
+
+          <!-- Row 2: Cadence-specific details on left + Time of Day on right -->
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <!-- Left side: WEEKLY chips, MONTHLY day-of-month, or DAILY indicator -->
+            <div v-if="recurrenceCadence === 'WEEKLY'" class="flex flex-col gap-1">
+              <span class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                Repeat on days
+              </span>
+              <div data-testid="task-weekdays-selector" class="flex flex-wrap items-center gap-1">
+                <Button
+                  v-for="day in weekdayOptions"
+                  :key="day.value"
+                  type="button"
+                  size="small"
+                  :severity="selectedDaysOfWeek.includes(day.value) ? 'primary' : 'secondary'"
+                  :variant="selectedDaysOfWeek.includes(day.value) ? undefined : 'outlined'"
+                  :data-testid="`weekday-chip-${day.value}`"
+                  class="!text-xs !py-1 !px-2.5 cursor-pointer font-medium"
+                  :class="selectedDaysOfWeek.includes(day.value) ? 'font-semibold shadow-xs' : ''"
+                  @click="toggleDayOfWeek(day.value)"
+                >
+                  {{ day.label }}
+                </Button>
+              </div>
+            </div>
+
+            <div v-else-if="recurrenceCadence === 'MONTHLY'" class="flex flex-col gap-1">
+              <Label for="task-day-of-month-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                Day of month
+              </Label>
+              <div class="flex items-center gap-2">
+                <DatePicker
+                  id="task-day-of-month-input"
+                  v-model="monthDayPickerValue"
+                  dateFormat="d"
+                  showIcon
+                  iconDisplay="input"
+                  placeholder="1"
+                  size="small"
+                  data-testid="task-day-of-month-input"
+                  class="!w-28 text-xs font-medium"
+                />
+                <span class="text-xs text-surface-500 dark:text-surface-400">
+                  {{ ordinalDayString(dayOfMonth) }} of each month
+                </span>
+              </div>
+            </div>
+
+            <div v-else class="text-xs text-surface-500 dark:text-surface-400 pb-1.5">
+              Repeats every calendar day
+            </div>
+
+            <!-- Right side: Time of Day DatePicker -->
+            <div class="flex flex-col gap-1 w-32 sm:w-36 shrink-0">
+              <Label for="task-time-of-day-input" class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+                Time (HH:MM)
+              </Label>
+              <DatePicker
+                id="task-time-of-day-input"
+                v-model="timePickerValue"
+                timeOnly
+                hourFormat="24"
+                showIcon
+                iconDisplay="input"
+                placeholder="00:00"
+                size="small"
+                fluid
+                data-testid="task-time-of-day-input"
+                class="text-xs font-mono !h-[34px]"
+                @blur="onTimePickerBlur"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Task Timer Section (Full-Width Focus & Work Journal) -->
       <div data-testid="task-dialog-timer-section" class="w-full">
         <TaskTimerEditor
@@ -207,16 +360,75 @@
         />
       </div>
 
+      <!-- Save Scope Confirmation Step for Recurring Tasks -->
+      <div
+        v-if="isConfirmingSaveScope"
+        data-testid="task-save-scope-confirmation"
+        class="flex flex-col gap-3 p-4 rounded-xl bg-surface-50 dark:bg-surface-900 border border-primary-500/30 dark:border-primary-500/30 shadow-sm"
+      >
+        <div class="flex items-start gap-3">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+            <i class="pi pi-sync text-sm" />
+          </div>
+          <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-700 dark:text-surface-300">
+              Recurring Task Scope
+            </h4>
+            <p class="text-sm font-medium text-surface-800 dark:text-surface-200">
+              This is a recurring task. Do you want to apply these changes to just this task or all future tasks?
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-surface-200/60 dark:border-surface-800">
+          <Button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            size="small"
+            text
+            data-testid="task-save-scope-cancel-button"
+            @click="cancelSaveScope"
+          />
+          <Button
+            type="button"
+            label="Update this task only"
+            severity="secondary"
+            size="small"
+            variant="outlined"
+            data-testid="task-save-scope-this-button"
+            @click="executeSave(false)"
+          />
+          <Button
+            type="button"
+            label="Update this and all future tasks"
+            severity="primary"
+            size="small"
+            data-testid="task-save-scope-future-button"
+            @click="executeSave(true)"
+          />
+        </div>
+      </div>
+
       <!-- Delete Confirmation Step -->
       <div
         v-if="isConfirmingDelete"
         data-testid="task-delete-confirmation"
-        class="danger-callout-box flex flex-col gap-2"
+        class="danger-callout-box flex flex-col gap-3 rounded-xl p-4"
       >
-        <p class="text-sm font-medium text-red-800 dark:text-red-200">
-          Are you sure you want to delete this task? This cannot be undone.
-        </p>
-        <div class="flex justify-end gap-2">
+        <div class="flex items-start gap-3">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-red-400">
+            <i class="pi pi-exclamation-triangle text-sm" />
+          </div>
+          <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400">
+              Confirm Deletion
+            </h4>
+            <p class="text-sm font-medium text-red-800 dark:text-red-200">
+              {{ isRecurringTask ? 'This is a recurring task. Choose how you want to delete it:' : 'Are you sure you want to delete this task? This cannot be undone.' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-red-200/60 dark:border-red-900/40">
           <Button
             type="button"
             label="Cancel"
@@ -226,14 +438,35 @@
             data-testid="task-cancel-delete-button"
             @click="cancelDelete"
           />
-          <Button
-            type="button"
-            label="Confirm Delete"
-            severity="danger"
-            size="small"
-            data-testid="task-confirm-delete-button"
-            @click="confirmDelete"
-          />
+          <template v-if="isRecurringTask">
+            <Button
+              type="button"
+              label="Delete this task only"
+              severity="secondary"
+              size="small"
+              variant="outlined"
+              data-testid="task-delete-single-button"
+              @click="confirmDelete(false)"
+            />
+            <Button
+              type="button"
+              label="Delete this task and cancel recurrence"
+              severity="danger"
+              size="small"
+              data-testid="task-delete-cancel-recurrence-button"
+              @click="confirmDelete(true)"
+            />
+          </template>
+          <template v-else>
+            <Button
+              type="button"
+              label="Confirm Delete"
+              severity="danger"
+              size="small"
+              data-testid="task-confirm-delete-button"
+              @click="confirmDelete(false)"
+            />
+          </template>
         </div>
       </div>
 
@@ -279,9 +512,17 @@ import type {
   TagDto,
   TaskDialogSavePayload,
   KanbanColumnSummary,
+  RecurrenceCadence,
 } from '~/api/kanban'
-import { kanbanContextKey, TASK_PRIORITY_CONFIG } from '~/api/kanban'
+import {
+  kanbanContextKey,
+  TASK_PRIORITY_CONFIG,
+  TASK_CADENCE_OPTIONS,
+  TASK_WEEKDAY_OPTIONS,
+} from '~/api/kanban'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
+import { useAuthStore } from '~/stores/auth'
+import DatePicker from 'primevue/datepicker'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 
 interface Props {
@@ -304,7 +545,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'save', payload: TaskDialogSavePayload): void
-  (e: 'delete', taskId: string | number): void
+  (e: 'delete', taskId: string | number, options?: { cancelRecurrence?: boolean }): void
   (e: 'cancel'): void
   (e: 'createTag', name: string): void
   (e: 'timerExpired', entry: TaskTimeEntryDto): void
@@ -324,6 +565,148 @@ const selectedColumnId = ref<string | number | null>(null)
 const attachedTags = ref<TagDto[]>([])
 const tagInputText = ref('')
 const isConfirmingDelete = ref(false)
+const isConfirmingSaveScope = ref(false)
+
+// Recurrence Form State
+const authStore = useAuthStore()
+const userTimezone = computed(() => {
+  return authStore.user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+})
+const isRecurring = ref(false)
+const recurrenceCadence = ref<RecurrenceCadence>('DAILY')
+const selectedDaysOfWeek = ref<number[]>([0])
+const dayOfMonth = ref<number | null>(1)
+const timeOfDay = ref('00:00')
+
+const cadenceOptions = TASK_CADENCE_OPTIONS
+const weekdayOptions = TASK_WEEKDAY_OPTIONS
+
+const toggleDayOfWeek = (dayVal: number) => {
+  const idx = selectedDaysOfWeek.value.indexOf(dayVal)
+  if (idx > -1) {
+    if (selectedDaysOfWeek.value.length > 1) {
+      selectedDaysOfWeek.value.splice(idx, 1)
+    }
+  } else {
+    selectedDaysOfWeek.value.push(dayVal)
+    selectedDaysOfWeek.value.sort((a, b) => a - b)
+  }
+}
+
+const ordinalDayString = (day: number | null) => {
+  if (!day) return '1st'
+  const j = day % 10
+  const k = day % 100
+  if (j === 1 && k !== 11) return `${day}st`
+  if (j === 2 && k !== 12) return `${day}nd`
+  if (j === 3 && k !== 13) return `${day}rd`
+  return `${day}th`
+}
+
+const validateTimeOfDay = () => {
+  if (!timeOfDay.value) {
+    timeOfDay.value = '00:00'
+    return
+  }
+  const clean = timeOfDay.value.replace(/[^0-9:]/g, '')
+  const parts = clean.split(':')
+  if (parts.length === 2 && parts[0] !== undefined && parts[1] !== undefined) {
+    let hours = parseInt(parts[0], 10)
+    let minutes = parseInt(parts[1], 10)
+    if (isNaN(hours)) hours = 0
+    if (isNaN(minutes)) minutes = 0
+    if (hours > 23) hours = 23
+    if (hours < 0) hours = 0
+    if (minutes > 59) minutes = 59
+    if (minutes < 0) minutes = 0
+    timeOfDay.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  } else {
+    timeOfDay.value = '00:00'
+  }
+}
+
+const timePickerValue = computed({
+  get: (): Date | null => {
+    if (!timeOfDay.value) return null
+    const parts = timeOfDay.value.split(':')
+    const hours = parseInt(parts[0] ?? '0', 10) || 0
+    const minutes = parseInt(parts[1] ?? '0', 10) || 0
+    const d = new Date()
+    d.setHours(Math.min(Math.max(hours, 0), 23), Math.min(Math.max(minutes, 0), 59), 0, 0)
+    return d
+  },
+  set: (val: Date | null) => {
+    if (!val) {
+      timeOfDay.value = '00:00'
+      return
+    }
+    const anyVal = val as unknown
+    if (anyVal instanceof Date) {
+      const h = String(anyVal.getHours()).padStart(2, '0')
+      const m = String(anyVal.getMinutes()).padStart(2, '0')
+      timeOfDay.value = `${h}:${m}`
+    } else if (typeof anyVal === 'string') {
+      timeOfDay.value = anyVal
+    }
+  },
+})
+
+const onTimePickerBlur = () => {
+  validateTimeOfDay()
+}
+
+const monthDayPickerValue = computed({
+  get: (): Date | null => {
+    if (!dayOfMonth.value) return null
+    // Anchor to a 31-day month (January 2024) to prevent month overflow on day 29, 30, or 31 in short months
+    const d = new Date(2024, 0, Math.min(Math.max(dayOfMonth.value, 1), 31))
+    return d
+  },
+  set: (val: Date | null) => {
+    if (!val) {
+      dayOfMonth.value = 1
+      return
+    }
+    const anyVal = val as unknown
+    if (anyVal instanceof Date) {
+      dayOfMonth.value = anyVal.getDate()
+    } else if (typeof anyVal === 'number') {
+      dayOfMonth.value = Math.min(Math.max(anyVal, 1), 31)
+    } else if (typeof anyVal === 'string') {
+      const parsed = parseInt(anyVal, 10)
+      dayOfMonth.value = isNaN(parsed) ? 1 : Math.min(Math.max(parsed, 1), 31)
+    }
+  },
+})
+
+const humanScheduleDescription = computed(() => {
+  const time = timeOfDay.value || '00:00'
+  if (recurrenceCadence.value === 'DAILY') {
+    return `Repeats every day at ${time}`
+  }
+  if (recurrenceCadence.value === 'WEEKLY') {
+    const days = selectedDaysOfWeek.value
+    if (days.length === 5 && [0, 1, 2, 3, 4].every(d => days.includes(d))) {
+      return `Repeats every weekday (Mon–Fri) at ${time}`
+    }
+    if (days.length === 7) {
+      return `Repeats every day at ${time}`
+    }
+    if (days.length === 2 && days.includes(5) && days.includes(6)) {
+      return `Repeats every weekend (Sat, Sun) at ${time}`
+    }
+    const dayNames = days.map(d => weekdayOptions.find(w => w.value === d)?.label ?? '').filter(Boolean)
+    return `Repeats every ${dayNames.join(', ')} at ${time}`
+  }
+  if (recurrenceCadence.value === 'MONTHLY') {
+    return `Repeats monthly on the ${ordinalDayString(dayOfMonth.value)} at ${time}`
+  }
+  return `Repeats on schedule at ${time}`
+})
+
+const isRecurringTask = computed(() => {
+  return Boolean(props.task?.recurringTaskId || props.task?.recurringTask)
+})
 
 const activeTaskId = computed(() => props.task?.id ?? 'draft-task')
 
@@ -394,6 +777,7 @@ const getPriorityLabel = (val: TaskPriorityType) => {
 
 const syncFormWithProps = () => {
   isConfirmingDelete.value = false
+  isConfirmingSaveScope.value = false
   tagInputText.value = ''
   if (props.mode === 'edit' && props.task) {
     title.value = props.task.title ?? ''
@@ -401,6 +785,22 @@ const syncFormWithProps = () => {
     priority.value = props.task.priority ?? null
     selectedColumnId.value = props.task.columnId ?? (props.task as any)?.column_id ?? props.columnId ?? null
     attachedTags.value = props.task.tags ? [...props.task.tags] : []
+
+    const rec = props.task.recurringTask
+    if (props.task.recurringTaskId || rec) {
+      isRecurring.value = rec?.isActive !== false
+      recurrenceCadence.value = rec?.cadence ?? 'DAILY'
+      selectedDaysOfWeek.value = rec?.daysOfWeek && rec.daysOfWeek.length > 0 ? [...rec.daysOfWeek] : [0]
+      dayOfMonth.value = rec?.dayOfMonth ?? 1
+      timeOfDay.value = rec?.timeOfDay ? rec.timeOfDay.slice(0, 5) : '00:00'
+    } else {
+      isRecurring.value = false
+      recurrenceCadence.value = 'DAILY'
+      selectedDaysOfWeek.value = [0]
+      dayOfMonth.value = 1
+      timeOfDay.value = '00:00'
+    }
+
     timerState.value = props.task.timer
       ? { ...props.task.timer }
       : {
@@ -418,6 +818,12 @@ const syncFormWithProps = () => {
     priority.value = null
     selectedColumnId.value = props.columnId ?? null
     attachedTags.value = []
+    isRecurring.value = false
+    recurrenceCadence.value = 'DAILY'
+    selectedDaysOfWeek.value = [0]
+    dayOfMonth.value = 1
+    timeOfDay.value = '00:00'
+
     timerState.value = {
       taskId: 'new-task',
       mode: 'NONE',
@@ -527,9 +933,9 @@ const cancelDelete = () => {
   isConfirmingDelete.value = false
 }
 
-const confirmDelete = () => {
+const confirmDelete = (cancelRecurrence = false) => {
   if (props.task?.id != null) {
-    emit('delete', props.task.id)
+    emit('delete', props.task.id, { cancelRecurrence })
   }
   isVisible.value = false
   isConfirmingDelete.value = false
@@ -538,13 +944,64 @@ const confirmDelete = () => {
 const cancel = () => {
   isVisible.value = false
   isConfirmingDelete.value = false
+  isConfirmingSaveScope.value = false
   emit('cancel')
 }
 
+const cancelSaveScope = () => {
+  isConfirmingSaveScope.value = false
+}
+
+const hasCoreMetadataChanged = computed(() => {
+  if (!props.task) return true
+  // Title
+  if (trimmedTitle.value !== (props.task.title ?? '').trim()) return true
+  // Description
+  if (description.value.trim() !== (props.task.description ?? '').trim()) return true
+  // Priority
+  if (priority.value !== (props.task.priority ?? null)) return true
+  // Tags
+  const currentTagIds = attachedTags.value.map(t => String(t.id)).sort().join(',')
+  const originalTagIds = (props.task.tags ?? []).map(t => String(t.id)).sort().join(',')
+  if (currentTagIds !== originalTagIds) return true
+  // Timer mode / duration
+  const origTimer = props.task.timer
+  const curTimer = timerState.value
+  const origTimerMode = origTimer?.mode ?? 'NONE'
+  const curTimerMode = curTimer?.mode ?? 'NONE'
+  if (origTimerMode !== curTimerMode) return true
+  if (curTimerMode !== 'NONE') {
+    if ((origTimer?.targetDurationSeconds ?? null) !== (curTimer?.targetDurationSeconds ?? null)) return true
+  }
+  // Recurrence schedule
+  const origRec = props.task.recurringTask
+  if (isRecurring.value) {
+    if (!origRec) return true
+    if (recurrenceCadence.value !== origRec.cadence) return true
+    if (recurrenceCadence.value === 'WEEKLY') {
+      const curDays = [...selectedDaysOfWeek.value].sort().join(',')
+      const origDays = [...(origRec.daysOfWeek ?? [])].sort().join(',')
+      if (curDays !== origDays) return true
+    }
+    if (recurrenceCadence.value === 'MONTHLY' && dayOfMonth.value !== origRec.dayOfMonth) return true
+    if ((timeOfDay.value || '00:00') !== (origRec.timeOfDay ? origRec.timeOfDay.slice(0, 5) : '00:00')) return true
+  }
+  return false
+})
+
 const save = () => {
-  if (isSaveDisabled.value || isConfirmingDelete.value) {
+  if (isSaveDisabled.value || isConfirmingDelete.value || isConfirmingSaveScope.value) {
     return
   }
+  // When editing an existing recurring task and core metadata actually changed, prompt user for scope
+  if (props.mode === 'edit' && isRecurringTask.value && isRecurring.value && hasCoreMetadataChanged.value) {
+    isConfirmingSaveScope.value = true
+    return
+  }
+  executeSave(false)
+}
+
+const executeSave = (applyToFuture = false) => {
   const payload: TaskDialogSavePayload = {
     title: trimmedTitle.value,
     description: description.value.trim(),
@@ -554,7 +1011,23 @@ const save = () => {
     priority: priority.value,
     tags: [...attachedTags.value],
     tagIds: attachedTags.value.map(t => t.id),
+    recurringTaskId: props.task?.recurringTaskId ?? props.task?.recurringTask?.id ?? null,
+    applyToFuture,
   }
+
+  if (isRecurring.value) {
+    validateTimeOfDay()
+    payload.recurrence = {
+      cadence: recurrenceCadence.value,
+      daysOfWeek: recurrenceCadence.value === 'WEEKLY' ? [...selectedDaysOfWeek.value] : [],
+      dayOfMonth: recurrenceCadence.value === 'MONTHLY' ? (dayOfMonth.value ?? 1) : null,
+      timeOfDay: timeOfDay.value || '00:00',
+      timezone: userTimezone.value,
+    }
+  } else {
+    payload.recurrence = null
+  }
+
   if (timerState.value && (props.mode === 'edit' || timerState.value.mode !== 'NONE')) {
     payload.timer = timerState.value
   }
@@ -563,6 +1036,7 @@ const save = () => {
   }
   emit('save', payload)
   isVisible.value = false
+  isConfirmingSaveScope.value = false
 }
 
 defineExpose({
@@ -575,11 +1049,25 @@ defineExpose({
   isSaveDisabled,
   isVisible,
   isConfirmingDelete,
+  isConfirmingSaveScope,
+  isRecurring,
+  recurrenceCadence,
+  selectedDaysOfWeek,
+  dayOfMonth,
+  timeOfDay,
+  timePickerValue,
+  monthDayPickerValue,
+  validateTimeOfDay,
   initiateDelete,
   cancelDelete,
   confirmDelete,
   cancel,
+  cancelSaveScope,
   save,
+  executeSave,
+  toggleDayOfWeek,
+  ordinalDayString,
+  humanScheduleDescription,
   addTagFromInput,
   attachExistingTag,
   removeTag,
