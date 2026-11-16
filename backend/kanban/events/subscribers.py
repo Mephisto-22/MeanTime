@@ -56,6 +56,9 @@ async def subscribe_to_board(board_id: int, user_id: int):
                     yield format_sse_event(event)
                     break
 
+                # do not send another user's revocation to this subscriber
+                continue
+
             # The entire board has been deleted
             if event_type == BoardEventType.BOARD_DELETED:
                 yield format_sse_event(event)
