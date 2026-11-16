@@ -228,6 +228,39 @@ describe('Default Layout Header Suite', () => {
       expect(inactiveFriendsLink.classes()).toContain('text-surface-700')
     })
 
+    it('renders navigation link pointing to /analytics with chart icon and label', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const link = wrapper.find('[data-testid="analytics-nav-link"]')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href') || link.attributes('to')).toBe('/analytics')
+      expect(link.text()).toContain('Analytics')
+      expect(link.find('.pi-chart-bar').exists()).toBe(true)
+    })
+
+    it('highlights the analytics link only on /analytics, not on a board analytics page', async () => {
+      const router = useRouter()
+      await router.push('/analytics')
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const activeLink = wrapper.find('[data-testid="analytics-nav-link"]')
+      expect(activeLink.classes()).toContain('bg-surface-100')
+      expect(activeLink.classes()).toContain('text-primary')
+      expect(activeLink.attributes('aria-current')).toBe('page')
+
+      await router.push('/boards/123/analytics')
+      const wrapperBoardAnalytics = mountLayout()
+      await flushPromises()
+
+      const boardAnalyticsLink = wrapperBoardAnalytics.find('[data-testid="analytics-nav-link"]')
+      expect(boardAnalyticsLink.classes()).not.toContain('bg-surface-100')
+      expect(boardAnalyticsLink.classes()).toContain('text-surface-700')
+      expect(wrapperBoardAnalytics.find('[data-testid="boards-nav-link"]').classes())
+        .toContain('bg-surface-100')
+    })
+
     it('renders profile button with user display name matching standard button size', async () => {
       const wrapper = mountLayout()
       await flushPromises()
