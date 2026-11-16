@@ -2,7 +2,7 @@
   <div class="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 data-testid="analytics-title" class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-        {{ analytics ? `${analytics.title} analytics` : 'Board analytics' }}
+        Board Stats
       </h1>
       <Button
         as="router-link"
