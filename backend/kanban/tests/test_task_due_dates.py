@@ -27,12 +27,12 @@ class TaskDueDateModelTests(TestCase):
     def test_create_task_with_future_reminder(self):
         """Creating a task with future due date and reminder calculates reminder_at and leaves reminder_sent_at None."""
         future_due = timezone.now() + timedelta(days=2)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Future Task",
-            due_at=future_due,
-            reminder_offset_seconds=3600,
         )
+        task.set_due_date_and_reminder(future_due, reminder_offset_seconds=3600)
+        task.save()
         self.assertIsNotNone(task.reminder_at)
         self.assertEqual(task.reminder_at, future_due - timedelta(seconds=3600))
         self.assertIsNone(task.reminder_sent_at)
@@ -40,12 +40,12 @@ class TaskDueDateModelTests(TestCase):
     def test_create_task_with_past_reminder_suppresses_dispatch(self):
         """Creating a task whose reminder window is already past initializes reminder_sent_at to now."""
         past_due = timezone.now() - timedelta(minutes=5)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Past Due Task",
-            due_at=past_due,
-            reminder_offset_seconds=900,
         )
+        task.set_due_date_and_reminder(past_due, reminder_offset_seconds=900)
+        task.save()
         self.assertIsNotNone(task.reminder_at)
         self.assertEqual(task.reminder_at, past_due - timedelta(seconds=900))
         self.assertIsNotNone(task.reminder_sent_at)
@@ -58,29 +58,29 @@ class TaskDueDateModelTests(TestCase):
     def test_create_task_without_reminder_offset(self):
         """Creating a task with due_at but no reminder leaves reminder_at and reminder_sent_at None."""
         future_due = timezone.now() + timedelta(days=1)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="No Reminder Task",
-            due_at=future_due,
-            reminder_offset_seconds=None,
         )
+        task.set_due_date_and_reminder(future_due, reminder_offset_seconds=None)
+        task.save()
         self.assertIsNone(task.reminder_at)
         self.assertIsNone(task.reminder_sent_at)
 
     def test_extending_due_at_resets_reminder_sent_at(self):
         """Extending a task's due date into the future resets reminder_sent_at to None."""
         initial_due = timezone.now() + timedelta(hours=1)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Extend Task",
-            due_at=initial_due,
-            reminder_offset_seconds=7200,  # reminder_at is in the past!
         )
+        task.set_due_date_and_reminder(initial_due, reminder_offset_seconds=7200)
+        task.save()
         self.assertIsNotNone(task.reminder_sent_at)
 
         # Extend due date by 3 days
         extended_due = timezone.now() + timedelta(days=3)
-        task.due_at = extended_due
+        task.set_due_date_and_reminder(extended_due, reminder_offset_seconds=7200)
         task.save()
 
         self.assertEqual(task.reminder_at, extended_due - timedelta(seconds=7200))
@@ -89,15 +89,15 @@ class TaskDueDateModelTests(TestCase):
     def test_disabling_reminder_clears_reminder_fields(self):
         """Setting reminder_offset_seconds to None clears reminder_at and reminder_sent_at."""
         future_due = timezone.now() + timedelta(days=2)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Toggle Reminder Off",
-            due_at=future_due,
-            reminder_offset_seconds=3600,
         )
+        task.set_due_date_and_reminder(future_due, reminder_offset_seconds=3600)
+        task.save()
         self.assertIsNotNone(task.reminder_at)
 
-        task.reminder_offset_seconds = None
+        task.set_due_date_and_reminder(task.due_at, reminder_offset_seconds=None)
         task.save()
 
         self.assertIsNone(task.reminder_at)
@@ -106,13 +106,14 @@ class TaskDueDateModelTests(TestCase):
     def test_clearing_due_date_clears_reminder(self):
         """Clearing due_at to None clears reminder_offset_seconds, reminder_at, and reminder_sent_at."""
         future_due = timezone.now() + timedelta(days=2)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Clear Due Date",
-            due_at=future_due,
-            reminder_offset_seconds=3600,
         )
-        task.due_at = None
+        task.set_due_date_and_reminder(future_due, reminder_offset_seconds=3600)
+        task.save()
+
+        task.set_due_date_and_reminder(None)
         task.save()
 
         self.assertIsNone(task.due_at)
@@ -123,12 +124,12 @@ class TaskDueDateModelTests(TestCase):
     def test_updating_unrelated_field_preserves_reminder_sent_at(self):
         """Updating title or description does not clobber reminder_sent_at or recalculate reminder_at."""
         past_due = timezone.now() - timedelta(hours=1)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Initial Title",
-            due_at=past_due,
-            reminder_offset_seconds=0,
         )
+        task.set_due_date_and_reminder(past_due, reminder_offset_seconds=0)
+        task.save()
         original_sent_at = task.reminder_sent_at
         self.assertIsNotNone(original_sent_at)
 

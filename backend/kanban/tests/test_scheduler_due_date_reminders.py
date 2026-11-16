@@ -53,12 +53,12 @@ class DueDateReminderSchedulerTests(TestCase):
         """Active due tasks trigger discrete transactional emails to owner and active collaborators."""
         now = timezone.now()
         due_at = now + timedelta(minutes=30)
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Deploy release candidate",
-            due_at=due_at,
-            reminder_offset_seconds=3600,
         )
+        task.set_due_date_and_reminder(due_at, reminder_offset_seconds=3600)
+        task.save()
         # Simulate time passing: reminder_at has arrived in the past and reminder_sent_at is null
         Task.objects.filter(id=task.id).update(
             reminder_at=now - timedelta(minutes=5),
@@ -95,12 +95,12 @@ class DueDateReminderSchedulerTests(TestCase):
     def test_reminders_suppressed_for_archived_tasks(self):
         """Archived tasks do not trigger reminder emails."""
         now = timezone.now()
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Archived Task",
-            due_at=now + timedelta(minutes=30),
-            reminder_offset_seconds=3600,
         )
+        task.set_due_date_and_reminder(now + timedelta(minutes=30), reminder_offset_seconds=3600)
+        task.save()
         Task.objects.filter(id=task.id).update(
             reminder_at=now - timedelta(minutes=5),
             reminder_sent_at=None,
@@ -115,12 +115,12 @@ class DueDateReminderSchedulerTests(TestCase):
     def test_future_reminders_are_not_dispatched(self):
         """Tasks whose reminder_at is in the future are not dispatched."""
         now = timezone.now()
-        task = Task.objects.create(
+        task = Task(
             column=self.column,
             title="Future Task",
-            due_at=now + timedelta(days=2),
-            reminder_offset_seconds=3600,
         )
+        task.set_due_date_and_reminder(now + timedelta(days=2), reminder_offset_seconds=3600)
+        task.save()
         self.assertGreater(task.reminder_at, now)
         self.assertIsNone(task.reminder_sent_at)
 

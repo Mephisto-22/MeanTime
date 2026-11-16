@@ -281,32 +281,32 @@ class Task(models.Model):
     def __str__(self):
         return self.title
 
-    def save(self, *args, **kwargs):
-        if self.due_at is None:
+    def set_due_date_and_reminder(
+        self,
+        due_at: datetime | None,
+        reminder_offset_seconds: int | None = None,
+    ) -> None:
+        """Set due_at and recalculate reminder metadata."""
+        if due_at is None:
+            self.due_at = None
             self.reminder_offset_seconds = None
+            self.reminder_at = None
+            self.reminder_sent_at = None
+            return
 
-        if self.due_at is not None and self.reminder_offset_seconds is not None:
-            expected_reminder_at = self.due_at - timedelta(seconds=self.reminder_offset_seconds)
+        self.due_at = due_at
+        self.reminder_offset_seconds = reminder_offset_seconds
+
+        if reminder_offset_seconds is not None:
+            expected_reminder_at = due_at - timedelta(seconds=reminder_offset_seconds)
+            if self.reminder_at != expected_reminder_at:
+                self.reminder_at = expected_reminder_at
+                self.reminder_sent_at = (
+                    timezone.now() if expected_reminder_at <= timezone.now() else None
+                )
         else:
-            expected_reminder_at = None
-
-        recalculated = False
-        is_new = self.pk is None or bool(getattr(self, "_state", None) and self._state.adding)
-        if is_new or expected_reminder_at != self.reminder_at:
-            self.reminder_at = expected_reminder_at
-            if self.reminder_at is not None:
-                if self.reminder_at <= timezone.now():
-                    self.reminder_sent_at = timezone.now()
-                else:
-                    self.reminder_sent_at = None
-            else:
-                self.reminder_sent_at = None
-            recalculated = True
-
-        if recalculated and "update_fields" in kwargs and kwargs["update_fields"] is not None:
-            kwargs["update_fields"] = list(set(kwargs["update_fields"]) | {"reminder_at", "reminder_sent_at"})
-
-        super().save(*args, **kwargs)
+            self.reminder_at = None
+            self.reminder_sent_at = None
 
 
 class TaskTimer(models.Model):

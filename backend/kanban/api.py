@@ -305,17 +305,17 @@ def create_task_in_column(user, column: BoardColumn, payload: TaskIn) -> Task:
                 tags=tags,
             )
 
-        task = Task.objects.create(
+        task = Task(
             column=column,
             recurring_task=rec_task,
             title=payload.title,
             description=payload.description,
             priority=payload.priority.value if payload.priority is not None else None,
-            due_at=payload.due_at,
-            reminder_offset_seconds=payload.reminder_offset_seconds,
             position=0 if last is None else last + 1,
             column_activity_at=timezone.now(),
         )
+        task.set_due_date_and_reminder(payload.due_at, payload.reminder_offset_seconds)
+        task.save()
         task.tags.set(tags)
 
         if payload.timer_mode is not None and payload.timer_mode != TimerMode.NONE:
@@ -691,22 +691,28 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
     target_duration_seconds = updates.pop("target_duration_seconds", None)
     recurrence = updates.pop("recurrence", None)
 
+    # Pop due date & reminder fields if included in payload
+    has_due_update = "due_at" in updates or "reminder_offset_seconds" in updates
+    new_due_at = updates.pop("due_at", task.due_at)
+    new_reminder_offset = updates.pop("reminder_offset_seconds", task.reminder_offset_seconds)
+
     tags = None
     if tag_ids is not None:
         tags = get_available_board_tags(request.auth, task.column.board, tag_ids)
 
     with transaction.atomic():
+        if has_due_update:
+            task.set_due_date_and_reminder(new_due_at, new_reminder_offset)
+
         # update supplied fields and tags
         for field, value in updates.items():
             if field == "priority":
                 value = value.value if value is not None else None
-            elif field in ("due_at", "reminder_offset_seconds"):
-                pass
             elif value is None:
                 continue
 
             setattr(task, field, value)
-        if updates or tags is not None:
+        if updates or tags is not None or has_due_update:
             task.column_activity_at = timezone.now()
             task.save()
 
