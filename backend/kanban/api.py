@@ -124,13 +124,22 @@ def reconcile_expired_countdowns(user):
             ended_at = anchor + timedelta(seconds=remaining)
             start_time = timer.started_at or (ended_at - timedelta(seconds=target))
             if not session_already_recorded(timer.task, start_time):
-                TaskTimeEntry.objects.create(
+                entry = TaskTimeEntry.objects.create(
                     task=timer.task,
                     user=user,
                     started_at=start_time,
                     ended_at=ended_at,
                     duration_seconds=target,
                     note="Completed countdown session",
+                )
+                publish_event_on_commit(
+                    board_id=timer.task.column.board_id,
+                    actor_id=user.id,
+                    event_type=BoardEventType.TIME_ENTRY_CREATED,
+                    data={
+                        "task_id": timer.task.id,
+                        "time_entry": serialize_time_entry(entry),
+                    },
                 )
             timer.state = TimerState.IDLE
             timer.started_at = None
@@ -699,13 +708,22 @@ def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
                     start_time = timer.started_at or (end_time - timedelta(seconds=total_duration))
                     default_note = "Completed countdown session" if timer.mode == TimerMode.COUNT_DOWN else ""
                     if not session_already_recorded(task, start_time):
-                        TaskTimeEntry.objects.create(
+                        entry = TaskTimeEntry.objects.create(
                             task=task,
                             user=request.auth,
                             started_at=start_time,
                             ended_at=end_time,
                             duration_seconds=total_duration,
                             note=default_note,
+                        )
+                        publish_event_on_commit(
+                            board_id=task.column.board_id,
+                            actor_id=request.auth.id,
+                            event_type=BoardEventType.TIME_ENTRY_CREATED,
+                            data={
+                                "task_id": task.id,
+                                "time_entry": serialize_time_entry(entry),
+                            },
                         )
 
             # Reset ephemeral runtime fields
@@ -892,7 +910,7 @@ def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
                 "time_entry": serialize_time_entry(entry),
             },
         )
-        
+
     return entry
 
 @router.delete("/time-entries/{entry_id}")
