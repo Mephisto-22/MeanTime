@@ -311,6 +311,8 @@ def create_task_in_column(user, column: BoardColumn, payload: TaskIn) -> Task:
             title=payload.title,
             description=payload.description,
             priority=payload.priority.value if payload.priority is not None else None,
+            due_at=payload.due_at,
+            reminder_offset_seconds=payload.reminder_offset_seconds,
             position=0 if last is None else last + 1,
             column_activity_at=timezone.now(),
         )
@@ -698,6 +700,8 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
         for field, value in updates.items():
             if field == "priority":
                 value = value.value if value is not None else None
+            elif field in ("due_at", "reminder_offset_seconds"):
+                pass
             elif value is None:
                 continue
 
