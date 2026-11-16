@@ -22,6 +22,9 @@ class BoardEventType(StrEnum):
     TASK_MOVED = "task.moved"
 
     TASK_TIMER_UPDATED = "task.timer_updated"
+    TIME_ENTRY_CREATED = "time_entry.created"
+    TIME_ENTRY_UPDATED = "time_entry.updated"
+    TIME_ENTRY_DELETED = "time_entry.deleted"
 
 class BoardEvent(BaseModel):
     """Common structure for all Kanban board events."""

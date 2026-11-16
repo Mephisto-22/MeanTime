@@ -351,6 +351,13 @@ const handleBoardEvent = (event: BoardEvent): void => {
       }
       break
     }
+
+    case 'time_entry.created':
+    case 'time_entry.updated':
+    case 'time_entry.deleted': {
+      void refreshTaskTotal(data.taskId)
+      break
+    }
   }
 }
 
@@ -917,10 +924,18 @@ const handleSetTaskTotal = (taskId: string | number, totalSeconds: number): void
   }
 }
 
-/** Reload a task's time entries and update the total shown on its card. */
+const handleSetTaskTimeEntries = (taskId: string | number, entries: TaskTimeEntryDto[]): void => {
+  const task = findTaskById(taskId)
+  if (!task) return
+
+  task.timeEntries = entries
+}
+
+/** Reload a task's time entries and update its local state and total. */
 const refreshTaskTotal = async (taskId: string | number): Promise<void> => {
   try {
     const entries = await kanbanApi.listTimeEntries(taskId)
+    handleSetTaskTimeEntries(taskId, entries)
     handleSetTaskTotal(taskId, sumEntryDurations(entries))
   } catch {
     // Keep the previous total; the next board load corrects it.

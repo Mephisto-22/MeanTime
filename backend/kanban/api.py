@@ -261,6 +261,13 @@ def serialize_task(task: Task) -> dict:
         from_attributes=True
     ).model_dump(mode="json")
 
+def serialize_time_entry(entry: TaskTimeEntry) -> dict:
+    """Serialize a time entry using the existing output schema."""
+    return TaskTimeEntryOut.model_validate(
+        entry,
+        from_attributes=True,
+    ).model_dump(mode="json")
+
 def get_timer_event_data(task, timer):
     return {
         "task_id": task.id,
@@ -825,6 +832,17 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
         )
         task.column_activity_at = timezone.now()
         task.save(update_fields=["column_activity_at", "updated_at"])
+
+        # publish time entry creation event to subscribers
+        publish_event_on_commit(
+            board_id=entry.task.column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TIME_ENTRY_CREATED,
+            data={
+                "task_id": entry.task_id,
+                "time_entry": serialize_time_entry(entry),
+            },
+        )
     return 201, entry
 
 @router.patch("/time-entries/{entry_id}", response=TaskTimeEntryOut)
@@ -863,13 +881,42 @@ def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
             setattr(entry, field, val)
 
         entry.save()
+
+        # publish time entry update event to subscribers
+        publish_event_on_commit(
+            board_id=entry.task.column.board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TIME_ENTRY_UPDATED,
+            data={
+                "task_id": entry.task_id,
+                "time_entry": serialize_time_entry(entry),
+            },
+        )
+        
     return entry
 
 @router.delete("/time-entries/{entry_id}")
 def delete_time_entry(request, entry_id: int):
     """Delete a recorded work session."""
     entry = get_owned_time_entry(request.auth, entry_id)
-    entry.delete()
+
+    task_id = entry.task_id
+    board_id = entry.task.column.board_id
+
+    with transaction.atomic():
+        entry.delete()
+
+        # publish time entry deletion event to subscribers
+        publish_event_on_commit(
+            board_id=board_id,
+            actor_id=request.auth.id,
+            event_type=BoardEventType.TIME_ENTRY_DELETED,
+            data={
+                "task_id": task_id,
+                "time_entry_id": entry_id,
+            },
+        )
+
     return {"success": True}
 
 # ------------------

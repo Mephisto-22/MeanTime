@@ -449,6 +449,15 @@ watch(
   },
 )
 
+watch(
+  () => props.task?.timeEntries,
+  (entries) => {
+    if (!props.visible || !entries) return
+
+    timeEntriesState.value = [...entries]
+  },
+)
+
 const suggestedTags = computed<TagDto[]>(() => {
   const query = tagInputText.value.trim().toLowerCase()
   const attachedIds = new Set(attachedTags.value.map(t => String(t.id)))
