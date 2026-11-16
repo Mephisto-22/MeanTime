@@ -248,6 +248,9 @@ class BoardEventSchemaTests(TestCase):
                 "task.deleted",
                 "task.moved",
                 "task.timer_updated",
+                "time_entry.created",
+                "time_entry.updated",
+                "time_entry.deleted",
             },
         )
 

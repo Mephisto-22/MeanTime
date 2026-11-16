@@ -24,6 +24,13 @@ def get_redis_client() -> redis.Redis:
 
     return _redis_client
 
+def close_redis_client() -> None:
+    """Close the shared Redis client during application shutdown."""
+    global _redis_client
+
+    if _redis_client is not None:
+        _redis_client.close()
+        _redis_client = None
 
 def publish_board_event(board_id: int, actor_id: int, event_type: BoardEventType, data: dict) -> None:
     """Publish an event to subscribers of a specific board."""
