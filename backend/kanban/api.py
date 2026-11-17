@@ -565,12 +565,25 @@ def share_board(request, board_id: int, payload: BoardShareIn):
     if not request.auth.is_friends_with(friend):
         raise HttpError(403, "You can only share boards with accepted friends.")
 
-    # Create or update the collaborator's membership and role.
-    BoardMembership.objects.update_or_create(
-        board=board,
-        user=friend,
-        defaults={"role": payload.role},
-    )
+    # Lock existing memberships so concurrent role changes are applied in order.
+    with transaction.atomic():
+        membership, created = BoardMembership.objects.select_for_update().get_or_create(
+            board=board,
+            user=friend,
+            defaults={"role": payload.role},
+        )
+        role_changed = membership.role != payload.role
+        if role_changed:
+            membership.role = payload.role
+            membership.save(update_fields=["role"])
+
+        if created or role_changed:
+            publish_event_on_commit(
+                board_id=board.id,
+                actor_id=request.auth.id,
+                event_type=BoardEventType.BOARD_COLLABORATOR_UPDATED,
+                data={"user_id": friend.id, "role": membership.role},
+            )
 
     return {"success": True, "message": "Board shared successfully."}
 

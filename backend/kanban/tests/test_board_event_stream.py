@@ -106,6 +106,28 @@ class BoardEventSubscriberTests(IsolatedAsyncioTestCase):
         self.redis_patch.start()
         self.addCleanup(self.redis_patch.stop)
 
+    async def test_collaborator_update_reaches_all_subscribers_and_keeps_stream_open(self):
+        for user_id in (20, 999):
+            with self.subTest(user_id=user_id):
+                event = make_event(
+                    BoardEventType.BOARD_COLLABORATOR_UPDATED,
+                    data={"user_id": 20, "role": "VIEWER"},
+                )
+                self.pubsub.get_message.side_effect = [
+                    {"data": event.model_dump_json()},
+                    None,
+                ]
+                stream = subscribe_to_board(board_id=10, user_id=user_id)
+                try:
+                    self.assertEqual(await anext(stream), format_sse_retry())
+                    self.assertEqual(
+                        await anext(stream),
+                        format_sse_event(event.model_dump(mode="json")),
+                    )
+                    self.assertEqual(await anext(stream), ": keep-alive\n\n")
+                finally:
+                    await stream.aclose()
+
     async def test_subscribes_and_emits_retry_and_keepalive(self):
         event = make_event(BoardEventType.TASK_CREATED)
         self.pubsub.get_message.side_effect = [

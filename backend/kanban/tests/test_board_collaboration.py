@@ -5,6 +5,7 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import Client, TestCase, TransactionTestCase
 
 from kanban.event_schemas import BoardEvent, BoardEventType
@@ -83,6 +84,66 @@ class BoardCollaborationTestMixin:
 
 
 class BoardCollaborationApiTests(BoardCollaborationTestMixin, TestCase):
+    @patch("kanban.api.publish_board_event")
+    def test_collaborator_creation_and_role_changes_publish_after_commit(self, publish):
+        headers = self.auth_headers("owner@example.com")
+        for role in ("VIEWER", "EDITOR", "VIEWER"):
+            with self.subTest(role=role):
+                publish.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(
+                        f"/api/kanban/boards/{self.board.id}/collaborators",
+                        data=json.dumps({"friend_id": self.friend.id, "role": role}),
+                        content_type="application/json",
+                        **headers,
+                    )
+                    publish.assert_not_called()
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(
+                        BoardMembership.objects.get(board=self.board, user=self.friend).role,
+                        role,
+                    )
+
+                publish.assert_called_once_with(
+                    board_id=self.board.id,
+                    actor_id=self.owner.id,
+                    event_type=BoardEventType.BOARD_COLLABORATOR_UPDATED,
+                    data={"user_id": self.friend.id, "role": role},
+                )
+
+    @patch("kanban.api.publish_board_event")
+    def test_unchanged_collaborator_role_does_not_publish(self, publish):
+        self.add_collaborator(self.friend)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/kanban/boards/{self.board.id}/collaborators",
+                data=json.dumps({"friend_id": self.friend.id, "role": "EDITOR"}),
+                content_type="application/json",
+                **self.auth_headers("owner@example.com"),
+            )
+        self.assertEqual(response.status_code, 200)
+        publish.assert_not_called()
+
+    @patch("kanban.api.publish_board_event")
+    def test_rolled_back_role_change_does_not_publish(self, publish):
+        self.add_collaborator(self.friend)
+        headers = self.auth_headers("owner@example.com")
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                response = self.client.post(
+                    f"/api/kanban/boards/{self.board.id}/collaborators",
+                    data=json.dumps({"friend_id": self.friend.id, "role": "VIEWER"}),
+                    content_type="application/json",
+                    **headers,
+                )
+                self.assertEqual(response.status_code, 200)
+                transaction.set_rollback(True)
+        self.assertEqual(
+            BoardMembership.objects.get(board=self.board, user=self.friend).role,
+            "EDITOR",
+        )
+        publish.assert_not_called()
+
     def test_shared_board_appears_in_collaborators_board_list(self):
         self.add_collaborator(self.friend)
 
@@ -253,6 +314,7 @@ class BoardEventSchemaTests(TestCase):
                 "board.updated",
                 "board.deleted",
                 "board.access_revoked",
+                "board.collaborator_updated",
                 "column.created",
                 "column.updated",
                 "column.deleted",
