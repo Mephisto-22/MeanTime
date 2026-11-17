@@ -1,10 +1,11 @@
+
 """Tests for task priority API handling, schema serialization, and nullability."""
 
 import json
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
-from kanban.models import Board, BoardColumn, Task, Tag, TaskPriority
+from kanban.models import Board, BoardColumn, Task, Tag, TaskPriority, BoardMembership
 
 User = get_user_model()
 
@@ -171,9 +172,13 @@ class TaskTagSharingApiTests(TestCase):
             owner=self.owner,
             title="Shared Board",
         )
-        self.board.collaborators.add(
-            self.collaborator,
-            self.other_collaborator,
+        BoardMembership.objects.create(
+            board=self.board,
+            user=self.collaborator,
+        )
+        BoardMembership.objects.create(
+            board=self.board,
+            user=self.other_collaborator,
         )
 
         self.column = BoardColumn.objects.create(

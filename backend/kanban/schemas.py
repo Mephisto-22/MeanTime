@@ -316,17 +316,31 @@ class BoardIn(Schema):
     title: str
     description: str = ""
 
+class BoardCollaboratorOut(UserOut):
+    """A board member's public profile and board-specific role."""
+    role: Literal["EDITOR", "VIEWER"]
+
 class BoardOut(Schema):
     """Shape of a board returned to clients."""
     id: int
     title: str
     description: str
     owner: UserOut
-    collaborators: list[UserOut] = []
-    is_owner: bool = True
+    collaborators: list[BoardCollaboratorOut] = Field(default_factory=list)
+    is_owner: bool = False
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_collaborators(obj):
+        return [
+            BoardCollaboratorOut(
+                **UserOut.model_validate(membership.user).model_dump(),
+                role=membership.role,
+            )
+            for membership in obj.memberships.all()
+        ]
 
 class TaskMoveIn(Schema):
     """Payload expected when moving a task to another column."""

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from kanban.models import Board, BoardColumn, Task, TaskTimeEntry
+from kanban.models import Board, BoardColumn, Task, TaskTimeEntry, BoardMembership
 
 User = get_user_model()
 PASSWORD = "TestPassword123!"
@@ -251,7 +251,10 @@ class TaskTimeEntryApiTests(TestCase):
 
         # Add collaborator to board
         board = Board.objects.get(id=self.board_id)
-        board.collaborators.add(collaborator)
+        BoardMembership.objects.create(
+            board=board,
+            user=collaborator,
+        )
 
         now = timezone.now()
         start = (now - timedelta(minutes=45)).isoformat()
@@ -327,7 +330,15 @@ class TaskTimeEntryApiTests(TestCase):
         )
 
         board = Board.objects.get(id=self.board_id)
-        board.collaborators.add(collab_a, collab_b)
+
+        BoardMembership.objects.create(
+            board=board,
+            user=collab_a,
+        )
+        BoardMembership.objects.create(
+            board=board,
+            user=collab_b,
+        )
 
         # Login as collab_a
         login_a = self.client.post(

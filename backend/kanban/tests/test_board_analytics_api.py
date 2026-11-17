@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from kanban.models import Board, BoardColumn, Task, TaskTimeEntry, TaskTimer, TimerMode, TimerState
+from kanban.models import Board, BoardColumn, Task, TaskTimeEntry, TaskTimer, TimerMode, TimerState, BoardMembership
 from users.models import UserBlock
 
 User = get_user_model()
@@ -144,7 +144,10 @@ class BoardAnalyticsAccessTests(BoardAnalyticsTestCase):
             email="collab@example.com", password=PASSWORD, display_name="Collaborator")
         self.stranger = User.objects.create_user(
             email="stranger@example.com", password=PASSWORD, display_name="Stranger")
-        self.board.collaborators.add(self.collaborator)
+        BoardMembership.objects.create(
+            board=self.board,
+            user=self.collaborator,
+        )
         self.add_task(self.todo, "Shared work", 900)
 
     def test_owner_can_see_analytics(self):
