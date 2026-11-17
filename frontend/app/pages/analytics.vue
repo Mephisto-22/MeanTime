@@ -36,7 +36,7 @@
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" data-testid="personal-analytics-error" class="error-state-card">
+    <Message v-else-if="error" data-testid="personal-analytics-error" severity="error" role="alert">
       <div class="flex flex-wrap items-center gap-3">
         <span>We couldn't load your tracked time.</span>
         <Button
@@ -48,7 +48,7 @@
           @click="() => refresh()"
         />
       </div>
-    </div>
+    </Message>
 
     <!-- No tracked time in the range -->
     <Message
