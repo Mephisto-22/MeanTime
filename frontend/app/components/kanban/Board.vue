@@ -71,6 +71,12 @@
         @delete="handleDeleteTask"
         @timer-expired="handleDialogTimerExpired"
       />
+
+      <!-- Board-Scoped Live Chat Sidebar (only on shared boards) -->
+      <ChatSidebar
+        v-if="isShared"
+        :board-title="boardTitle"
+      />
     </template>
   </Card>
 </template>
@@ -93,6 +99,8 @@ import type { UserOut } from '~/api/friends'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
 import { sumEntryDurations } from '~/composables/useTaskTimer'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
+import ChatSidebar from '~/components/chat/ChatSidebar.vue'
+import { useBoardChat } from '~/composables/useBoardChat'
 import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
 
 const notify = useNotifications()
@@ -122,6 +130,8 @@ const localColumns = ref<KanbanColumnDto[]>([])
 const availableTags = ref<TagDto[]>([])
 const columnDialogVisible = ref(false)
 const selectedColumn = ref<KanbanColumnDto | null>(null)
+
+const boardChat = useBoardChat(() => props.board.id)
 
 const loadTags = async (): Promise<void> => {
   try {
@@ -1086,6 +1096,12 @@ const isShared = computed<boolean>(() => {
   return hasCollaborators || isNotOwner
 })
 
+watch(isShared, (shared) => {
+  if (!shared) {
+    boardChat.close()
+  }
+})
+
 const boardMembers = computed<UserOut[]>(() => {
   const members: UserOut[] = []
   if (props.board.owner) {
@@ -1118,11 +1134,13 @@ provide(kanbanContextKey, {
   stopTimer: handleStopTimer,
   setTaskTotal: handleSetTaskTotal,
   onTimerExpired: handleTimerExpired,
+  boardChat,
 })
 
 defineExpose({
   localColumns,
   availableTags,
+  boardChat,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,
