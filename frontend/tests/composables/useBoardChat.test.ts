@@ -185,6 +185,57 @@ describe('useBoardChat Composable Suite (SSE Event-Driven)', () => {
     scope.stop()
   })
 
+  it('loadHistory() drops pre-existing cached messages omitted by server (aged-out >50 window or newly blocked sender) instead of appending them at the bottom', async () => {
+    let resolveReload: ((val: MessageOut[]) => void) | undefined
+    const getSpy = vi
+      .spyOn(chatApi, 'getBoardMessages')
+      .mockResolvedValueOnce([...mockMessagesBoard1])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveReload = resolve
+          }),
+      )
+
+    const scope = effectScope()
+    await scope.run(async () => {
+      const chat = useBoardChat(10)
+      await chat.loadHistory()
+      expect(chat.messages.value.map((m) => m.id)).toEqual([1, 2])
+
+      // Start a reload (e.g. on SSE reconnect or drawer reopen) where message 1 aged out or was blocked
+      const reloadPromise = chat.loadHistory()
+
+      // Message 4 arrives via SSE while reload is in flight
+      chat.receiveMessage({
+        id: 4,
+        boardId: 10,
+        senderId: 2,
+        senderName: 'Alice',
+        content: 'Mid-flight message 4',
+        createdAt: '2026-11-13T12:04:00Z',
+      })
+
+      // Server returns [2, 3] (omitting pre-existing message 1)
+      resolveReload?.([
+        mockMessagesBoard1[1]!,
+        {
+          id: 3,
+          board_id: 10,
+          sender_id: 3,
+          sender_name: 'Bob',
+          content: 'Message 3 from server',
+          created_at: '2026-11-13T12:03:00Z',
+        },
+      ])
+      await reloadPromise
+
+      expect(getSpy).toHaveBeenCalledTimes(2)
+      expect(chat.messages.value.map((m) => m.id)).toEqual([2, 3, 4])
+    })
+    scope.stop()
+  })
+
   it('toggling isOpen.value directly reactively triggers loadHistory', async () => {
     const getSpy = vi
       .spyOn(chatApi, 'getBoardMessages')

@@ -66,20 +66,15 @@ export function useBoardChat(
     if (targetId === undefined || targetId === null || targetId === '') return
 
     const token = ++requestToken
+    const preLoadIds = new Set(messages.value.map((m) => m.id))
     loading.value = true
     try {
       const history = await chatApi.getBoardMessages(targetId)
       if (token !== requestToken || String(toValue(boardId)) !== String(targetId)) return
 
-      const merged = [...(history || [])]
-      const seen = new Set(merged.map((m) => m.id))
-      for (const existing of messages.value) {
-        if (!seen.has(existing.id)) {
-          merged.push(existing)
-          seen.add(existing.id)
-        }
-      }
-      messages.value = merged
+      const arrivedMidFlight = messages.value.filter((m) => !preLoadIds.has(m.id))
+      messages.value = [...(history || [])]
+      appendUniqueMessages(arrivedMidFlight)
     } finally {
       if (token === requestToken && String(toValue(boardId)) === String(targetId)) {
         loading.value = false
