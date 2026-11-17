@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
 
 from .api import get_accessible_boards, reconcile_expired_countdowns
+from .collaborator_analytics import CollaboratorTimeOut, collaborator_totals
 from .models import BoardColumn, Task
 
 router = Router(tags=["Analytics"])
@@ -31,20 +32,22 @@ class TaskTimeOut(Schema):
 
 
 class BoardAnalyticsOut(Schema):
-    """Tracked time on a board, in total, per column and for its top tasks."""
+    """Tracked time on a board: in total, per column, for its top tasks and per person."""
     board_id: int
     title: str
+    is_shared: bool
     total_seconds: int
     columns: list[ColumnTimeOut]
     top_tasks: list[TaskTimeOut]
+    collaborators: list[CollaboratorTimeOut]
 
 
 @router.get("/boards/{board_id}/analytics", response=BoardAnalyticsOut)
 def get_board_analytics(request, board_id: int):
-    """Return the board's total tracked time, time per column and its top tasks by time.
+    """Return the board's total tracked time, time per column, its top tasks and time per person.
 
-    Only the owner and collaborators can see a board's analytics; anyone else
-    gets 404, as they would for the board itself.
+    Only the owner and collaborators can see a board's analytics, including
+    the time per person; anyone else gets 404, as they would for the board itself.
     """
     board = get_object_or_404(get_accessible_boards(request.auth), id=board_id)
     # Record any countdowns that ran out while nobody had the board open.
@@ -66,6 +69,7 @@ def get_board_analytics(request, board_id: int):
     return {
         "board_id": board.id,
         "title": board.title,
+        "is_shared": board.collaborators.exists(),
         "total_seconds": sum(column.total_seconds for column in columns),
         "columns": [
             {"column_id": column.id, "title": column.title, "total_seconds": column.total_seconds}
@@ -81,4 +85,5 @@ def get_board_analytics(request, board_id: int):
             }
             for task in top_tasks
         ],
+        "collaborators": collaborator_totals(board),
     }
