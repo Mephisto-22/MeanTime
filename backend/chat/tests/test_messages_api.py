@@ -1,9 +1,11 @@
 import json
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from ninja_jwt.tokens import RefreshToken
 
 from chat.models import Message
+from kanban.event_schemas import BoardEventType
 from kanban.models import Board
 from users.models import UserBlock
 
@@ -186,3 +188,40 @@ class BoardMessagesAPITests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(res_post.status_code, 401)
+
+    @patch("kanban.api.publish_board_event")
+    def test_send_board_message_publishes_chat_message_created_event_on_commit(self, mock_publish):
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/chat/boards/{self.board.id}/messages",
+                data=json.dumps({"content": "Live hello!"}),
+                content_type="application/json",
+                **self.owner_auth,
+            )
+
+        self.assertEqual(res.status_code, 201)
+        body = res.json()
+        mock_publish.assert_called_once()
+        kwargs = mock_publish.call_args.kwargs
+        self.assertEqual(kwargs["board_id"], self.board.id)
+        self.assertEqual(kwargs["actor_id"], self.owner.id)
+        self.assertEqual(kwargs["event_type"], BoardEventType.CHAT_MESSAGE_CREATED)
+        self.assertEqual(kwargs["data"]["message"]["id"], body["id"])
+        self.assertEqual(kwargs["data"]["message"]["board_id"], self.board.id)
+        self.assertEqual(kwargs["data"]["message"]["content"], "Live hello!")
+        self.assertEqual(kwargs["data"]["message"]["sender_id"], self.owner.id)
+        self.assertEqual(kwargs["data"]["message"]["sender_name"], "Alice Owner")
+
+    @patch("kanban.api.publish_board_event")
+    def test_invalid_message_does_not_publish_board_event(self, mock_publish):
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/chat/boards/{self.board.id}/messages",
+                data=json.dumps({"content": "   "}),
+                content_type="application/json",
+                **self.owner_auth,
+            )
+
+        self.assertEqual(res.status_code, 422)
+        mock_publish.assert_not_called()
+

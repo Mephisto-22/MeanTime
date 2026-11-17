@@ -2,8 +2,6 @@ import {
   ref,
   watch,
   toValue,
-  getCurrentScope,
-  onScopeDispose,
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue'
@@ -14,12 +12,34 @@ export interface BoardChatComposable {
   isOpen: Ref<boolean>
   loading: Ref<boolean>
   loadHistory: () => Promise<void>
-  pollMessages: () => Promise<void>
+  receiveMessage: (incoming: MessageOut | Record<string, any>) => void
   sendMessage: (content: string) => Promise<MessageOut | undefined>
   open: () => void
   close: () => void
   toggle: () => void
-  stopPolling: () => void
+}
+
+function normalizeMessage(raw: any): MessageOut | null {
+  if (!raw || typeof raw !== 'object') return null
+  const id = raw.id
+  const boardId = raw.board_id ?? raw.boardId
+  const senderId = raw.sender_id ?? raw.senderId
+  const senderName = raw.sender_name ?? raw.senderName
+  const content = raw.content
+  const createdAt = raw.created_at ?? raw.createdAt
+
+  if (id === undefined || boardId === undefined || typeof content !== 'string') {
+    return null
+  }
+
+  return {
+    id: Number(id),
+    board_id: Number(boardId),
+    sender_id: Number(senderId ?? 0),
+    sender_name: String(senderName ?? ''),
+    content,
+    created_at: String(createdAt ?? ''),
+  }
 }
 
 export function useBoardChat(
@@ -28,8 +48,6 @@ export function useBoardChat(
   const messages = ref<MessageOut[]>([])
   const isOpen = ref(false)
   const loading = ref(false)
-  const isPolling = ref(false)
-  let pollingTimer: ReturnType<typeof setInterval> | null = null
   let requestToken = 0
 
   function appendUniqueMessages(incoming: MessageOut[]) {
@@ -52,7 +70,16 @@ export function useBoardChat(
     try {
       const history = await chatApi.getBoardMessages(targetId)
       if (token !== requestToken || String(toValue(boardId)) !== String(targetId)) return
-      messages.value = history || []
+
+      const merged = [...(history || [])]
+      const seen = new Set(merged.map((m) => m.id))
+      for (const existing of messages.value) {
+        if (!seen.has(existing.id)) {
+          merged.push(existing)
+          seen.add(existing.id)
+        }
+      }
+      messages.value = merged
     } finally {
       if (token === requestToken && String(toValue(boardId)) === String(targetId)) {
         loading.value = false
@@ -60,24 +87,15 @@ export function useBoardChat(
     }
   }
 
-  async function pollMessages(): Promise<void> {
-    if (isPolling.value) return
+  function receiveMessage(incoming: MessageOut | Record<string, any>): void {
     const targetId = toValue(boardId)
     if (targetId === undefined || targetId === null || targetId === '') return
 
-    isPolling.value = true
-    try {
-      const lastMsg = messages.value[messages.value.length - 1]
-      const params = lastMsg ? { since_id: lastMsg.id } : undefined
-      const newMessages = await chatApi.getBoardMessages(targetId, params)
+    const normalized = normalizeMessage(incoming)
+    if (!normalized) return
+    if (String(normalized.board_id) !== String(targetId)) return
 
-      if (String(toValue(boardId)) !== String(targetId)) return
-      appendUniqueMessages(newMessages)
-    } catch {
-      // Suppress transient background polling errors
-    } finally {
-      isPolling.value = false
-    }
+    appendUniqueMessages([normalized])
   }
 
   async function sendMessage(content: string): Promise<MessageOut | undefined> {
@@ -91,23 +109,6 @@ export function useBoardChat(
       appendUniqueMessages([msg])
     }
     return msg
-  }
-
-  function startPolling(): void {
-    stopPolling()
-    pollingTimer = setInterval(() => {
-      if (isOpen.value) {
-        pollMessages()
-      }
-    }, 2500)
-  }
-
-  function stopPolling(): void {
-    if (pollingTimer) {
-      clearInterval(pollingTimer)
-      pollingTimer = null
-    }
-    isPolling.value = false
   }
 
   function open(): void {
@@ -131,9 +132,6 @@ export function useBoardChat(
     (openState) => {
       if (openState) {
         loadHistory().catch(() => {})
-        startPolling()
-      } else {
-        stopPolling()
       }
     },
     { flush: 'sync' },
@@ -146,30 +144,21 @@ export function useBoardChat(
       requestToken += 1
       messages.value = []
       loading.value = false
-      stopPolling()
       if (isOpen.value) {
         loadHistory().catch(() => {})
-        startPolling()
       }
     },
   )
-
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      stopPolling()
-    })
-  }
 
   return {
     messages,
     isOpen,
     loading,
     loadHistory,
-    pollMessages,
+    receiveMessage,
     sendMessage,
     open,
     close,
     toggle,
-    stopPolling,
   }
 }

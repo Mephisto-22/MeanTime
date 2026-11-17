@@ -22,7 +22,7 @@ const mockMessagesBoard1: MessageOut[] = [
   },
 ]
 
-describe('useBoardChat Composable Suite', () => {
+describe('useBoardChat Composable Suite (SSE Event-Driven)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.restoreAllMocks()
@@ -43,7 +43,7 @@ describe('useBoardChat Composable Suite', () => {
     scope.stop()
   })
 
-  it('open() sets isOpen=true, loads initial history, and starts 2.5s polling timer', async () => {
+  it('open() sets isOpen=true and loads initial history once without starting any polling interval', async () => {
     const getSpy = vi
       .spyOn(chatApi, 'getBoardMessages')
       .mockResolvedValue([...mockMessagesBoard1])
@@ -55,44 +55,28 @@ describe('useBoardChat Composable Suite', () => {
       expect(chat.isOpen.value).toBe(true)
 
       await vi.advanceTimersByTimeAsync(0)
+      expect(getSpy).toHaveBeenCalledTimes(1)
       expect(getSpy).toHaveBeenCalledWith(10)
       expect(chat.messages.value).toEqual(mockMessagesBoard1)
 
-      // Advance 2.5s to trigger differential poll
-      getSpy.mockResolvedValueOnce([
-        {
-          id: 3,
-          board_id: 10,
-          sender_id: 2,
-          sender_name: 'Alice',
-          content: 'Polled message 3',
-          created_at: '2026-11-13T12:02:00Z',
-        },
-      ])
-      await vi.advanceTimersByTimeAsync(2500)
-      expect(getSpy).toHaveBeenLastCalledWith(10, { since_id: 2 })
-      expect(chat.messages.value).toHaveLength(3)
+      // Advancing timers must not trigger background polling
+      await vi.advanceTimersByTimeAsync(10000)
+      expect(getSpy).toHaveBeenCalledTimes(1)
     })
     scope.stop()
   })
 
-  it('close() sets isOpen=false and stops polling timer', async () => {
-    const getSpy = vi
-      .spyOn(chatApi, 'getBoardMessages')
-      .mockResolvedValue([...mockMessagesBoard1])
+  it('close() sets isOpen=false', async () => {
+    vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValue([...mockMessagesBoard1])
 
     const scope = effectScope()
     await scope.run(async () => {
       const chat = useBoardChat(10)
       chat.open()
       await vi.advanceTimersByTimeAsync(0)
-      expect(getSpy).toHaveBeenCalledTimes(1)
 
       chat.close()
       expect(chat.isOpen.value).toBe(false)
-
-      await vi.advanceTimersByTimeAsync(5000)
-      expect(getSpy).toHaveBeenCalledTimes(1)
     })
     scope.stop()
   })
@@ -111,62 +95,97 @@ describe('useBoardChat Composable Suite', () => {
     scope.stop()
   })
 
-  it('pollMessages() fetches with since_id of last message and appends new messages without duplicates', async () => {
-    const getSpy = vi
-      .spyOn(chatApi, 'getBoardMessages')
-      .mockResolvedValueOnce([...mockMessagesBoard1])
-      .mockResolvedValueOnce([
-        mockMessagesBoard1[1]!,
-        {
-          id: 3,
-          board_id: 10,
-          sender_id: 2,
-          sender_name: 'Alice',
-          content: 'New message',
-          created_at: '2026-11-13T12:02:00Z',
-        },
-      ])
-
+  it('receiveMessage() appends snake_case MessageOut and deduplicates by id', () => {
     const scope = effectScope()
-    await scope.run(async () => {
+    scope.run(() => {
       const chat = useBoardChat(10)
-      await chat.loadHistory()
-      await chat.pollMessages()
+      chat.receiveMessage(mockMessagesBoard1[0]!)
+      chat.receiveMessage(mockMessagesBoard1[0]!)
+      chat.receiveMessage(mockMessagesBoard1[1]!)
 
-      expect(getSpy).toHaveBeenLastCalledWith(10, { since_id: 2 })
-      expect(chat.messages.value.map((m) => m.id)).toEqual([1, 2, 3])
+      expect(chat.messages.value).toEqual(mockMessagesBoard1)
     })
     scope.stop()
   })
 
-  it('pollMessages() skips concurrent execution when isPolling is true', async () => {
-    let resolvePoll: ((val: MessageOut[]) => void) | undefined
-    const getSpy = vi.spyOn(chatApi, 'getBoardMessages').mockImplementation(
+  it('receiveMessage() normalizes camelCase SSE payloads into MessageOut', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const chat = useBoardChat(10)
+      chat.receiveMessage({
+        id: 7,
+        boardId: 10,
+        senderId: 2,
+        senderName: 'Alice',
+        content: 'From SSE camelCase',
+        createdAt: '2026-11-16T18:00:00Z',
+      })
+
+      expect(chat.messages.value).toEqual([
+        {
+          id: 7,
+          board_id: 10,
+          sender_id: 2,
+          sender_name: 'Alice',
+          content: 'From SSE camelCase',
+          created_at: '2026-11-16T18:00:00Z',
+        },
+      ])
+    })
+    scope.stop()
+  })
+
+  it('receiveMessage() ignores messages belonging to a different boardId', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const chat = useBoardChat(10)
+      chat.receiveMessage({
+        id: 8,
+        boardId: 999,
+        senderId: 2,
+        senderName: 'Alice',
+        content: 'Other board message',
+        createdAt: '2026-11-16T18:00:00Z',
+      })
+
+      expect(chat.messages.value).toEqual([])
+    })
+    scope.stop()
+  })
+
+  it('messages received via receiveMessage() while loadHistory() is in flight are preserved', async () => {
+    let resolveHistory: ((val: MessageOut[]) => void) | undefined
+    vi.spyOn(chatApi, 'getBoardMessages').mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolvePoll = resolve
+          resolveHistory = resolve
         }),
     )
 
     const scope = effectScope()
     await scope.run(async () => {
       const chat = useBoardChat(10)
-      const p1 = chat.pollMessages()
-      const p2 = chat.pollMessages()
+      const loadPromise = chat.loadHistory()
 
-      expect(getSpy).toHaveBeenCalledTimes(1)
-      resolvePoll?.([])
-      await Promise.all([p1, p2])
+      // Live SSE message arrives before history request finishes
+      chat.receiveMessage({
+        id: 3,
+        boardId: 10,
+        senderId: 2,
+        senderName: 'Alice',
+        content: 'Arrived mid-flight',
+        createdAt: '2026-11-13T12:02:00Z',
+      })
 
-      // Subsequent poll after completion should execute normally
-      getSpy.mockResolvedValueOnce([])
-      await chat.pollMessages()
-      expect(getSpy).toHaveBeenCalledTimes(2)
+      resolveHistory?.([...mockMessagesBoard1])
+      await loadPromise
+
+      expect(chat.messages.value.map((m) => m.id)).toEqual([1, 2, 3])
     })
     scope.stop()
   })
 
-  it('toggling isOpen.value directly reactively triggers loadHistory and starts/stops polling', async () => {
+  it('toggling isOpen.value directly reactively triggers loadHistory', async () => {
     const getSpy = vi
       .spyOn(chatApi, 'getBoardMessages')
       .mockResolvedValue([...mockMessagesBoard1])
@@ -178,10 +197,6 @@ describe('useBoardChat Composable Suite', () => {
       await vi.advanceTimersByTimeAsync(0)
       expect(getSpy).toHaveBeenCalledWith(10)
       expect(chat.messages.value).toEqual(mockMessagesBoard1)
-
-      chat.isOpen.value = false
-      await vi.advanceTimersByTimeAsync(5000)
-      expect(getSpy).toHaveBeenCalledTimes(1)
     })
     scope.stop()
   })
@@ -208,9 +223,8 @@ describe('useBoardChat Composable Suite', () => {
       expect(res).toEqual(sentMsg)
       expect(chat.messages.value).toEqual([sentMsg])
 
-      // Calling poll that returns the same id should not duplicate it
-      vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValueOnce([sentMsg])
-      await chat.pollMessages()
+      // Receiving the same message id via SSE does not duplicate it
+      chat.receiveMessage(sentMsg)
       expect(chat.messages.value).toHaveLength(1)
     })
     scope.stop()
@@ -342,24 +356,5 @@ describe('useBoardChat Composable Suite', () => {
       expect(chat.messages.value.map((m) => m.board_id)).toEqual([20])
     })
     scope.stop()
-  })
-
-  it('stops polling timer automatically when scope/component is disposed', async () => {
-    const getSpy = vi
-      .spyOn(chatApi, 'getBoardMessages')
-      .mockResolvedValue([...mockMessagesBoard1])
-
-    const scope = effectScope()
-    await scope.run(async () => {
-      const chat = useBoardChat(10)
-      chat.open()
-      await vi.advanceTimersByTimeAsync(0)
-    })
-
-    const callsBeforeStop = getSpy.mock.calls.length
-    scope.stop()
-
-    await vi.advanceTimersByTimeAsync(10000)
-    expect(getSpy).toHaveBeenCalledTimes(callsBeforeStop)
   })
 })

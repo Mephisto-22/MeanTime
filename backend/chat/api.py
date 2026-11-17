@@ -1,11 +1,13 @@
 from typing import List, Optional
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja.errors import HttpError
 
 from chat.models import Message
 from chat.schemas import MessageOut, SendMessageIn
-from kanban.api import get_accessible_boards
+from kanban.api import get_accessible_boards, publish_event_on_commit
+from kanban.event_schemas import BoardEventType
 from users.authentication import AppJWTAuth
 from users.models import UserBlock
 
@@ -83,10 +85,18 @@ def send_board_message(
     if len(text) > 2000:
         raise HttpError(422, "Message content cannot exceed 2000 characters.")
 
-    msg = Message.objects.create(
-        board=board,
-        sender=user,
-        content=text,
-    )
+    with transaction.atomic():
+        msg = Message.objects.create(
+            board=board,
+            sender=user,
+            content=text,
+        )
+        serialized = _serialize_message(msg)
+        publish_event_on_commit(
+            board_id=board.id,
+            actor_id=user.id,
+            event_type=BoardEventType.CHAT_MESSAGE_CREATED,
+            data={"message": serialized},
+        )
 
-    return 201, _serialize_message(msg)
+    return 201, serialized
