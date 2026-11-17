@@ -63,7 +63,7 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
     const { wrapper, boardId } = await mountAnalyticsPage()
 
     expect(spy).toHaveBeenCalledWith(String(boardId))
-    expect(wrapper.find('[data-testid="analytics-title"]').text()).toBe('Sprint Board analytics')
+    expect(wrapper.find('[data-testid="analytics-title"]').text()).toBe('Board Stats')
     expect(wrapper.find('[data-testid="analytics-total-value"]').text()).toBe('1h 30m')
 
     const columns = wrapper.findAll('[data-testid="analytics-column-row"]')
@@ -142,7 +142,7 @@ describe('Board page analytics link', () => {
     vi.restoreAllMocks()
   })
 
-  it('links from the board header to its analytics page', async () => {
+  it('links from the board header to its analytics page with a Stats button', async () => {
     const board: KanbanBoardDto = { id: 77, title: 'Linked', description: '', columns: [] }
     vi.spyOn(kanbanApi, 'getBoard').mockResolvedValue(board)
 
@@ -152,5 +152,7 @@ describe('Board page analytics link', () => {
     const link = wrapper.find('[data-testid="board-analytics-link"]')
     expect(link.exists()).toBe(true)
     expect(link.attributes('href')).toBe('/boards/77/analytics')
+    // "Analytics" is the personal page in the navigation bar.
+    expect(link.text()).toBe('Stats')
   })
 })
