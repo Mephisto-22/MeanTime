@@ -59,11 +59,24 @@
         </ol>
       </template>
     </Card>
+
+    <!-- How the board's time splits between the people who tracked it -->
+    <Card data-testid="analytics-collaborators" class="md:col-span-3">
+      <template #title>Time per collaborator</template>
+      <template #content>
+        <CollaboratorTimeList
+          :collaborators="analytics.collaborators"
+          :total-seconds="analytics.totalSeconds"
+          :is-shared="analytics.isShared"
+        />
+      </template>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { BoardAnalyticsDto } from '~/api/analytics'
+import CollaboratorTimeList from '~/components/analytics/CollaboratorTimeList.vue'
 import ColumnTimeShareChart from '~/components/analytics/ColumnTimeShareChart.vue'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 
