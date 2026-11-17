@@ -8,6 +8,7 @@ from users.oauth import oauth_router
 
 from kanban.analytics import router as analytics_router
 from kanban.api import router as kanban_router
+from chat.api import chat_router
 
 
 api = NinjaAPI(
@@ -45,6 +46,7 @@ def api_exception_handler(request, exc):
 api.add_router("/auth", auth_router, tags=["Authentication"])
 api.add_router("/auth/oauth", oauth_router, tags=["Authentication"])
 api.add_router("/users", users_router, tags=["Users"])
+api.add_router("/chat", chat_router, tags=["Chat"])
 
 
 class HealthResponse(Schema):
