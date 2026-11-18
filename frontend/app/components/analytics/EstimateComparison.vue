@@ -25,13 +25,14 @@
 
         <DataTable
           v-if="estimates.tasks.length > 0"
-          v-model:sort-field="sortField"
+          :sort-field="sortField"
           v-model:sort-order="sortOrder"
           :value="visibleTasks"
           data-key="taskId"
           :row-class="rowClass"
           size="small"
           data-testid="estimate-table"
+          @update:sort-field="onSortFieldUpdate"
         >
           <Column field="title" header="Task" sortable>
             <template #body="{ data }">
@@ -87,16 +88,25 @@ const props = defineProps<{
   estimates: EstimatesDto
 }>()
 
-type SortableField = 'title' | 'plannedSeconds' | 'actualSeconds' | 'differenceSeconds'
+const SORTABLE_FIELDS = ['title', 'plannedSeconds', 'actualSeconds', 'differenceSeconds'] as const
+type SortableField = (typeof SORTABLE_FIELDS)[number]
 
 // The table only gets the rows on show, so it sorts here, across every task,
 // before cutting the list off at the limit.
-const sortField = ref<string | ((item: unknown) => string) | undefined>('differenceSeconds')
+const sortField = ref<SortableField | undefined>('differenceSeconds')
 const sortOrder = ref<number | undefined>(-1)
 const rowLimit = ref(DEFAULT_ROW_LIMIT)
 
+function isSortableField(field: string): field is SortableField {
+  return (SORTABLE_FIELDS as readonly string[]).includes(field)
+}
+
+function onSortFieldUpdate(field: string) {
+  sortField.value = isSortableField(field) ? field : undefined
+}
+
 const visibleTasks = computed(() => {
-  const field = sortField.value as SortableField | undefined
+  const field = sortField.value
   const direction = sortOrder.value ?? 1
   const tasks = [...props.estimates.tasks]
   if (field) {
