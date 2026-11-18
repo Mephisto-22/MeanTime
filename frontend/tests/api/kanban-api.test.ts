@@ -40,9 +40,16 @@ describe('KanbanApi Contract Suite', () => {
     await kanbanApi.deleteBoard(42)
     expect(deleteSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42')
 
-    // 6. shareBoard
+    // 6.1 shareBoard
     await kanbanApi.shareBoard(42, 10)
-    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators', { friend_id: 10 })
+    expect(postSpy).toHaveBeenLastCalledWith('/api/kanban/boards/42/collaborators', { friend_id: 10, role: 'EDITOR' })
+
+    // 6.2 Explicit role selection
+    await kanbanApi.shareBoard(42, 10, 'VIEWER')
+    expect(postSpy).toHaveBeenLastCalledWith(
+      '/api/kanban/boards/42/collaborators',
+      { friend_id: 10, role: 'VIEWER' },
+    )
 
     // 7. removeCollaborator
     await kanbanApi.removeCollaborator(42, 10)

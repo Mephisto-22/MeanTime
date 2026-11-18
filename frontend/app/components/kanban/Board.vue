@@ -109,6 +109,10 @@ const props = defineProps<{
   board: KanbanBoardDto
 }>()
 
+const emit = defineEmits<{
+  (e: 'membership-updated'): void
+}>()
+
 const boardTitle = ref(props.board.title)
 const boardDescription = ref(props.board.description)
 
@@ -252,6 +256,11 @@ const applyTaskMove = (
 
 const handleBoardEvent = (event: BoardEvent): void => {
   const auth = useAuthStore()
+
+  if (event.type === 'board.collaborator_updated') {
+    emit('membership-updated')
+    return
+  }
 
   // ignore events published by the currently authenticated user as their UI is already
   // updated through local state
