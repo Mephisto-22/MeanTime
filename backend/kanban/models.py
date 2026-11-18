@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -253,6 +253,10 @@ class Task(models.Model):
     description = models.TextField(blank=True)
     position = models.PositiveIntegerField(null=True, blank=True, default=0) # vertical position Top -> Bot
     column_activity_at = models.DateTimeField(default=timezone.now)
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True, default=None)
+    reminder_offset_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
+    reminder_at = models.DateTimeField(null=True, blank=True, db_index=True, default=None)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, default=None)
     archived_at = models.DateTimeField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -276,6 +280,33 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+    def set_due_date_and_reminder(
+        self,
+        due_at: datetime | None,
+        reminder_offset_seconds: int | None = None,
+    ) -> None:
+        """Set due_at and recalculate reminder metadata."""
+        if due_at is None:
+            self.due_at = None
+            self.reminder_offset_seconds = None
+            self.reminder_at = None
+            self.reminder_sent_at = None
+            return
+
+        self.due_at = due_at
+        self.reminder_offset_seconds = reminder_offset_seconds
+
+        if reminder_offset_seconds is not None:
+            expected_reminder_at = due_at - timedelta(seconds=reminder_offset_seconds)
+            if self.reminder_at != expected_reminder_at:
+                self.reminder_at = expected_reminder_at
+                self.reminder_sent_at = (
+                    timezone.now() if expected_reminder_at <= timezone.now() else None
+                )
+        else:
+            self.reminder_at = None
+            self.reminder_sent_at = None
 
 
 class TaskTimer(models.Model):
