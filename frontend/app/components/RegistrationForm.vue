@@ -39,17 +39,11 @@
 </template>
 
 <script lang="ts">
-export function getClientTimezone(): string {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    return typeof tz === 'string' && tz.trim() ? tz.trim() : 'UTC'
-  } catch {
-    return 'UTC'
-  }
-}
+export { getClientTimezone } from '~/utils/timezone'
 </script>
 
 <script setup lang="ts">
+import { getClientTimezone } from '~/utils/timezone'
 import { requiredText, validEmail, validPassword } from '~/utils/validation'
 import { authApi, type PasswordRequirement, type RegistrationRequest } from '~/api/auth'
 
