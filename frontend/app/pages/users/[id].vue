@@ -81,11 +81,15 @@
             </div>
             <div class="flex flex-1 items-center justify-between gap-4">
               <div class="flex-1">
-                <InputText
+                <Select
                   v-if="isEditingTimezone"
                   id="input-timezone"
                   v-model="draftTimezone"
                   data-testid="input-timezone"
+                  :options="timezoneOptions"
+                  filter
+                  filter-placeholder="Search timezones..."
+                  placeholder="Select timezone"
                   fluid
                   size="small"
                 />
@@ -200,6 +204,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
 import { usersApi } from '~/api/users'
+import { getAvailableTimezones } from '~/utils/timezone'
 import SaveConfirmDialog from '~/components/user/SaveConfirmDialog.vue'
 import DeleteAccountDialog from '~/components/user/DeleteAccountDialog.vue'
 
@@ -207,6 +212,7 @@ const authStore = useAuthStore()
 const notify = useNotifications()
 
 const currentUser = computed(() => authStore.user)
+const timezoneOptions = computed(() => getAvailableTimezones([currentUser.value?.timezone]))
 
 const isEditingDisplayName = ref(false)
 const isEditingTimezone = ref(false)
