@@ -16,13 +16,25 @@ export interface TaskTimeDto {
   totalSeconds: number
 }
 
-/** Tracked time on a board, in total, per column and for its top tasks. */
+/**
+ * Tracked time by one person on a board, by display name only. `userId` is
+ * null for the "Unknown" group: entries recorded before they had a user.
+ */
+export interface CollaboratorTimeDto {
+  userId: number | null
+  displayName: string
+  totalSeconds: number
+}
+
+/** Tracked time on a board: in total, per column, for its top tasks and per person. */
 export interface BoardAnalyticsDto {
   boardId: number
   title: string
+  isShared: boolean
   totalSeconds: number
   columns: ColumnTimeDto[]
   topTasks: TaskTimeDto[]
+  collaborators: CollaboratorTimeDto[]
 }
 
 /** One of the user's time entries, with the task and board it was tracked on. */
