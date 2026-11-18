@@ -6,12 +6,10 @@ from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
 
 from .api import get_accessible_boards, reconcile_expired_countdowns
+from .estimate_analytics import EstimatesOut, board_estimates
 from .models import BoardColumn, Task
 
 router = Router(tags=["Analytics"])
-
-# How many of a board's most time-consuming tasks the analytics list.
-TOP_TASK_LIMIT = 5
 
 
 class ColumnTimeOut(Schema):
@@ -31,17 +29,19 @@ class TaskTimeOut(Schema):
 
 
 class BoardAnalyticsOut(Schema):
-    """Tracked time on a board, in total, per column and for its top tasks."""
+    """Tracked time on a board: in total, per column, for its top tasks and against estimates."""
     board_id: int
     title: str
     total_seconds: int
     columns: list[ColumnTimeOut]
+    # Every task with tracked time, most first; the page shows the first few.
     top_tasks: list[TaskTimeOut]
+    estimates: EstimatesOut
 
 
 @router.get("/boards/{board_id}/analytics", response=BoardAnalyticsOut)
 def get_board_analytics(request, board_id: int):
-    """Return the board's total tracked time, time per column and its top tasks by time.
+    """Return the board's tracked time in total, per column and for its top tasks, plus estimates.
 
     Only the owner and collaborators can see a board's analytics; anyone else
     gets 404, as they would for the board itself.
@@ -60,7 +60,7 @@ def get_board_analytics(request, board_id: int):
         .select_related("column")
         .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
         .filter(total_seconds__gt=0)
-        .order_by("-total_seconds", "column__position", "position", "id")[:TOP_TASK_LIMIT]
+        .order_by("-total_seconds", "column__position", "position", "id")
     )
 
     return {
@@ -81,4 +81,5 @@ def get_board_analytics(request, board_id: int):
             }
             for task in top_tasks
         ],
+        "estimates": board_estimates(board),
     }
