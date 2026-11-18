@@ -6,13 +6,18 @@ import json
 from unittest import IsolatedAsyncioTestCase, TestCase
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase as DjangoTestCase
 from redis.exceptions import RedisError
 
 from kanban.event_schemas import BoardEvent, BoardEventType
 from kanban.events import publisher
 from kanban.events.publisher import publish_board_event
-from kanban.events.subscribers import subscribe_to_board
+from kanban.events.subscribers import check_user_blocked, is_user_blocked, subscribe_to_board
 from kanban.sse import format_sse_event, format_sse_retry
+from users.models import UserBlock
+
+User = get_user_model()
 
 
 def make_event(event_type, *, board_id=10, data=None):
@@ -231,3 +236,115 @@ class BoardEventSubscriberTests(IsolatedAsyncioTestCase):
 
         self.pubsub.aclose.assert_awaited_once()
         self.client.aclose.assert_awaited_once()
+
+    @patch("kanban.events.subscribers.is_user_blocked", new_callable=AsyncMock)
+    async def test_chat_message_event_suppressed_when_users_are_blocked(self, mock_is_blocked):
+        blocked_chat_event = make_event(
+            BoardEventType.CHAT_MESSAGE_CREATED,
+            board_id=10,
+            data={"message": {"id": 1, "sender_id": 20, "content": "Hidden"}},
+        )
+        allowed_chat_event = make_event(
+            BoardEventType.CHAT_MESSAGE_CREATED,
+            board_id=10,
+            data={"message": {"id": 2, "sender_id": 21, "content": "Visible"}},
+        )
+        allowed_chat_event.actor_id = 21
+
+        mock_is_blocked.side_effect = [True, False]
+        self.pubsub.get_message.side_effect = [
+            {"data": blocked_chat_event.model_dump_json()},
+            {"data": allowed_chat_event.model_dump_json()},
+        ]
+
+        stream = subscribe_to_board(board_id=10, user_id=30)
+        self.assertEqual(await anext(stream), format_sse_retry())
+        self.assertEqual(
+            await anext(stream),
+            format_sse_event(allowed_chat_event.model_dump(mode="json")),
+        )
+        await stream.aclose()
+        self.assertEqual(mock_is_blocked.await_count, 2)
+
+
+class SubscriberUserBlockQueryTests(DjangoTestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(
+            email="alice-sse@example.com",
+            password="password123",
+            display_name="Alice",
+        )
+        self.bob = User.objects.create_user(
+            email="bob-sse@example.com",
+            password="password123",
+            display_name="Bob",
+        )
+        self.charlie = User.objects.create_user(
+            email="charlie-sse@example.com",
+            password="password123",
+            display_name="Charlie",
+        )
+        UserBlock.objects.create(blocker=self.alice, blocked=self.bob)
+
+    def test_is_user_blocked_detects_bidirectional_blocks(self):
+        self.assertTrue(check_user_blocked(self.alice.id, self.bob.id))
+        self.assertTrue(check_user_blocked(self.bob.id, self.alice.id))
+        self.assertFalse(check_user_blocked(self.alice.id, self.charlie.id))
+        self.assertFalse(check_user_blocked(self.alice.id, self.alice.id))
+
+    def test_subscribe_to_board_filters_blocked_chat_messages_and_yields_unblocked(self):
+        def run_coro(coro):
+            try:
+                coro.send(None)
+            except StopIteration as exc:
+                return exc.value
+            raise AssertionError("Coroutine unexpectedly suspended")
+
+        blocked_event = make_event(
+            BoardEventType.CHAT_MESSAGE_CREATED,
+            board_id=10,
+            data={"message": {"id": 1, "sender_id": self.bob.id, "content": "Blocked msg"}},
+        )
+        blocked_event.actor_id = self.bob.id
+
+        allowed_event = make_event(
+            BoardEventType.CHAT_MESSAGE_CREATED,
+            board_id=10,
+            data={"message": {"id": 2, "sender_id": self.charlie.id, "content": "Allowed msg"}},
+        )
+        allowed_event.actor_id = self.charlie.id
+
+        messages = [
+            {"data": blocked_event.model_dump_json()},
+            {"data": allowed_event.model_dump_json()},
+        ]
+
+        pubsub = MagicMock()
+        async def noop_async(*args, **kwargs):
+            return None
+        async def pop_msg(*args, **kwargs):
+            return messages.pop(0)
+        async def sync_is_blocked(u1, u2):
+            return check_user_blocked(u1, u2)
+
+        pubsub.subscribe = noop_async
+        pubsub.get_message = pop_msg
+        pubsub.aclose = noop_async
+
+        client = MagicMock()
+        client.pubsub.return_value = pubsub
+        client.aclose = noop_async
+
+        with (
+            patch("kanban.events.subscribers.redis.Redis.from_url", return_value=client),
+            patch("kanban.events.subscribers.is_user_blocked", side_effect=sync_is_blocked),
+        ):
+            stream = subscribe_to_board(board_id=10, user_id=self.alice.id)
+            self.assertEqual(run_coro(stream.__anext__()), format_sse_retry())
+            self.assertEqual(
+                run_coro(stream.__anext__()),
+                format_sse_event(allowed_event.model_dump(mode="json")),
+            )
+            run_coro(stream.aclose())
+
+

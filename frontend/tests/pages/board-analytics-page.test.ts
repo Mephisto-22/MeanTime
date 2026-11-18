@@ -33,6 +33,7 @@ function analyticsFixture(overrides: Partial<BoardAnalyticsDto> = {}): BoardAnal
   return {
     boardId: 1,
     title: 'Sprint Board',
+    isShared: true,
     totalSeconds: 5400,
     columns: [
       { columnId: 10, title: 'To Do', totalSeconds: 1800 },
@@ -49,6 +50,10 @@ function analyticsFixture(overrides: Partial<BoardAnalyticsDto> = {}): BoardAnal
       averageSessionSeconds: 1800,
       averageSessionsPerTask: 1.5,
     },
+    collaborators: [
+      { userId: 2, displayName: 'Alice', totalSeconds: 3600 },
+      { userId: 1, displayName: 'Owner', totalSeconds: 1800 },
+    ],
     tags: ['bug', 'docs'],
     ...overrides,
   }
@@ -106,6 +111,12 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
       'Time per task45m',
       'Session length30m',
       'Sessions per task1.5',
+    ])
+
+    const people = wrapper.findAll('[data-testid="collaborator-time-row"]')
+    expect(people.map(person => person.text())).toEqual([
+      expect.stringContaining('Alice'),
+      expect.stringContaining('Owner'),
     ])
   })
 

@@ -374,8 +374,8 @@ for policy details and test commands.
 
 Login links to `/forgot-password`; the reset link opens the public `/reset-password`
 page. Forms call `AuthApi` to request, validate, and confirm a reset. With backend
-debug enabled, reset links print in backend container logs. Mailgun and inbox
-delivery are deferred. See [the reset guide](../docs/password-reset.md) for setup,
+console delivery enabled, reset links print in backend container logs. AWS SES
+uses the shared mail service once configured. See [the reset guide](../docs/password-reset.md) for setup,
 database changes, endpoint contracts, and manual tests.
 
 ### Authentication frontend

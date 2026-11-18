@@ -106,6 +106,25 @@ class TagFilterTests(BoardAnalyticsFilterTestCase):
 
         self.assertEqual(data["tags"], ["bug", "docs"])
 
+    def test_time_per_collaborator_follows_the_filters(self):
+        alice = User.objects.create_user(
+            email="alice@example.com", password=PASSWORD, display_name="Alice")
+        self.board.collaborators.add(alice)
+        alices_task = self.add_task(self.todo, "Alice's docs")
+        alices_task.time_entries.create(
+            user=alice, started_at=alices_task.created_at, duration_seconds=900)
+        alices_task.tags.add(self.docs)
+
+        def people(query):
+            return {
+                row["display_name"]: row["total_seconds"]
+                for row in self.get_filtered(query).json()["collaborators"]
+            }
+
+        self.assertEqual(people(""), {"Owner": 3300, "Alice": 900})
+        self.assertEqual(people("?tags=bug"), {"Owner": 3000, "Alice": 0})
+        self.assertEqual(people("?tags=docs&timer_mode=COUNT_UP"), {"Owner": 1800, "Alice": 0})
+
     def test_no_matching_tasks(self):
         data = self.get_filtered("?tags=missing").json()
 

@@ -28,14 +28,26 @@ export interface TaskAveragesDto {
   averageSessionsPerTask: number | null
 }
 
-/** Tracked time on a board: in total, per column, for its top tasks and on average. */
+/**
+ * Tracked time by one person on a board, by display name only. `userId` is
+ * null for the "Unknown" group: entries recorded before they had a user.
+ */
+export interface CollaboratorTimeDto {
+  userId: number | null
+  displayName: string
+  totalSeconds: number
+}
+
+/** Tracked time on a board: in total, per column, for its top tasks, on average and per person. */
 export interface BoardAnalyticsDto {
   boardId: number
   title: string
+  isShared: boolean
   totalSeconds: number
   columns: ColumnTimeDto[]
   topTasks: TaskTimeDto[]
   averages: TaskAveragesDto
+  collaborators: CollaboratorTimeDto[]
   /** The names of the tags used on the board, for the tag filter. */
   tags: string[]
 }

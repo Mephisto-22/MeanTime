@@ -26,6 +26,8 @@ class BoardEventType(StrEnum):
     TIME_ENTRY_UPDATED = "time_entry.updated"
     TIME_ENTRY_DELETED = "time_entry.deleted"
 
+    CHAT_MESSAGE_CREATED = "chat.message_created"
+
 class BoardEvent(BaseModel):
     """Common structure for all Kanban board events."""
 

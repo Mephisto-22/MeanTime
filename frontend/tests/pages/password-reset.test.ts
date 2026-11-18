@@ -42,6 +42,9 @@ describe('Password reset pages', () => {
     await flushPromises()
     expect(request).toHaveBeenCalledWith('user@example.com')
     expect(wrapper.get('[role="status"]').text()).toContain('If an account exists')
+    expect(wrapper.text()).toContain('spam folder')
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.find('input[name="email"]').exists()).toBe(true)
   })
 
   it('shows request errors and enables retry', async () => {
@@ -62,6 +65,7 @@ describe('Password reset pages', () => {
     const clear = vi.spyOn(auth, 'clearTokens')
     const wrapper = await mountReset()
     expect(validate).toHaveBeenCalledWith({ uid: 'MQ', token: 'test-token' })
+    expect(window.location.hash).toBe('')
     expect(clear).toHaveBeenCalled()
     await wrapper.get('input[name="password"]').setValue('NewPassword982!')
     await wrapper.get('input[name="password_confirm"]').setValue('NewPassword982!')
@@ -87,6 +91,20 @@ describe('Password reset pages', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Link expired')
     expect(wrapper.find('form').exists()).toBe(false)
     expect(wrapper.get('a[href="/forgot-password"]').exists()).toBe(true)
+  })
+
+  it('retries link validation after a network failure without putting secrets back in history', async () => {
+    const validate = vi.spyOn(authApi, 'validatePasswordReset')
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValueOnce({ detail: 'Verified' })
+    const wrapper = await mountReset()
+    expect(window.location.hash).toBe('')
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    expect(validate).toHaveBeenCalledTimes(2)
+    expect(validate).toHaveBeenLastCalledWith({ uid: 'MQ', token: 'test-token' })
+    expect(wrapper.find('input[name="password"]').exists()).toBe(true)
+    expect(window.location.hash).toBe('')
   })
 
   it('retains the form for correction after backend password validation fails', async () => {
