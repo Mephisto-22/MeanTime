@@ -25,7 +25,8 @@ class EstimateAnalyticsTestCase(BoardAnalyticsTestCase):
         return data["estimates"]
 
     @staticmethod
-    def rows(estimates):
+    def estimate_tuples(estimates):
+        """Project each estimate row to (title, planned_seconds, actual_seconds, difference_seconds)."""
         return [
             (row["title"], row["planned_seconds"], row["actual_seconds"], row["difference_seconds"])
             for row in estimates["tasks"]
@@ -43,7 +44,7 @@ class EstimateTotalsTests(EstimateAnalyticsTestCase):
         estimates = self.get_estimates()
 
         self.assertEqual(
-            self.rows(estimates),
+            self.estimate_tuples(estimates),
             [("Over", 1500, 1800, 300), ("On", 1500, 1500, 0), ("Under", 1500, 1200, -300)],
         )
 
@@ -78,7 +79,7 @@ class EstimateTotalsTests(EstimateAnalyticsTestCase):
         TaskTimeEntry.objects.create(
             task=task, user=alice, started_at=now, ended_at=now, duration_seconds=900)
 
-        self.assertEqual(self.rows(self.get_estimates()), [("Shared", 1200, 1500, 300)])
+        self.assertEqual(self.estimate_tuples(self.get_estimates()), [("Shared", 1200, 1500, 300)])
 
     def test_expired_countdown_counts_as_actual_time(self):
         task = self.add_task(self.todo, "Running")
@@ -90,7 +91,7 @@ class EstimateTotalsTests(EstimateAnalyticsTestCase):
             started_at=timezone.now() - timedelta(seconds=1600),
         )
 
-        self.assertEqual(self.rows(self.get_estimates()), [("Running", 1500, 1500, 0)])
+        self.assertEqual(self.estimate_tuples(self.get_estimates()), [("Running", 1500, 1500, 0)])
 
     def test_other_boards_are_not_counted(self):
         other_board = Board.objects.create(owner=self.owner, title="Other")
@@ -125,7 +126,7 @@ class EstimateAverageTests(EstimateAnalyticsTestCase):
         estimates = self.get_estimates()
 
         self.assertEqual(
-            self.rows(estimates),
+            self.estimate_tuples(estimates),
             [("Tracked", 1000, 1100, 100), ("Not started", 1000, 0, -1000)],
         )
         self.assertEqual(estimates["average_difference_percent"], 10)
@@ -164,7 +165,7 @@ class EstimateAccessTests(EstimateAnalyticsTestCase):
         res = self.get_analytics(**self.auth_for("collab@example.com"))
 
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(self.rows(res.json()["estimates"]), [("Focus", 600, 900, 300)])
+        self.assertEqual(self.estimate_tuples(res.json()["estimates"]), [("Focus", 600, 900, 300)])
 
     def test_stranger_gets_404(self):
         res = self.get_analytics(**self.auth_for("stranger@example.com"))
