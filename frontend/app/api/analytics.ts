@@ -7,12 +7,16 @@ export interface ColumnTimeDto {
   totalSeconds: number
 }
 
-/** Tracked time on one task. */
-export interface TaskTimeDto {
+/** Task identity and column placement shared across board analytics rows. */
+export interface AnalyticsTaskDto {
   taskId: number
   title: string
   columnId: number
   columnTitle: string
+}
+
+/** Tracked time on one task. */
+export interface TaskTimeDto extends AnalyticsTaskDto {
   totalSeconds: number
 }
 
@@ -21,11 +25,7 @@ export interface TaskTimeDto {
  * target; actual is the sum of the task's time entries. A positive
  * difference means over the target.
  */
-export interface TaskEstimateDto {
-  taskId: number
-  title: string
-  columnId: number
-  columnTitle: string
+export interface TaskEstimateDto extends AnalyticsTaskDto {
   plannedSeconds: number
   actualSeconds: number
   differenceSeconds: number

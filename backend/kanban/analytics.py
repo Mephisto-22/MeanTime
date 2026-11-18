@@ -18,21 +18,21 @@ class ColumnTimeOut(Schema):
     total_seconds: int
 
 
-class TaskTimeOut(Schema):
-    """Tracked time on one task."""
+class AnalyticsTaskOut(Schema):
+    """Task identity and column placement shared across board analytics rows."""
     task_id: int
     title: str
     column_id: int
     column_title: str
+
+
+class TaskTimeOut(AnalyticsTaskOut):
+    """Tracked time on one task."""
     total_seconds: int
 
 
-class TaskEstimateOut(Schema):
+class TaskEstimateOut(AnalyticsTaskOut):
     """Planned vs actual time on one task. A positive difference means over the target."""
-    task_id: int
-    title: str
-    column_id: int
-    column_title: str
     planned_seconds: int
     actual_seconds: int
     difference_seconds: int
