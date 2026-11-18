@@ -226,6 +226,7 @@ export interface TaskDialogSavePayload {
 }
 
 export interface KanbanContext {
+  canEdit: ComputedRef<boolean>
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
   isShared?: ComputedRef<boolean>

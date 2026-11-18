@@ -23,6 +23,7 @@
           fluid
           :maxlength="TITLE_MAX_LENGTH"
           required
+          :disabled="!canSave"
           :invalid="showTitleError"
           :aria-invalid="showTitleError"
           :aria-describedby="showTitleError ? 'board-title-error' : undefined"
@@ -46,6 +47,7 @@
           v-model="description"
           data-testid="board-description-input"
           rows="3"
+          :disabled="!canSave"
           fluid
         />
       </div>
@@ -109,7 +111,7 @@
           data-testid="board-save-button"
           :label="isEditing ? 'Save' : 'Create'"
           :loading="isSaving"
-          :disabled="isBusy || showTitleError"
+          :disabled="!canSave || isBusy || showTitleError"
         />
       </template>
     </template>
@@ -119,6 +121,7 @@
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 import {useAuthStore} from '~/stores/auth';
+import { useBoardPermissions } from '~/composables/useBoardPermissions'
 
 interface Props {
   /** The board to edit, or null to create a new one. */
@@ -158,6 +161,12 @@ const isOwner = computed(() => {
   }
   return Boolean(props.board.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id);
 });
+const { canEdit: canEditExistingBoard } =
+  useBoardPermissions(() => props.board)
+
+const canSave = computed(() =>
+  props.board === null || canEditExistingBoard.value,
+)
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
 const showTitleError = computed(
@@ -176,6 +185,7 @@ watch(visible, isOpen => {
 }, {immediate: true});
 
 async function save(): Promise<void> {
+  if (!canSave.value) return
   // Enter in a field still submits the form while the confirmation shows.
   if (trimmedTitle.value === '' || isBusy.value || isConfirmingDelete.value) {
     return;
@@ -204,6 +214,7 @@ async function save(): Promise<void> {
 }
 
 async function deleteBoard(): Promise<void> {
+  if (!isOwner.value) return
   if (props.board === null || isBusy.value) {
     return;
   }

@@ -20,6 +20,7 @@
       </div>
 
       <Button
+        v-if="canEdit"
         data-testid="edit-column-button"
         icon="pi pi-pencil"
         severity="secondary"
@@ -48,6 +49,7 @@
         :data-column-id="column.id"
         group="kanban-tasks"
         :animation="150"
+        :disabled="!canEdit"
         draggable="[data-testid='kanban-task']"
         ghost-class="kanban-task-ghost"
         drag-class="kanban-task-drag"
@@ -69,6 +71,7 @@
 
     <!-- Add Task Button -->
     <Button
+      v-if="canEdit"
       data-testid="add-task-button"
       label="Add Task"
       severity="secondary"
@@ -101,14 +104,20 @@ defineSlots<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 
+const canEdit = computed(() =>
+  kanbanContext?.canEdit?.value ?? false,
+)
+
 const tasks = computed({
   get: () => props.column.tasks,
   set: (newTasks: KanbanTaskDto[]) => {
+    if (!canEdit.value) return
     props.column.tasks.splice(0, props.column.tasks.length, ...newTasks)
   },
 })
 
 const onUpdate = (event: any) => {
+  if (!canEdit.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const targetPosition = event.newDraggableIndex ?? event.newIndex
   if (taskId !== undefined && targetPosition !== undefined && kanbanContext) {
@@ -122,6 +131,7 @@ const onUpdate = (event: any) => {
 }
 
 const onAdd = (event: any) => {
+  if (!canEdit.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const fromColumnId =
     event.from?.getAttribute('data-column-id') ||
@@ -139,12 +149,14 @@ const onAdd = (event: any) => {
 }
 
 const handleAddTask = () => {
+  if (!canEdit.value) return
   if (kanbanContext?.openCreateTaskDialog) {
     kanbanContext.openCreateTaskDialog(props.column.id)
   }
 }
 
 const handleEditColumn = () => {
+  if (!canEdit.value) return
   emit('edit', props.column)
 }
 

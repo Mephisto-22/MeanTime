@@ -22,6 +22,7 @@
           <div class="flex items-center gap-3">
             <slot name="actions" />
             <Button
+              v-if="canEdit"
               data-testid="add-column-button"
               label="Add Column"
               icon="pi pi-plus"
@@ -35,6 +36,15 @@
       </Toolbar>
     </template>
     <template #content>
+      <Message
+        v-if="!canEdit"
+        severity="info"
+        :closable="false"
+        class="mb-3"
+        data-testid="viewer-notice"
+      >
+        You have viewer access. You can browse this board and its time history.
+      </Message>
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
@@ -53,6 +63,7 @@
 
       <!-- Column Dialog -->
       <ColumnFormDialog
+        v-if="canEdit"
         v-model:visible="columnDialogVisible"
         :board-id="props.board.id"
         :column="selectedColumn"
@@ -63,6 +74,7 @@
 
       <!-- Centralized Task Dialog -->
       <KanbanTaskDialog
+        v-if="canEdit"
         v-model:visible="isTaskDialogOpen"
         :mode="dialogMode"
         :task="activeTask"
@@ -70,6 +82,12 @@
         @save="handleSaveTask"
         @delete="handleDeleteTask"
         @timer-expired="handleDialogTimerExpired"
+      />
+      <!-- Viewer Task Dialog -->
+      <ViewerTaskDialog
+        v-else
+        v-model:visible="isTaskDialogOpen"
+        :task="activeTask"
       />
 
       <!-- Board-Scoped Live Chat Sidebar (only on shared boards) -->
@@ -102,6 +120,8 @@ import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 import ChatSidebar from '~/components/chat/ChatSidebar.vue'
 import { useBoardChat } from '~/composables/useBoardChat'
 import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
+import { useBoardPermissions } from '~/composables/useBoardPermissions'
+import ViewerTaskDialog from '~/components/kanban/ViewerTaskDialog.vue'
 
 const notify = useNotifications()
 
@@ -109,6 +129,7 @@ const props = defineProps<{
   board: KanbanBoardDto
 }>()
 
+const { canEdit } = useBoardPermissions(() => props.board)
 const emit = defineEmits<{
   (e: 'membership-updated'): void
 }>()
@@ -421,6 +442,8 @@ const insertTaskAtPosition = (
 const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
   await nextTick()
 
+  if (!canEdit.value) return
+
   const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
   const toCol = localColumns.value.find(col => sameId(col.id, req.toColumnId))
 
@@ -486,7 +509,15 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const activeTask = ref<KanbanTaskDto | null>(null)
 const activeColumnId = ref<string | number | null>(null)
 
+watch(canEdit, (allowed, previous) => {
+  if (allowed === previous) return
+
+  columnDialogVisible.value = false
+  isTaskDialogOpen.value = false
+})
+
 const openCreateTaskDialog = (columnId: string | number): void => {
+  if (!canEdit.value) return
   dialogMode.value = 'create'
   activeTask.value = null
   activeColumnId.value = columnId
@@ -516,6 +547,7 @@ const handleCreateTask = async (
   columnId: string | number,
   payload: Partial<KanbanTaskDto> & { tag_ids?: Array<string | number> },
 ): Promise<void> => {
+  if (!canEdit.value) return
   const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
   if (!targetCol) return
 
@@ -647,6 +679,7 @@ const handleUpdateTask = async (
     columnId?: string | number | null
   },
 ): Promise<void> => {
+  if (!canEdit.value) return
   let sourceCol: KanbanColumnDto | undefined
   let sourceIndex = -1
   let targetTask: KanbanTaskDto | undefined
@@ -761,6 +794,7 @@ const handleDeleteTask = async (
   taskId: string | number,
   options?: { cancelRecurrence?: boolean },
 ): Promise<void> => {
+  if (!canEdit.value) return
   let targetCol: KanbanColumnDto | undefined
   let targetIndex = -1
   let deletedTask: KanbanTaskDto | undefined
@@ -800,6 +834,7 @@ const handleDeleteTask = async (
 }
 
 const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
+  if (!canEdit.value) return
   if (savePayload.mode === 'create' && savePayload.columnId != null) {
     await handleCreateTask(savePayload.columnId, {
       title: savePayload.title,
@@ -846,6 +881,9 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
 }
 
 const handleCreateTag = async (payload: { name: string } | string): Promise<TagDto> => {
+  if (!canEdit.value) {
+    throw new Error('Viewer access does not allow creating tags for this board.')
+  }
   const name = typeof payload === 'string' ? payload : payload.name
   try {
     const created = await kanbanApi.createTag({ name })
@@ -871,6 +909,7 @@ const findTaskById = (taskId: string | number): KanbanTaskDto | undefined => {
 }
 
 const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>): Promise<void> => {
+  if (!canEdit.value) return
   const task = findTaskById(taskId)
   if (!task) return
 
@@ -906,6 +945,7 @@ const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<
 }
 
 const handlePauseTimer = async (taskId: string | number): Promise<void> => {
+  if (!canEdit.value) return
   const task = findTaskById(taskId)
   if (!task || !task.timer) return
 
@@ -947,6 +987,7 @@ const recentAlerts = new Map<string | number, number>()
 const recentlyStoppedTasks = new Map<string | number, number>()
 
 const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
+  if (!canEdit.value) return
   const lastStopped = recentlyStoppedTasks.get(taskId) ?? 0
   const now = Date.now()
   if (now - lastStopped < 2000) {
@@ -1028,6 +1069,7 @@ const refreshTaskTotal = async (taskId: string | number): Promise<void> => {
 }
 
 const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
+  if (!canEdit.value) return
   const lastAlertTime = recentAlerts.get(task.id) ?? 0
   const now = Date.now()
   if (now - lastAlertTime < 3000) {
@@ -1045,6 +1087,7 @@ const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
 }
 
 const openCreateColumnDialog = () => {
+  if (!canEdit.value) return
   console.log('Add Column clicked')
 
   selectedColumn.value = null
@@ -1054,6 +1097,7 @@ const openCreateColumnDialog = () => {
 }
 
 const openEditColumnDialog = (column: KanbanColumnDto) => {
+  if (!canEdit.value) return
   selectedColumn.value = column
   columnDialogVisible.value = true
 }
@@ -1127,6 +1171,7 @@ const boardMembers = computed<UserOut[]>(() => {
 })
 
 provide(kanbanContextKey, {
+  canEdit,
   columns: columnRegistry,
   availableTags: computed(() => availableTags.value),
   isShared,

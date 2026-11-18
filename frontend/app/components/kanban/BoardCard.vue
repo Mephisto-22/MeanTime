@@ -17,6 +17,7 @@
           {{ board.title }}
         </NuxtLink>
         <Button
+          v-if="canEdit"
           icon="pi pi-pencil"
           severity="secondary"
           text
@@ -24,7 +25,7 @@
           size="small"
           class="relative z-10 shrink-0 text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity"
           :aria-label="`Edit ${board.title}`"
-          @click="emit('edit', board)"
+          @click="canEdit && emit('edit', board)"
         />
       </div>
     </template>
@@ -96,6 +97,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { KanbanBoardDto } from '~/api/kanban';
+import { useBoardPermissions } from '~/composables/useBoardPermissions'
 
 interface Props {
   board: KanbanBoardDto;
@@ -108,6 +110,8 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+const { canEdit } = useBoardPermissions(() => props.board)
 
 const activeTimerCount = computed(() => {
   return (props.board.columns || []).reduce((acc, col) => {

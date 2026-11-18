@@ -6,8 +6,11 @@
       body: 'p-2.5 flex flex-col justify-between h-full flex-1',
       content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
     }"
-    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm h-32 shrink-0"
-    :class="priorityBorderClass"
+    class="kanban-task-card select-none rounded-xl overflow-hidden shadow-sm h-32 shrink-0"
+    :class="[
+      priorityBorderClass,
+      canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+    ]"
     @click="handleClick"
     @pointerdown="handlePointerDown"
     @pointermove="handlePointerMove"
@@ -99,6 +102,7 @@
         v-if="hasActiveTimer"
         :task-id="task.id"
         :timer="task.timer"
+        :read-only="!canEdit"
         @start="handleTimerStart"
         @pause="handleTimerPause"
         @stop="handleTimerStop"
@@ -125,21 +129,28 @@ const props = defineProps<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 
+const canEdit = computed(() =>
+  kanbanContext?.canEdit?.value ?? false,
+)
+
 const hasActiveTimer = computed(() => {
   return props.task.timer != null && props.task.timer.mode !== 'NONE'
 })
 
 const handleTimerStart = (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => {
+  if (!canEdit.value) return
   if (props.onTimerStart) props.onTimerStart(taskId, defaultTimer)
   else if (kanbanContext?.startTimer) kanbanContext.startTimer(taskId, defaultTimer)
 }
 
 const handleTimerPause = (taskId: string | number) => {
+  if (!canEdit.value) return
   if (props.onTimerPause) props.onTimerPause(taskId)
   else if (kanbanContext?.pauseTimer) kanbanContext.pauseTimer(taskId)
 }
 
 const handleTimerStop = (taskId: string | number, entry?: TaskTimeEntryDto) => {
+  if (!canEdit.value) return
   if (props.onTimerStop) props.onTimerStop(taskId, entry)
   else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId, entry)
 }
