@@ -3,8 +3,10 @@
 `/` is a public, server-rendered introduction to MeanTime with links to `/login`
 and `/register`. It uses the `headless` layout, with a compact PrimeVue Toolbar
 for the brand and login link rather than the authenticated application navbar.
-PrimeVue Card, Tag, and Button components form a paper-and-cobalt composition,
+PrimeVue Card, Tag, and Button components form a charcoal-and-cobalt composition,
 with oversized type, serif accents, and overlapping task, timer, and note cards.
+The background matches the site's dark canvas, with pale blue headings, dark
+task cards, and coral/lime stickers that retain dark text for contrast.
 Scoped styles keep this public-page treatment separate from the application
 theme. The page fills the headless layout with responsive spacing; its entrance
 animation respects reduced-motion preferences. The board and timer are static,
