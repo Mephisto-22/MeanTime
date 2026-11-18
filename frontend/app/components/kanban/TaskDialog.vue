@@ -844,7 +844,7 @@ const syncFormWithProps = () => {
       } else {
         dueTimeValue.value = '17:00'
       }
-      reminderOffsetSeconds.value = props.task.reminderOffsetSeconds ?? 3600
+      reminderOffsetSeconds.value = props.task.reminderOffsetSeconds ?? null
     } else {
       isDueDateEnabled.value = false
       dueDateValue.value = null

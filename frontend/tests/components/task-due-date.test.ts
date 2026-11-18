@@ -1,8 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+enableAutoUnmount(afterEach)
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
 import Task from '~/components/kanban/Task.vue'
 import Board from '~/components/kanban/Board.vue'
@@ -262,6 +264,34 @@ describe('Task Due Date & Collaborator Reminders Component Suite', () => {
       expect(badge.exists()).toBe(true)
       expect(badge.attributes('data-status')).toBe('upcoming')
       expect(badge.classes()).toContain('text-surface-600')
+    })
+
+    it('transitions badge from due_soon to overdue automatically as time advances', async () => {
+      vi.useFakeTimers()
+      try {
+        const start = new Date('2026-11-18T12:00:00.000Z')
+        vi.setSystemTime(start)
+        const dueDate = new Date(start.getTime() + 20_000).toISOString()
+
+        const { wrapper } = mountTask({
+          task: createTaskFixture({ dueAt: dueDate }),
+        })
+
+        const initialBadge = wrapper.find('[data-testid="task-due-date-badge"]')
+        expect(initialBadge.attributes('data-status')).toBe('due_soon')
+        expect(initialBadge.classes()).toContain('text-amber-700')
+
+        await vi.advanceTimersByTimeAsync(30_000)
+        await nextTick()
+
+        const updatedBadge = wrapper.find('[data-testid="task-due-date-badge"]')
+        expect(updatedBadge.attributes('data-status')).toBe('overdue')
+        expect(updatedBadge.classes()).toContain('text-red-700')
+
+        wrapper.unmount()
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 

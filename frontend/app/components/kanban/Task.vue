@@ -133,6 +133,7 @@ import {
 } from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
+import { useNow } from '~/composables/useNow'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
 const props = defineProps<{
@@ -185,9 +186,11 @@ const rawDueAt = computed(() => props.task.dueAt)
 
 const hasDueDate = computed(() => Boolean(rawDueAt.value))
 
+const now = useNow()
+
 const dueDateStatus = computed<DueDateStatus | null>(() => {
   if (!rawDueAt.value) return null
-  return getDueDateStatus(rawDueAt.value)
+  return getDueDateStatus(rawDueAt.value, now.value)
 })
 
 const dueDateConfig = computed(() => {
