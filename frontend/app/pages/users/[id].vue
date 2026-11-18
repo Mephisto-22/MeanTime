@@ -76,16 +76,21 @@
           <!-- Row 3: Timezone (Editable) -->
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
             <div class="flex flex-col sm:w-1/3">
-              <label for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
+              <label id="label-timezone" for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Used for timer logs and daily summaries</span>
             </div>
             <div class="flex flex-1 items-center justify-between gap-4">
               <div class="flex-1">
-                <InputText
+                <Select
                   v-if="isEditingTimezone"
-                  id="input-timezone"
                   v-model="draftTimezone"
+                  label-id="input-timezone"
+                  aria-labelledby="label-timezone"
                   data-testid="input-timezone"
+                  :options="timezoneOptions"
+                  filter
+                  filter-placeholder="Search timezones..."
+                  placeholder="Select timezone"
                   fluid
                   size="small"
                 />
@@ -200,6 +205,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
 import { usersApi } from '~/api/users'
+import { getAvailableTimezones } from '~/utils/timezone'
 import SaveConfirmDialog from '~/components/user/SaveConfirmDialog.vue'
 import DeleteAccountDialog from '~/components/user/DeleteAccountDialog.vue'
 
@@ -207,6 +213,7 @@ const authStore = useAuthStore()
 const notify = useNotifications()
 
 const currentUser = computed(() => authStore.user)
+const timezoneOptions = computed(() => getAvailableTimezones([currentUser.value?.timezone]))
 
 const isEditingDisplayName = ref(false)
 const isEditingTimezone = ref(false)
