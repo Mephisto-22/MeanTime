@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { analyticsApi, type BoardAnalyticsDto } from '~/api/analytics'
 import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
+import BoardAnalyticsFilters from '~/components/analytics/BoardAnalyticsFilters.vue'
 import BoardPage from '~/pages/boards/[id]/index.vue'
 import BoardAnalyticsPage from '~/pages/boards/[id]/analytics.vue'
 import { useAuthStore } from '~/stores/auth'
@@ -41,34 +42,33 @@ function analyticsFixture(overrides: Partial<BoardAnalyticsDto> = {}): BoardAnal
       { taskId: 100, title: 'Ship it', columnId: 11, columnTitle: 'Done', totalSeconds: 3600 },
       { taskId: 101, title: 'Write tests', columnId: 10, columnTitle: 'To Do', totalSeconds: 1800 },
     ],
-    estimates: {
-      tasks: [
-        {
-          taskId: 100,
-          title: 'Ship it',
-          columnId: 11,
-          columnTitle: 'Done',
-          plannedSeconds: 3000,
-          actualSeconds: 3600,
-          differenceSeconds: 600,
-        },
-      ],
-      averageDifferencePercent: 20,
-      trackedTaskCount: 1,
+    averages: {
+      taskCount: 2,
+      sessionCount: 3,
+      averageTaskSeconds: 2700,
+      averageSessionSeconds: 1800,
+      averageSessionsPerTask: 1.5,
     },
+    tags: ['bug', 'docs'],
     ...overrides,
   }
 }
 
+// Pages from earlier tests are unmounted, so they don't fetch again when the
+// next test changes the route.
+const mountedPages: Array<{ unmount: () => void }> = []
+
 async function mountAnalyticsPage() {
   const boardId = nextBoardId++
   const wrapper = await mountSuspended(BoardAnalyticsPage, { route: `/boards/${boardId}/analytics` })
+  mountedPages.push(wrapper)
   await flushPromises()
   return { wrapper, boardId }
 }
 
 describe('Board analytics page (/boards/[id]/analytics)', () => {
   afterEach(() => {
+    mountedPages.splice(0).forEach(page => page.unmount())
     vi.restoreAllMocks()
   })
 
@@ -77,7 +77,7 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
 
     const { wrapper, boardId } = await mountAnalyticsPage()
 
-    expect(spy).toHaveBeenCalledWith(String(boardId))
+    expect(spy).toHaveBeenCalledWith(String(boardId), { timerMode: 'ALL', tags: [] })
     expect(wrapper.find('[data-testid="analytics-title"]').text()).toBe('Board Stats')
     expect(wrapper.find('[data-testid="analytics-total-value"]').text()).toBe('1h 30m')
 
@@ -101,8 +101,68 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
     expect(tasks[0]!.text()).toContain('Done')
     expect(tasks[0]!.text()).toContain('1h')
 
-    expect(wrapper.find('[data-testid="estimate-accuracy-value"]').text()).toBe('20% over')
-    expect(wrapper.find('[data-testid="estimate-table"]').text()).toContain('Ship it')
+    const averages = wrapper.findAll('[data-testid="analytics-average"]')
+    expect(averages.map(average => average.text())).toEqual([
+      'Time per task45m',
+      'Session length30m',
+      'Sessions per task1.5',
+    ])
+  })
+
+  it('fetches again for countdown or stopwatch tasks when the toggle changes', async () => {
+    const spy = vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture())
+    const { wrapper, boardId } = await mountAnalyticsPage()
+
+    const buttons = wrapper.findAll('[data-testid="analytics-timer-mode"] button')
+    expect(buttons.map(button => button.text())).toEqual(['All', 'Countdown', 'Stopwatch'])
+    await buttons[1]!.trigger('click')
+    await flushPromises()
+    expect(spy).toHaveBeenLastCalledWith(String(boardId), { timerMode: 'COUNT_DOWN', tags: [] })
+
+    await buttons[2]!.trigger('click')
+    await flushPromises()
+    expect(spy).toHaveBeenLastCalledWith(String(boardId), { timerMode: 'COUNT_UP', tags: [] })
+  })
+
+  it('offers the board\'s tags and fetches again when some are chosen', async () => {
+    const spy = vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture())
+    const { wrapper, boardId } = await mountAnalyticsPage()
+
+    const filters = wrapper.findComponent(BoardAnalyticsFilters)
+    expect(filters.props('availableTags')).toEqual(['bug', 'docs'])
+    expect(wrapper.find('[data-testid="analytics-tag-filter"]').exists()).toBe(true)
+
+    filters.vm.$emit('update:tags', ['bug', 'docs'])
+    await flushPromises()
+
+    expect(spy).toHaveBeenLastCalledWith(String(boardId), { timerMode: 'ALL', tags: ['bug', 'docs'] })
+  })
+
+  it('has no tag filter on a board without tags', async () => {
+    vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture({ tags: [] }))
+
+    const { wrapper } = await mountAnalyticsPage()
+
+    expect(wrapper.find('[data-testid="analytics-timer-mode"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="analytics-tag-filter"]').exists()).toBe(false)
+  })
+
+  it('keeps the filters on screen when nothing matches them', async () => {
+    const spy = vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture())
+    const { wrapper } = await mountAnalyticsPage()
+
+    spy.mockResolvedValue(analyticsFixture({
+      totalSeconds: 0,
+      columns: [{ columnId: 10, title: 'To Do', totalSeconds: 0 }],
+      topTasks: [],
+    }))
+    await wrapper.findAll('[data-testid="analytics-timer-mode"] button')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="analytics-filtered-empty"]').text()).toContain('No tracked time matches these filters')
+    expect(wrapper.find('[data-testid="analytics-filters"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="analytics-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="analytics-total-tile"]').exists()).toBe(false)
   })
 
   it('shows the top five tasks at first, with buttons to show more', async () => {
@@ -154,6 +214,7 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
 
     expect(wrapper.find('[data-testid="analytics-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="analytics-total-tile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="analytics-filters"]').exists()).toBe(false)
   })
 
   it('shows not found for a board the user cannot open', async () => {

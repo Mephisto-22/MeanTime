@@ -30,6 +30,9 @@
       </template>
     </Card>
 
+    <!-- How long a task and a session take on average -->
+    <TaskAverages :averages="analytics.averages" />
+
     <!-- Each column's share of the board total -->
     <Card data-testid="analytics-share" class="md:col-span-1">
       <template #title>Share of time</template>
@@ -62,17 +65,14 @@
         <RowLimitFooter v-model="topTaskLimit" :total="analytics.topTasks.length" noun="tasks" />
       </template>
     </Card>
-
-    <!-- Planned vs actual time for tasks with a countdown target -->
-    <EstimateComparison :estimates="analytics.estimates" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { BoardAnalyticsDto } from '~/api/analytics'
 import ColumnTimeShareChart from '~/components/analytics/ColumnTimeShareChart.vue'
-import EstimateComparison from '~/components/analytics/EstimateComparison.vue'
 import RowLimitFooter, { DEFAULT_ROW_LIMIT } from '~/components/analytics/RowLimitFooter.vue'
+import TaskAverages from '~/components/analytics/TaskAverages.vue'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 
 const props = defineProps<{

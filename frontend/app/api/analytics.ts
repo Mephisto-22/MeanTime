@@ -17,39 +17,37 @@ export interface TaskTimeDto {
 }
 
 /**
- * Planned vs actual time on a task with a countdown target. Planned is the
- * target; actual is the sum of the task's time entries. A positive
- * difference means over the target.
+ * Averages across the tasks with tracked time. A session is one time entry.
+ * The averages are null when no task has tracked time.
  */
-export interface TaskEstimateDto {
-  taskId: number
-  title: string
-  columnId: number
-  columnTitle: string
-  plannedSeconds: number
-  actualSeconds: number
-  differenceSeconds: number
+export interface TaskAveragesDto {
+  taskCount: number
+  sessionCount: number
+  averageTaskSeconds: number | null
+  averageSessionSeconds: number | null
+  averageSessionsPerTask: number | null
 }
 
-/**
- * Planned vs actual time for a board's countdown tasks. The average is each
- * tracked task's difference as a percentage of its target, averaged; it's
- * null when no task has tracked time yet.
- */
-export interface EstimatesDto {
-  tasks: TaskEstimateDto[]
-  averageDifferencePercent: number | null
-  trackedTaskCount: number
-}
-
-/** Tracked time on a board: in total, per column, for its top tasks and against estimates. */
+/** Tracked time on a board: in total, per column, for its top tasks and on average. */
 export interface BoardAnalyticsDto {
   boardId: number
   title: string
   totalSeconds: number
   columns: ColumnTimeDto[]
   topTasks: TaskTimeDto[]
-  estimates: EstimatesDto
+  averages: TaskAveragesDto
+  /** The names of the tags used on the board, for the tag filter. */
+  tags: string[]
+}
+
+/** Which tasks count, by their timer now: every task, countdowns or stopwatches. */
+export type TimerModeFilter = 'ALL' | 'COUNT_DOWN' | 'COUNT_UP'
+
+/** Narrows the board's analytics to some of its tasks. */
+export interface BoardAnalyticsFilters {
+  timerMode: TimerModeFilter
+  /** Tag names; a task counts if it has any of them. Empty means every task. */
+  tags: string[]
 }
 
 /** One of the user's time entries, with the task and board it was tracked on. */
@@ -90,8 +88,11 @@ export interface DayRange {
 export class AnalyticsApi {
   private readonly endpoint = '/api/kanban'
 
-  getBoardAnalytics(boardId: string | number): Promise<BoardAnalyticsDto> {
-    return apiService.get<BoardAnalyticsDto>(`${this.endpoint}/boards/${boardId}/analytics`)
+  getBoardAnalytics(boardId: string | number, filters?: BoardAnalyticsFilters): Promise<BoardAnalyticsDto> {
+    const query: Record<string, string | string[]> = {}
+    if (filters && filters.timerMode !== 'ALL') query.timerMode = filters.timerMode
+    if (filters && filters.tags.length > 0) query.tags = filters.tags
+    return apiService.get<BoardAnalyticsDto>(`${this.endpoint}/boards/${boardId}/analytics`, query)
   }
 
   /** Returns the user's time per day; without a range, the backend uses the last 7 days. */
