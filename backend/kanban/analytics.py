@@ -81,7 +81,7 @@ def _task_identity(task: Task) -> dict:
     }
 
 
-def board_estimates(board: Board) -> dict:
+def board_estimates(board: Board) -> EstimatesOut:
     """Return planned vs actual time for each task on the board with a countdown target.
 
     Planned time is the countdown timer's target; actual time is the sum of the
@@ -95,28 +95,30 @@ def board_estimates(board: Board) -> dict:
         timer__target_duration_seconds__gt=0,
     )
 
-    rows = []
+    rows: list[TaskEstimateOut] = []
     for task in tasks:
         planned = task.timer.target_duration_seconds
-        rows.append({
-            **_task_identity(task),
-            "planned_seconds": planned,
-            "actual_seconds": task.tracked_seconds,
-            "difference_seconds": task.tracked_seconds - planned,
-        })
-    rows.sort(key=lambda row: (-row["difference_seconds"], row["title"].casefold()))
+        rows.append(
+            TaskEstimateOut(
+                **_task_identity(task),
+                planned_seconds=planned,
+                actual_seconds=task.tracked_seconds,
+                difference_seconds=task.tracked_seconds - planned,
+            )
+        )
+    rows.sort(key=lambda row: (-row.difference_seconds, row.title.casefold()))
 
-    tracked = [row for row in rows if row["actual_seconds"] > 0]
+    tracked = [row for row in rows if row.actual_seconds > 0]
     average = None
     if tracked:
-        percents = [row["difference_seconds"] / row["planned_seconds"] * 100 for row in tracked]
+        percents = [row.difference_seconds / row.planned_seconds * 100 for row in tracked]
         average = round(sum(percents) / len(percents))
 
-    return {
-        "tasks": rows,
-        "average_difference_percent": average,
-        "tracked_task_count": len(tracked),
-    }
+    return EstimatesOut(
+        tasks=rows,
+        average_difference_percent=average,
+        tracked_task_count=len(tracked),
+    )
 
 
 @router.get("/boards/{board_id}/analytics", response=BoardAnalyticsOut)
@@ -141,17 +143,17 @@ def get_board_analytics(request, board_id: int):
         .order_by("-tracked_seconds", "column__position", "position", "id")
     )
 
-    return {
-        "board_id": board.id,
-        "title": board.title,
-        "total_seconds": sum(column.total_seconds for column in columns),
-        "columns": [
-            {"column_id": column.id, "title": column.title, "total_seconds": column.total_seconds}
+    return BoardAnalyticsOut(
+        board_id=board.id,
+        title=board.title,
+        total_seconds=sum(column.total_seconds for column in columns),
+        columns=[
+            ColumnTimeOut(column_id=column.id, title=column.title, total_seconds=column.total_seconds)
             for column in columns
         ],
-        "top_tasks": [
-            {**_task_identity(task), "total_seconds": task.tracked_seconds}
+        top_tasks=[
+            TaskTimeOut(**_task_identity(task), total_seconds=task.tracked_seconds)
             for task in top_tasks
         ],
-        "estimates": board_estimates(board),
-    }
+        estimates=board_estimates(board),
+    )
