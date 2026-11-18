@@ -37,21 +37,22 @@ def mask(value):
         print(f"::add-mask::{value}", flush=True)
 
 
-def confirmation_token(email):
+def delivered_link(email, page):
     logs = subprocess.check_output(
         ["docker", "compose", "logs", "--no-color", "--no-log-prefix", "backend"], text=True
     )
     for block in reversed(logs.split("MeanTime email (development only)")):
         if f"To: {email}" not in block.splitlines():
             continue
-        match = re.search(r"https?://[^\s]+/confirm-email#[^\s]+", block)
+        match = re.search(r"https?://[^\s]+/" + re.escape(page) + r"#[^\s]+", block)
         if match:
-            token = parse_qs(urlsplit(match[0]).fragment).get("token", [None])[0]
+            values = {key: value[0] for key, value in parse_qs(urlsplit(match[0]).fragment).items()}
+            token = values.get("token")
             if token:
                 mask(token)
                 mask(quote(token, safe=""))
-                return token
-    raise RuntimeError("No confirmation link for this smoke account in console mail logs")
+                return values
+    raise RuntimeError(f"No {page} link for this smoke account in console mail logs")
 
 
 def main():
@@ -68,7 +69,7 @@ def main():
     request("/auth/login", data=credentials, expected=403)
 
     print("4. Confirm using the link actually delivered to console mail", flush=True)
-    request("/auth/email-verification/confirm", data={"token": confirmation_token(email)})
+    request("/auth/email-verification/confirm", data=delivered_link(email, "confirm-email"))
 
     print("5. Log in after confirmation", flush=True)
     session = request("/auth/login", data=credentials)
@@ -86,6 +87,26 @@ def main():
 
     print("8. Find the board in this user's list", flush=True)
     assert any(item["id"] == board["id"] for item in request("/kanban/boards", token=token))
+
+    print("9. Request and validate the delivered password-reset link", flush=True)
+    request("/auth/password-reset", data={"email": email})
+    link = delivered_link(email, "reset-password")
+    request("/auth/password-reset/validate", data=link)
+    request("/auth/login", data=credentials, expected=403)
+
+    print("10. Reset the password and reject the old session", flush=True)
+    password = "Replacement-smoke-pass-729!"
+    request("/auth/password-reset/confirm", data={**link, "password": password, "password_confirm": password})
+    request("/auth/me", token=token, expected=401)
+    request("/auth/refresh", data={"refresh_token": session["refresh_token"]}, expected=401)
+    request("/auth/login", data=credentials, expected=401)
+    request("/auth/password-reset/validate", data=link, expected=400)
+
+    print("11. Log in with the replacement password", flush=True)
+    session = request("/auth/login", data={"email": email, "password": password})
+    mask(session["access_token"])
+    mask(session["refresh_token"])
+    assert request("/auth/me", token=session["access_token"])["email"] == email
     print("Smoke check passed", flush=True)
 
 

@@ -11,6 +11,7 @@
           <PasswordResetForm v-if="valid && !success" :loading="loading" @submit="resetPassword" />
           <Message v-if="error" severity="error" role="alert">{{ error }}</Message>
           <div v-if="!checking && !valid && !success" class="pt-2 text-sm text-surface-600 dark:text-surface-400">
+            <Button v-if="link" label="Retry checking link" severity="secondary" class="mb-3" @click="validateLink" />
             <NuxtLink to="/forgot-password" class="auth-link">Request a new reset link</NuxtLink>
           </div>
           <div class="text-sm text-surface-600 dark:text-surface-400">
@@ -36,17 +37,28 @@ const loading = ref(false)
 const success = ref('')
 const error = ref('')
 let link: PasswordResetLink | null = null
+let validating = false
 
 onMounted(async () => {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
   const uid = fragment.get('uid')
   const token = fragment.get('token')
+  // Keep secrets only in component memory, including during network failures.
+  window.history.replaceState(window.history.state, '', window.location.pathname)
   if (!uid || !token) {
     error.value = 'This reset link is incomplete. Request a new link.'
     checking.value = false
     return
   }
   link = { uid, token }
+  await validateLink()
+})
+
+async function validateLink() {
+  if (!link || validating) return
+  validating = true
+  checking.value = true
+  error.value = ''
   try {
     await authApi.validatePasswordReset(link)
     auth.clearTokens()
@@ -55,11 +67,12 @@ onMounted(async () => {
     error.value = err instanceof Error ? err.message : 'Unable to verify the reset link. Please try again.'
   } finally {
     checking.value = false
+    validating = false
   }
-})
+}
 
 async function resetPassword(passwords: { password: string; password_confirm: string }) {
-  if (!link || loading.value) return
+  if (!link || loading.value || !valid.value || checking.value) return
   loading.value = true
   error.value = ''
   try {
