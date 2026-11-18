@@ -28,6 +28,7 @@ from .recurrence import calculate_next_run_at
 from .schemas import (
     TaskIn, 
     TaskOut, 
+    TaskFeedItemOut,
     TaskUpdateIn,
     RecurringTaskIn,
     RecurringTaskPatchIn,
@@ -107,12 +108,12 @@ def session_already_recorded(task, started_at) -> bool:
 
 def reconcile_expired_countdowns(user):
     """
-    Find any RUNNING COUNT_DOWN timers belonging to user's boards that have expired,
+    Find any RUNNING COUNT_DOWN timers on boards accessible to user that have expired,
     commit TaskTimeEntry records capped at target_duration_seconds, and reset timers to IDLE.
     """
     now = timezone.now()
     candidate_ids = list(TaskTimer.objects.filter(
-        task__column__board__owner=user,
+        task__column__board__in=get_accessible_boards(user),
         state=TimerState.RUNNING,
         mode=TimerMode.COUNT_DOWN,
         started_at__isnull=False,
@@ -123,7 +124,7 @@ def reconcile_expired_countdowns(user):
             # the same moment waits and then sees the timer already IDLE.
             timer = (
                 TaskTimer.objects.select_for_update()
-                .select_related("task")
+                .select_related("task", "task__column")
                 .filter(id=timer_id, state=TimerState.RUNNING)
                 .first()
             )
@@ -659,6 +660,24 @@ def delete_column(request, column_id: int):
 # ------------------
 # Task Endpoints
 # ------------------
+
+@router.get("/tasks", response=list[TaskFeedItemOut])
+def list_task_feed(request):
+    """List active tasks across owned boards and shared boards where the user recorded time."""
+    reconcile_expired_countdowns(request.auth)
+    user_has_time_entry = TaskTimeEntry.objects.filter(
+        task_id=OuterRef("pk"),
+        user=request.auth,
+    )
+    return (
+        Task.objects.active()
+        .filter(column__board__in=get_accessible_boards(request.auth))
+        .filter(Q(column__board__owner=request.auth) | Exists(user_has_time_entry))
+        .select_related("column__board", "timer", "recurring_task")
+        .prefetch_related("tags")
+        .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+        .order_by("-updated_at", "-id")
+    )
 
 @router.post("/columns/{column_id}/tasks", response=TaskOut)
 def create_task(request, column_id: int, payload: TaskIn):
