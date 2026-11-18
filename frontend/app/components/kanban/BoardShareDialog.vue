@@ -136,7 +136,7 @@
                   />
                   <Tag
                     v-else
-                    :value="collaborator.role === 'EDITOR' ? 'Editor' : 'Viewer'"
+                    :value="BOARD_ROLE_CONFIG[collaborator.role]?.label ?? 'Collaborator'"
                     severity="secondary"
                   />
                   <Button
@@ -228,6 +228,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { 
+  BOARD_ROLE_CONFIG,
   BOARD_ROLE_OPTIONS, 
   kanbanApi, 
   type BoardCollaboratorDto, 
@@ -350,7 +351,7 @@ async function handleInviteFriend() {
 
 async function handleChangeRole(collaborator: BoardCollaboratorDto, role: BoardRole) {
   if (!isOwner.value || isUpdatingCollaborators.value) return
-  if (role !== 'EDITOR' && role !== 'VIEWER') return
+  if (!(role in BOARD_ROLE_CONFIG)) return
   if (role === collaborator.role) return
 
   isChangingRoleId.value = collaborator.id
@@ -363,9 +364,7 @@ async function handleChangeRole(collaborator: BoardCollaboratorDto, role: BoardR
     )
 
     notify.success(
-      `${collaborator.display_name || collaborator.email} is now an ${
-        role === 'EDITOR' ? 'editor' : 'viewer'
-      }.`,
+      `${collaborator.display_name || collaborator.email} is now ${BOARD_ROLE_CONFIG[role].indefiniteLabel}.`,
     )
     emit('collaborators-updated')
   } catch (err) {

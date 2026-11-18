@@ -170,12 +170,29 @@ export interface BoardCollaboratorDto extends UserOut {
   role: BoardRole
 }
 
+export const BOARD_ROLE_CONFIG = {
+  EDITOR: {
+    label: 'Editor',
+    indefiniteLabel: 'an editor',
+    description: 'Can change board content',
+  },
+  VIEWER: {
+    label: 'Viewer',
+    indefiniteLabel: 'a viewer',
+    description: 'Can view the board and analytics',
+  },
+} as const satisfies Record<BoardRole, {
+  label: string
+  indefiniteLabel: string
+  description: string
+}>
+
 export const BOARD_ROLE_OPTIONS: Array<{
   label: string
   value: BoardRole
 }> = [
-  { label: 'Editor', value: 'EDITOR' },
-  { label: 'Viewer', value: 'VIEWER' },
+  { label: BOARD_ROLE_CONFIG.EDITOR.label, value: 'EDITOR' },
+  { label: BOARD_ROLE_CONFIG.VIEWER.label, value: 'VIEWER' },
 ]
 
 export interface KanbanBoardDto {
