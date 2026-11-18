@@ -44,7 +44,7 @@
       <template #content>
         <ol class="flex flex-col divide-y divide-surface-200 dark:divide-surface-700">
           <li
-            v-for="(task, index) in analytics.topTasks"
+            v-for="(task, index) in visibleTopTasks"
             :key="task.taskId"
             data-testid="analytics-top-task"
             class="flex items-center gap-3 py-2 text-sm"
@@ -58,16 +58,27 @@
           </li>
         </ol>
       </template>
+      <template v-if="analytics.topTasks.length > DEFAULT_ROW_LIMIT" #footer>
+        <RowLimitFooter v-model="topTaskLimit" :total="analytics.topTasks.length" noun="tasks" />
+      </template>
     </Card>
+
+    <!-- Planned vs actual time for tasks with a countdown target -->
+    <EstimateComparison :estimates="analytics.estimates" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { BoardAnalyticsDto } from '~/api/analytics'
 import ColumnTimeShareChart from '~/components/analytics/ColumnTimeShareChart.vue'
+import EstimateComparison from '~/components/analytics/EstimateComparison.vue'
+import RowLimitFooter, { DEFAULT_ROW_LIMIT } from '~/components/analytics/RowLimitFooter.vue'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 
-defineProps<{
+const props = defineProps<{
   analytics: BoardAnalyticsDto
 }>()
+
+const topTaskLimit = ref(DEFAULT_ROW_LIMIT)
+const visibleTopTasks = computed(() => props.analytics.topTasks.slice(0, topTaskLimit.value))
 </script>

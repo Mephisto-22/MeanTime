@@ -41,6 +41,21 @@ function analyticsFixture(overrides: Partial<BoardAnalyticsDto> = {}): BoardAnal
       { taskId: 100, title: 'Ship it', columnId: 11, columnTitle: 'Done', totalSeconds: 3600 },
       { taskId: 101, title: 'Write tests', columnId: 10, columnTitle: 'To Do', totalSeconds: 1800 },
     ],
+    estimates: {
+      tasks: [
+        {
+          taskId: 100,
+          title: 'Ship it',
+          columnId: 11,
+          columnTitle: 'Done',
+          plannedSeconds: 3000,
+          actualSeconds: 3600,
+          differenceSeconds: 600,
+        },
+      ],
+      averageDifferencePercent: 20,
+      trackedTaskCount: 1,
+    },
     ...overrides,
   }
 }
@@ -85,6 +100,39 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
     ])
     expect(tasks[0]!.text()).toContain('Done')
     expect(tasks[0]!.text()).toContain('1h')
+
+    expect(wrapper.find('[data-testid="estimate-accuracy-value"]').text()).toBe('20% over')
+    expect(wrapper.find('[data-testid="estimate-table"]').text()).toContain('Ship it')
+  })
+
+  it('shows the top five tasks at first, with buttons to show more', async () => {
+    const topTasks = Array.from({ length: 8 }, (_, i) => ({
+      taskId: 200 + i,
+      title: `Task ${i}`,
+      columnId: 10,
+      columnTitle: 'To Do',
+      totalSeconds: 3600 - i * 60,
+    }))
+    vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture({ topTasks }))
+
+    const { wrapper } = await mountAnalyticsPage()
+    const card = wrapper.find('[data-testid="analytics-top-tasks"]')
+
+    expect(card.findAll('[data-testid="analytics-top-task"]')).toHaveLength(5)
+    expect(card.find('[data-testid="row-limit-count"]').text()).toBe('Showing 5 of 8 tasks')
+
+    await card.findAll('[data-testid="row-limit-select"] button')[1]!.trigger('click')
+
+    expect(card.findAll('[data-testid="analytics-top-task"]')).toHaveLength(8)
+    expect(card.find('[data-testid="row-limit-count"]').text()).toBe('Showing 8 of 8 tasks')
+  })
+
+  it('has no show-more buttons with five top tasks or fewer', async () => {
+    vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture())
+
+    const { wrapper } = await mountAnalyticsPage()
+
+    expect(wrapper.find('[data-testid="analytics-top-tasks"] [data-testid="row-limit-select"]').exists()).toBe(false)
   })
 
   it('links back to the board', async () => {

@@ -16,13 +16,40 @@ export interface TaskTimeDto {
   totalSeconds: number
 }
 
-/** Tracked time on a board, in total, per column and for its top tasks. */
+/**
+ * Planned vs actual time on a task with a countdown target. Planned is the
+ * target; actual is the sum of the task's time entries. A positive
+ * difference means over the target.
+ */
+export interface TaskEstimateDto {
+  taskId: number
+  title: string
+  columnId: number
+  columnTitle: string
+  plannedSeconds: number
+  actualSeconds: number
+  differenceSeconds: number
+}
+
+/**
+ * Planned vs actual time for a board's countdown tasks. The average is each
+ * tracked task's difference as a percentage of its target, averaged; it's
+ * null when no task has tracked time yet.
+ */
+export interface EstimatesDto {
+  tasks: TaskEstimateDto[]
+  averageDifferencePercent: number | null
+  trackedTaskCount: number
+}
+
+/** Tracked time on a board: in total, per column, for its top tasks and against estimates. */
 export interface BoardAnalyticsDto {
   boardId: number
   title: string
   totalSeconds: number
   columns: ColumnTimeDto[]
   topTasks: TaskTimeDto[]
+  estimates: EstimatesDto
 }
 
 /** One of the user's time entries, with the task and board it was tracked on. */

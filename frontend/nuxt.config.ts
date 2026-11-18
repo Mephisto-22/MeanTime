@@ -71,9 +71,8 @@ export default defineNuxtConfig({
     },
     components: {
       exclude: [
-        // Heavy data grids & hierarchical trees (OrderList, VirtualScroller, TreeSelect kept available)
-        'DataTable',
-        'Column',
+        // Heavy data grids & hierarchical trees (DataTable, Column, OrderList, VirtualScroller and
+        // TreeSelect kept available)
         'ColumnGroup',
         'Row',
         'TreeTable',
