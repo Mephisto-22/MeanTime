@@ -19,17 +19,23 @@
         />
       </div>
 
-      <Button
-        data-testid="edit-column-button"
-        icon="pi pi-pencil"
-        severity="secondary"
-        text
-        rounded
-        size="small"
-        aria-label="Edit column"
-        @click="handleEditColumn"
-      />
+      <div class="flex items-center gap-1.5 shrink-0">
+        <slot name="header-actions" />
+        <Button
+          v-if="showEditButton"
+          data-testid="edit-column-button"
+          icon="pi pi-pencil"
+          severity="secondary"
+          text
+          rounded
+          size="small"
+          aria-label="Edit column"
+          @click="handleEditColumn"
+        />
+      </div>
     </div>
+
+    <slot name="subheader" />
 
     <!-- Draggable Tasks Container -->
     <div class="relative flex flex-1 min-h-[120px] flex-col overflow-y-auto">
@@ -37,9 +43,9 @@
       <div
         v-if="tasks.length === 0"
         data-testid="column-empty-placeholder"
-        class="kanban-column-empty absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-700"
+        class="kanban-column-empty absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 px-4 text-center text-sm text-surface-500 select-none pointer-events-none dark:border-surface-700"
       >
-        No tasks
+        {{ emptyText }}
       </div>
 
       <VueDraggable
@@ -48,6 +54,7 @@
         :data-column-id="column.id"
         group="kanban-tasks"
         :animation="150"
+        :disabled="!draggable"
         draggable="[data-testid='kanban-task']"
         ghost-class="kanban-task-ghost"
         drag-class="kanban-task-drag"
@@ -59,16 +66,17 @@
         @update="onUpdate"
         @add="onAdd"
       >
-        <KanbanTask
-          v-for="task in tasks"
-          :key="task.id"
-          :task="task"
-        />
+        <template v-for="task in tasks" :key="task.id">
+          <slot name="task" :task="task">
+            <KanbanTask :task="task" :draggable="draggable" />
+          </slot>
+        </template>
       </VueDraggable>
     </div>
 
     <!-- Add Task Button -->
     <Button
+      v-if="showAddTask"
       data-testid="add-task-button"
       label="Add Task"
       severity="secondary"
@@ -86,16 +94,30 @@ import { VueDraggable } from 'vue-draggable-plus'
 import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/api/kanban'
 import { kanbanContextKey } from '~/api/kanban'
 
-const props = defineProps<{
-  column: KanbanColumnDto
-  columns?: KanbanColumnSummary[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    column: KanbanColumnDto
+    columns?: KanbanColumnSummary[]
+    draggable?: boolean
+    showEditButton?: boolean
+    showAddTask?: boolean
+    emptyText?: string
+  }>(),
+  {
+    draggable: true,
+    showEditButton: true,
+    showAddTask: true,
+    emptyText: 'No tasks',
+  },
+)
 
 const emit = defineEmits<{
   edit: [column: KanbanColumnDto]
 }>()
 
 defineSlots<{
+  'header-actions'?: () => any
+  subheader?: () => any
   task?: (props: { task: KanbanTaskDto }) => any
 }>()
 
@@ -104,11 +126,13 @@ const kanbanContext = inject(kanbanContextKey, null)
 const tasks = computed({
   get: () => props.column.tasks,
   set: (newTasks: KanbanTaskDto[]) => {
+    if (!props.draggable) return
     props.column.tasks.splice(0, props.column.tasks.length, ...newTasks)
   },
 })
 
 const onUpdate = (event: any) => {
+  if (!props.draggable) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const targetPosition = event.newDraggableIndex ?? event.newIndex
   if (taskId !== undefined && targetPosition !== undefined && kanbanContext) {
@@ -122,6 +146,7 @@ const onUpdate = (event: any) => {
 }
 
 const onAdd = (event: any) => {
+  if (!props.draggable) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const fromColumnId =
     event.from?.getAttribute('data-column-id') ||

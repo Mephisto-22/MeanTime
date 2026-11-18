@@ -89,19 +89,22 @@ import type {
   KanbanColumnSummary,
   KanbanTaskDto,
   TaskMoveContext,
-  TaskDialogSavePayload,
   TagDto,
-  TaskPriorityType,
-  TaskTimerDto,
   TaskTimeEntryDto,
 } from '~/api/kanban'
 import type { UserOut } from '~/api/friends'
 import { kanbanContextKey, kanbanApi } from '~/api/kanban'
-import { sumEntryDurations } from '~/composables/useTaskTimer'
 import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 import ChatSidebar from '~/components/chat/ChatSidebar.vue'
 import { useBoardChat } from '~/composables/useBoardChat'
 import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
+import {
+  applyTaskUpdates,
+  getBoardMembers,
+  isBoardShared,
+  sameId,
+  useKanbanTaskActions,
+} from '~/composables/useKanbanTaskActions'
 
 const notify = useNotifications()
 
@@ -169,8 +172,6 @@ const columnRegistry = computed<KanbanColumnSummary[]>(() => {
     position: col.position,
   }))
 })
-
-const sameId = (a: string | number, b: string | number): boolean => String(a) === String(b)
 
 const findColumn = (columnId: string | number) =>
   localColumns.value.find(col => sameId(col.id, columnId))
@@ -587,24 +588,12 @@ const handleCreateTask = async (
           createdTask.columnId ?? optimisticLocation.task.columnId
         optimisticLocation.task.position =
           createdTask.position ?? optimisticLocation.task.position
-        optimisticLocation.task.priority =
-          createdTask.priority ?? optimisticLocation.task.priority
-        optimisticLocation.task.tags =
-          createdTask.tags ?? optimisticLocation.task.tags
-        if (createdTask.dueAt !== undefined) {
-          optimisticLocation.task.dueAt = createdTask.dueAt
-        }
-        if (createdTask.reminderOffsetSeconds !== undefined) {
-          optimisticLocation.task.reminderOffsetSeconds = createdTask.reminderOffsetSeconds
-        }
+        applyTaskUpdates(optimisticLocation.task, createdTask)
         if (createdTask.recurringTaskId !== undefined) {
           optimisticLocation.task.recurringTaskId = createdTask.recurringTaskId
         }
         if (createdTask.recurringTask !== undefined) {
           optimisticLocation.task.recurringTask = createdTask.recurringTask
-        }
-        if (createdTask.timer !== undefined) {
-          optimisticLocation.task.timer = createdTask.timer
         }
       }
     }
@@ -628,453 +617,53 @@ const handleCreateTask = async (
   }
 }
 
-const applyTaskUpdates = (
-  target: KanbanTaskDto,
-  source: {
-    title?: string
-    description?: string
-    priority?: TaskPriorityType
-    tags?: TagDto[]
-    timer?: TaskTimerDto | null
-    dueAt?: string | null
-    reminderOffsetSeconds?: number | null
-  },
-): void => {
-  if (source.title !== undefined) target.title = source.title
-  if (source.description !== undefined) target.description = source.description
-  if (source.priority !== undefined) target.priority = source.priority
-  if (source.tags !== undefined) target.tags = source.tags
-  if (source.dueAt !== undefined) {
-    target.dueAt = source.dueAt ?? null
-  }
-  if (source.reminderOffsetSeconds !== undefined) {
-    target.reminderOffsetSeconds = source.reminderOffsetSeconds ?? null
-  }
-  if (source.timer !== undefined) {
-    if (source.timer === null || source.timer.mode === 'NONE') {
-      target.timer = null
-    } else {
-      target.timer = {
-        taskId: target.id,
-        mode: source.timer.mode,
-        targetDurationSeconds: source.timer.targetDurationSeconds ?? null,
-        state: source.timer.state ?? 'IDLE',
-        startedAt: source.timer.startedAt ?? null,
-        elapsedSeconds: source.timer.elapsedSeconds ?? target.timer?.elapsedSeconds ?? 0,
-      }
-    }
-  }
-}
-
-const handleUpdateTask = async (
-  taskId: string | number,
-  payload: Omit<Partial<KanbanTaskDto>, 'columnId'> & {
-    columnId?: string | number | null
-  },
-): Promise<void> => {
-  let sourceCol: KanbanColumnDto | undefined
-  let sourceIndex = -1
-  let targetTask: KanbanTaskDto | undefined
-
-  for (const col of localColumns.value) {
-    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
-    if (idx !== -1) {
-      sourceCol = col
-      sourceIndex = idx
-      targetTask = col.tasks[idx]
-      break
-    }
-  }
-
-  if (!sourceCol || !targetTask || sourceIndex === -1) return
-
-  const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
-
-  const destinationColumnId =
-    payload.columnId != null
-      ? payload.columnId
-      : (targetTask.columnId ?? sourceCol.id)
-  const isColumnChanged = !sameId(sourceCol.id, destinationColumnId)
-  const destCol = isColumnChanged
-    ? localColumns.value.find(col => sameId(col.id, destinationColumnId))
-    : sourceCol
-
-  if (!destCol) {
-    notify.error(new Error('Destination column not found'), 'Unable to update task')
-    return
-  }
-
-  const targetPosition = destCol.tasks.length
-
-  // Optimistic update of task fields
-  applyTaskUpdates(targetTask, payload)
-
-  // Optimistic column relocation
-  if (isColumnChanged) {
-    sourceCol.tasks.splice(sourceIndex, 1)
-    reindexTasks(sourceCol.tasks)
-
-    targetTask.columnId = destCol.id
-    destCol.tasks.push(targetTask)
-    reindexTasks(destCol.tasks)
-  }
-
-  try {
-    const updatePayload: any = {
-      title: payload.title,
-      description: payload.description,
-    }
-    if (payload.priority !== undefined) {
-      updatePayload.priority = payload.priority
-    }
-    if (payload.tagIds !== undefined) {
-      updatePayload.tagIds = payload.tagIds
-    }
-    if (payload.dueAt !== undefined) {
-      updatePayload.dueAt = payload.dueAt
-    }
-    if (payload.reminderOffsetSeconds !== undefined) {
-      updatePayload.reminderOffsetSeconds = payload.reminderOffsetSeconds
-    }
-    if ((payload as any).applyToFuture !== undefined) {
-      updatePayload.applyToFuture = (payload as any).applyToFuture
-    }
-    if ((payload as any).recurrence !== undefined) {
-      updatePayload.recurrence = (payload as any).recurrence
-    }
-    if ((payload as any).timerMode !== undefined) {
-      updatePayload.timerMode = (payload as any).timerMode
-    }
-    if ((payload as any).targetDurationSeconds !== undefined) {
-      updatePayload.targetDurationSeconds = (payload as any).targetDurationSeconds
-    }
-
-    const updatePromise = kanbanApi.updateTask(taskId, updatePayload)
-    let updated: KanbanTaskDto | undefined
-
-    if (isColumnChanged) {
-      const movePromise = kanbanApi.moveTask(taskId, {
-        toColumnId: destCol.id,
-        targetPosition: targetPosition,
-      })
-      const [updateResult] = await Promise.all([updatePromise, movePromise])
-      updated = updateResult
-    } else {
-      updated = await updatePromise
-    }
-
-    notify.success('Task updated.')
-    if (updated) {
-      applyTaskUpdates(targetTask, updated)
-      if (updated.position !== undefined) {
-        targetTask.position = updated.position
-      }
-      if (updated.columnId != null) {
-        targetTask.columnId = updated.columnId
-      }
-      if (updated.recurringTaskId !== undefined) {
-        targetTask.recurringTaskId = updated.recurringTaskId
-      }
-      if (updated.recurringTask !== undefined) {
-        targetTask.recurringTask = updated.recurringTask
-      }
-      if (updated.timer !== undefined) {
-        targetTask.timer = updated.timer && updated.timer.mode !== 'NONE' ? updated.timer : null
-      }
-    }
-  } catch (err) {
-    localColumns.value = columnsSnapshot
-    notify.error(err, 'Unable to update task')
-  }
-}
-
-const handleDeleteTask = async (
-  taskId: string | number,
-  options?: { cancelRecurrence?: boolean },
-): Promise<void> => {
-  let targetCol: KanbanColumnDto | undefined
-  let targetIndex = -1
-  let deletedTask: KanbanTaskDto | undefined
-
-  for (const col of localColumns.value) {
-    const idx = col.tasks.findIndex(t => sameId(t.id, taskId))
-    if (idx !== -1) {
-      targetCol = col
-      targetIndex = idx
-      deletedTask = col.tasks[idx]
-      break
-    }
-  }
-
-  if (!targetCol || !deletedTask || targetIndex === -1) return
-
-  const originalColId = targetCol.id
-  const originalPosition = targetIndex
-  const snapshotTask: KanbanTaskDto = { ...deletedTask }
-
-  // Optimistically remove from column
-  targetCol.tasks.splice(targetIndex, 1)
-  reindexTasks(targetCol.tasks)
-
-  try {
-    await kanbanApi.deleteTask(taskId, options)
-    notify.success('Task deleted.')
-  } catch (err) {
-    // Restore task to original column and position
-    let restoreCol = localColumns.value.find(col => sameId(col.id, originalColId)) || targetCol
-    const restorePos = Math.max(0, Math.min(originalPosition, restoreCol.tasks.length))
-    restoreCol.tasks.splice(restorePos, 0, snapshotTask)
-    reindexTasks(restoreCol.tasks)
-
-    notify.error(err, 'Unable to delete task')
-  }
-}
-
-const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
-  if (savePayload.mode === 'create' && savePayload.columnId != null) {
-    await handleCreateTask(savePayload.columnId, {
-      title: savePayload.title,
-      description: savePayload.description,
-      priority: savePayload.priority,
-      tags: savePayload.tags,
-      tagIds: savePayload.tagIds,
-      dueAt: savePayload.dueAt,
-      reminderOffsetSeconds: savePayload.reminderOffsetSeconds,
-      recurrence: savePayload.recurrence,
-      timer: savePayload.timer,
-    })
-  } else if (savePayload.mode === 'edit' && savePayload.taskId != null) {
-    const updateTaskPayload: any = {
-      title: savePayload.title,
-      description: savePayload.description,
-      priority: savePayload.priority,
-      tags: savePayload.tags,
-      tagIds: savePayload.tagIds,
-      columnId: savePayload.columnId,
-      applyToFuture: savePayload.applyToFuture,
-      timer: savePayload.timer,
-    }
-    if (savePayload.dueAt !== undefined) {
-      updateTaskPayload.dueAt = savePayload.dueAt
-    }
-    if (savePayload.reminderOffsetSeconds !== undefined) {
-      updateTaskPayload.reminderOffsetSeconds = savePayload.reminderOffsetSeconds
-    }
-    if (savePayload.recurrence) {
-      updateTaskPayload.recurrence = savePayload.recurrence
-    }
-    if (savePayload.timer?.mode !== undefined) {
-      updateTaskPayload.timerMode = savePayload.timer.mode
-      updateTaskPayload.targetDurationSeconds = savePayload.timer.targetDurationSeconds ?? null
-    }
-    await handleUpdateTask(savePayload.taskId, updateTaskPayload)
-
-    // If recurrence was turned off on an existing recurring task, deactivate it
-    if (savePayload.recurrence === null && savePayload.recurringTaskId != null) {
-      try {
-        await kanbanApi.updateRecurringTask(savePayload.recurringTaskId, { isActive: false })
-        const target = findTaskById(savePayload.taskId)
-        if (target && target.recurringTask) {
-          target.recurringTask.isActive = false
-        }
-      } catch (err) {
-        notify.error(err, 'Unable to deactivate recurring schedule')
-      }
-    }
-  }
-}
-
-const handleCreateTag = async (payload: { name: string } | string): Promise<TagDto> => {
-  const name = typeof payload === 'string' ? payload : payload.name
-  try {
-    const created = await kanbanApi.createTag({ name })
-    const exists = availableTags.value.some(
-      t => sameId(t.id, created.id) || t.name.toLowerCase() === created.name.toLowerCase(),
-    )
-    if (!exists) {
-      availableTags.value.push(created)
-    }
-    return created
-  } catch (err) {
-    notify.error(err, 'Unable to create tag')
-    throw err
-  }
-}
-
 const findTaskById = (taskId: string | number): KanbanTaskDto | undefined => {
-  for (const col of localColumns.value) {
-    const t = col.tasks.find(task => sameId(task.id, taskId))
-    if (t) return t
-  }
-  return undefined
+  return findTaskLocation(taskId)?.task
 }
 
-const handleStartTimer = async (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>): Promise<void> => {
-  const task = findTaskById(taskId)
-  if (!task) return
-
-  const nowIso = new Date().toISOString()
-  const isResuming = task.timer?.state === 'PAUSED' && Boolean(task.timer?.startedAt)
-  const sessionStartedAt = isResuming ? task.timer!.startedAt : (defaultTimer?.startedAt || nowIso)
-
-  const updatedTimer: TaskTimerDto = {
-    taskId,
-    mode: defaultTimer?.mode || task.timer?.mode || 'COUNT_DOWN',
-    targetDurationSeconds: defaultTimer?.targetDurationSeconds ?? task.timer?.targetDurationSeconds ?? 1500,
-    state: 'RUNNING',
-    startedAt: sessionStartedAt,
-    lastResumedAt: nowIso,
-    lastPausedAt: null,
-    elapsedSeconds: task.timer?.elapsedSeconds || 0,
-  }
-
-  task.timer = { ...updatedTimer }
-
-  try {
-    const persisted = await kanbanApi.updateTaskTimer(taskId, updatedTimer)
-    if (persisted) {
-      task.timer = {
-        ...task.timer,
-        ...persisted,
-        taskId,
-      }
+const {
+  updateTask: handleUpdateTask,
+  deleteTask: handleDeleteTask,
+  saveTask: handleSaveTask,
+  createTag: handleCreateTag,
+  startTimer: handleStartTimer,
+  pauseTimer: handlePauseTimer,
+  stopTimer: handleStopTimer,
+  setTaskTotal: handleSetTaskTotal,
+  refreshTaskTotal,
+  handleTimerExpired,
+} = useKanbanTaskActions({
+  findTask: findTaskById,
+  availableTags,
+  onCreateTask: handleCreateTask,
+  createSnapshot: () => {
+    const columnsSnapshot = JSON.parse(JSON.stringify(localColumns.value))
+    return () => {
+      localColumns.value = columnsSnapshot
     }
-  } catch (err) {
-    notify.error(err, 'Unable to start timer')
-  }
-}
+  },
+  moveTaskLocally: (task, destinationColumnId) => {
+    const sourceLocation = findTaskLocation(task.id)
+    const destCol = findColumn(destinationColumnId)
+    if (!sourceLocation || !destCol) return null
 
-const handlePauseTimer = async (taskId: string | number): Promise<void> => {
-  const task = findTaskById(taskId)
-  if (!task || !task.timer) return
+    const targetPosition = destCol.tasks.length
+    sourceLocation.column.tasks.splice(sourceLocation.index, 1)
+    reindexTasks(sourceLocation.column.tasks)
 
-  const currentTimer = task.timer
-  const nowIso = new Date().toISOString()
-  let accumulated = currentTimer.elapsedSeconds || 0
-  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
-  if (currentTimer.state === 'RUNNING' && anchorTime) {
-    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
-    accumulated += delta
-  }
-
-  const pausedTimer: TaskTimerDto = {
-    ...currentTimer,
-    state: 'PAUSED',
-    startedAt: currentTimer.startedAt,
-    lastResumedAt: null,
-    lastPausedAt: nowIso,
-    elapsedSeconds: accumulated,
-  }
-
-  task.timer = { ...pausedTimer }
-
-  try {
-    const persisted = await kanbanApi.updateTaskTimer(taskId, pausedTimer)
-    if (persisted) {
-      task.timer = {
-        ...task.timer,
-        ...persisted,
-        taskId,
-      }
-    }
-  } catch (err) {
-    notify.error(err, 'Unable to pause timer')
-  }
-}
-
-const recentAlerts = new Map<string | number, number>()
-const recentlyStoppedTasks = new Map<string | number, number>()
-
-const handleStopTimer = async (taskId: string | number, entry?: TaskTimeEntryDto): Promise<void> => {
-  const lastStopped = recentlyStoppedTasks.get(taskId) ?? 0
-  const now = Date.now()
-  if (now - lastStopped < 2000) {
-    return
-  }
-  recentlyStoppedTasks.set(taskId, now)
-
-  const task = findTaskById(taskId)
-  if (!task || !task.timer) return
-  if (task.timer.state === 'IDLE') return
-
-  const currentTimer = task.timer
-  let totalElapsed = currentTimer.elapsedSeconds || 0
-  const anchorTime = currentTimer.lastResumedAt || currentTimer.startedAt
-  if (currentTimer.state === 'RUNNING' && anchorTime) {
-    const delta = Math.max(0, Math.floor((Date.now() - new Date(anchorTime).getTime()) / 1000))
-    totalElapsed += delta
-  }
-
-  const idleTimer: TaskTimerDto = {
-    ...currentTimer,
-    state: 'IDLE',
-    startedAt: null,
-    lastResumedAt: null,
-    lastPausedAt: null,
-    elapsedSeconds: totalElapsed,
-  }
-
-  task.timer = {
-    ...idleTimer,
-    elapsedSeconds: 0,
-  }
-
-  if (entry) {
-    handleTimerExpired(task, entry)
-  }
-
-  try {
-    const persisted = await kanbanApi.updateTaskTimer(taskId, idleTimer)
-    if (persisted) {
-      task.timer = {
-        ...task.timer,
-        ...persisted,
-        taskId,
-      }
-    }
-  } catch (err) {
-    notify.error(err, 'Unable to stop timer')
-    return
-  }
-
-  // Stopping saves the session as a time entry on the server.
-  await refreshTaskTotal(taskId)
-}
-
-const handleSetTaskTotal = (taskId: string | number, totalSeconds: number): void => {
-  const task = findTaskById(taskId)
-  if (task) {
-    task.totalSeconds = totalSeconds
-  }
-}
-
-const handleSetTaskTimeEntries = (taskId: string | number, entries: TaskTimeEntryDto[]): void => {
-  const task = findTaskById(taskId)
-  if (!task) return
-
-  task.timeEntries = entries
-}
-
-/** Reload a task's time entries and update its local state and total. */
-const refreshTaskTotal = async (taskId: string | number): Promise<void> => {
-  try {
-    const entries = await kanbanApi.listTimeEntries(taskId)
-    handleSetTaskTimeEntries(taskId, entries)
-    handleSetTaskTotal(taskId, sumEntryDurations(entries))
-  } catch {
-    // Keep the previous total; the next board load corrects it.
-  }
-}
-
-const handleTimerExpired = (task: KanbanTaskDto, entry?: TaskTimeEntryDto): void => {
-  const lastAlertTime = recentAlerts.get(task.id) ?? 0
-  const now = Date.now()
-  if (now - lastAlertTime < 3000) {
-    return
-  }
-  recentAlerts.set(task.id, now)
-  notify.timerComplete(task.title)
-}
+    task.columnId = destCol.id
+    destCol.tasks.push(task)
+    reindexTasks(destCol.tasks)
+    return targetPosition
+  },
+  removeTaskLocally: (taskId) => {
+    const location = findTaskLocation(taskId)
+    if (!location) return false
+    location.column.tasks.splice(location.index, 1)
+    reindexTasks(location.column.tasks)
+    return true
+  },
+})
 
 const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
   const task = activeTask.value
@@ -1138,11 +727,7 @@ const handleColumnDeleted = (columnId: string | number) => {
   notify.success('Column deleted.')
 }
 
-const isShared = computed<boolean>(() => {
-  const hasCollaborators = (props.board.collaborators?.length ?? 0) > 0
-  const isNotOwner = props.board.isOwner === false
-  return hasCollaborators || isNotOwner
-})
+const isShared = computed<boolean>(() => isBoardShared(props.board))
 
 watch(isShared, (shared) => {
   if (!shared) {
@@ -1150,20 +735,7 @@ watch(isShared, (shared) => {
   }
 })
 
-const boardMembers = computed<UserOut[]>(() => {
-  const members: UserOut[] = []
-  if (props.board.owner) {
-    members.push(props.board.owner)
-  }
-  if (props.board.collaborators) {
-    for (const collab of props.board.collaborators) {
-      if (!members.some(m => m.id === collab.id)) {
-        members.push(collab)
-      }
-    }
-  }
-  return members
-})
+const boardMembers = computed<UserOut[]>(() => getBoardMembers(props.board))
 
 provide(kanbanContextKey, {
   columns: columnRegistry,
