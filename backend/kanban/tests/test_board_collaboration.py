@@ -251,6 +251,7 @@ class BoardEventSchemaTests(TestCase):
                 "time_entry.created",
                 "time_entry.updated",
                 "time_entry.deleted",
+                "chat.message_created",
             },
         )
 

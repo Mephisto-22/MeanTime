@@ -368,6 +368,20 @@ const handleBoardEvent = (event: BoardEvent): void => {
       void refreshTaskTotal(data.taskId)
       break
     }
+
+    case 'chat.message_created': {
+      if (data.message) {
+        boardChat.receiveMessage(data.message)
+      }
+      break
+    }
+  }
+}
+
+const handleBoardReconnect = async (): Promise<void> => {
+  await refreshNuxtData()
+  if (boardChat.isOpen.value) {
+    await boardChat.loadHistory()
   }
 }
 
@@ -375,9 +389,7 @@ const handleBoardEvent = (event: BoardEvent): void => {
 const boardEvents = useBoardEvents({
   boardId: props.board.id,
   onEvent: handleBoardEvent,
-  onReconnect: async () => {
-    await refreshNuxtData()
-  },
+  onReconnect: handleBoardReconnect,
 })
 
 watch(
@@ -1141,6 +1153,8 @@ defineExpose({
   localColumns,
   availableTags,
   boardChat,
+  handleBoardEvent,
+  handleBoardReconnect,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,
