@@ -5,7 +5,7 @@ import { kanbanContextKey } from '~/api/kanban'
 import Task from '~/components/kanban/Task.vue'
 import { createTaskFixture, createTagFixture } from '../fixtures/kanban'
 
-function mountTask(props: any = {}, contextOverrides: any = {}) {
+function mountTask(props: any = {}, contextOverrides: any = {}, slots: Record<string, string> = {}) {
   const kanbanContext = {
     openEditTaskDialog: vi.fn(),
     openCreateTaskDialog: vi.fn(),
@@ -19,6 +19,7 @@ function mountTask(props: any = {}, contextOverrides: any = {}) {
       task: createTaskFixture({ id: 'task-1', title: 'Test Task Title' }),
       ...props,
     },
+    slots,
     global: {
       plugins: [PrimeVue],
       provide: {
@@ -392,6 +393,62 @@ describe('Task Component DOM Suite', () => {
         } as any),
       })
       expect(wrapper.find('[data-testid="task-recurring-badge"]').exists()).toBe(true)
+    })
+  })
+
+  describe('Non-draggable mode', () => {
+    it('applies cursor-pointer and min-h-32 and allows click-to-edit even after pointer drag gestures when draggable is false', async () => {
+      const task = createTaskFixture({ id: 'task-static', title: 'Feed Task' })
+      const { wrapper, kanbanContext } = mountTask({ task, draggable: false })
+      const taskEl = wrapper.find('[data-testid="kanban-task"]')
+
+      expect(taskEl.classes()).toContain('cursor-pointer')
+      expect(taskEl.classes()).toContain('min-h-32')
+      expect(taskEl.classes()).not.toContain('cursor-grab')
+      expect(taskEl.classes()).not.toContain('active:cursor-grabbing')
+      expect(taskEl.classes()).not.toContain('h-32')
+
+      await taskEl.trigger('pointerdown', { clientX: 10, clientY: 10, buttons: 1 })
+      await taskEl.trigger('pointermove', { clientX: 50, clientY: 50, buttons: 1 })
+      await taskEl.trigger('dragstart')
+      await taskEl.trigger('click')
+
+      expect(kanbanContext.openEditTaskDialog).toHaveBeenCalledTimes(1)
+      expect(kanbanContext.openEditTaskDialog).toHaveBeenCalledWith(task)
+    })
+
+    it('renders #before-timer slot directly between task-tags-row and TaskTimerDock', () => {
+      const task = createTaskFixture({
+        id: 'task-slot',
+        tags: [createTagFixture({ name: 'Feed' })],
+        timer: {
+          taskId: 'task-slot',
+          mode: 'COUNT_UP',
+          targetDurationSeconds: null,
+          state: 'IDLE',
+          startedAt: null,
+          elapsedSeconds: 0,
+        },
+      })
+      const { wrapper } = mountTask(
+        { task, draggable: false },
+        {},
+        { 'before-timer': '<div data-testid="feed-origin">Sprint › To Do</div>' },
+      )
+
+      const tagsRow = wrapper.find('[data-testid="task-tags-row"]')
+      const slotEl = wrapper.find('[data-testid="feed-origin"]')
+      const timerDock = wrapper.find('[data-testid="task-timer-dock"]')
+
+      expect(tagsRow.exists()).toBe(true)
+      expect(slotEl.exists()).toBe(true)
+      expect(timerDock.exists()).toBe(true)
+      expect(slotEl.text()).toBe('Sprint › To Do')
+
+      const orderedIds = wrapper
+        .findAll('[data-testid="task-tags-row"], [data-testid="feed-origin"], [data-testid="task-timer-dock"]')
+        .map(el => el.attributes('data-testid'))
+      expect(orderedIds).toEqual(['task-tags-row', 'feed-origin', 'task-timer-dock'])
     })
   })
 })

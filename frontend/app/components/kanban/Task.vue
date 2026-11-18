@@ -6,15 +6,10 @@
       body: 'p-2.5 flex flex-col justify-between h-full flex-1',
       content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
     }"
-    class="kanban-task-card cursor-grab active:cursor-grabbing select-none rounded-xl overflow-hidden shadow-sm h-32 shrink-0"
-    :class="priorityBorderClass"
+    class="kanban-task-card select-none rounded-xl overflow-hidden shadow-sm shrink-0"
+    :class="[priorityBorderClass, draggable ? 'cursor-grab active:cursor-grabbing h-32' : 'cursor-pointer min-h-32']"
     @click="handleClick"
-    @pointerdown="handlePointerDown"
-    @pointermove="handlePointerMove"
-    @mousedown="handlePointerDown"
-    @mousemove="handlePointerMove"
-    @dragstart="handleDragStart"
-    @dragend="handleDragEnd"
+    v-on="dragListeners"
   >
     <template #content>
       <!-- Top Section: Header (Title + Priority micro-pip) & Description -->
@@ -107,6 +102,8 @@
         </span>
       </div>
 
+      <slot name="before-timer" />
+
       <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
       <TaskTimerDock
         v-if="hasActiveTimer"
@@ -136,12 +133,22 @@ import { formatDurationBadge } from '~/composables/useTaskTimer'
 import { useNow } from '~/composables/useNow'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
-const props = defineProps<{
-  task: KanbanTaskDto
-  onOpenEdit?: (task: KanbanTaskDto) => void
-  onTimerStart?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
-  onTimerPause?: (taskId: string | number) => void
-  onTimerStop?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+const props = withDefaults(
+  defineProps<{
+    task: KanbanTaskDto
+    draggable?: boolean
+    onOpenEdit?: (task: KanbanTaskDto) => void
+    onTimerStart?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
+    onTimerPause?: (taskId: string | number) => void
+    onTimerStop?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+  }>(),
+  {
+    draggable: true,
+  },
+)
+
+defineSlots<{
+  'before-timer'?: () => any
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
@@ -173,6 +180,18 @@ const {
   handleDragEnd,
   handleClick,
 } = useTaskInteraction(() => props.task, props.onOpenEdit)
+
+const dragListeners = computed(() => {
+  if (!props.draggable) return {}
+  return {
+    pointerdown: handlePointerDown,
+    pointermove: handlePointerMove,
+    mousedown: handlePointerDown,
+    mousemove: handlePointerMove,
+    dragstart: handleDragStart,
+    dragend: handleDragEnd,
+  }
+})
 
 const hasDescription = computed(() => {
   return Boolean(props.task.description && props.task.description.trim().length > 0)

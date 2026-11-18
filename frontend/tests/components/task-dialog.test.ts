@@ -3,7 +3,7 @@ import { reactive, nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import TaskDialog from '~/components/kanban/TaskDialog.vue'
-import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub, InputMaskStub, DatePickerStub } from '../fixtures'
+import { createTaskFixture, createTagFixture, ToggleSwitchStub, InputNumberStub, InputMaskStub, DatePickerStub, NuxtLinkStub } from '../fixtures'
 import type { TaskDialogSavePayload, TagDto } from '~/api/kanban'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 
@@ -50,6 +50,7 @@ function mountTaskDialog(props: Record<string, any> = {}) {
         InputNumber: InputNumberStub,
         InputMask: InputMaskStub,
         DatePicker: DatePickerStub,
+        NuxtLink: NuxtLinkStub,
       },
     },
   })
@@ -739,5 +740,80 @@ describe('TaskDialog Component DOM Suite', () => {
 
     expect(timerEditor.props('timer').state).toBe('IDLE')
     expect(timerEditor.props('timer').startedAt).toBeNull()
+  })
+
+  describe('Cross-board context banner', () => {
+    it('renders board banner and Open board link in edit mode from task fallback fields and closes dialog on link click', async () => {
+      const feedTask = {
+        ...createTaskFixture({
+          id: 't-feed-1',
+          title: 'Feed Task',
+          columnId: 'col-99',
+        }),
+        boardId: 7,
+        boardTitle: 'Q4 Roadmap',
+        columnTitle: 'In Review',
+      }
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task: feedTask,
+        columns: [],
+      })
+
+      const banner = wrapper.find('[data-testid="task-dialog-board-banner"]')
+      expect(banner.exists()).toBe(true)
+      expect(banner.text()).toContain('Board:')
+      expect(banner.text()).toContain('Q4 Roadmap')
+      expect(banner.text()).toContain('In Review')
+
+      const link = wrapper.find('[data-testid="task-dialog-board-link"]')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href')).toBe('/boards/7')
+      expect(link.text()).toContain('Open board')
+
+      await link.trigger('click')
+      expect(wrapper.emitted('update:visible')?.[0]).toEqual([false])
+    })
+
+    it('renders board banner using explicit boardId/boardTitle props and column title from columns', () => {
+      const task = createTaskFixture({
+        id: 't-props-1',
+        title: 'Task With Props',
+        columnId: 'col-2',
+      })
+
+      const wrapper = mountTaskDialog({
+        mode: 'edit',
+        task,
+        boardId: 12,
+        boardTitle: 'Design Ops',
+        columns: [
+          { id: 'col-1', title: 'To Do' },
+          { id: 'col-2', title: 'Ready for QA' },
+        ],
+      })
+
+      const banner = wrapper.find('[data-testid="task-dialog-board-banner"]')
+      expect(banner.exists()).toBe(true)
+      expect(banner.text()).toContain('Design Ops')
+      expect(banner.text()).toContain('Ready for QA')
+      expect(wrapper.find('[data-testid="task-dialog-board-link"]').attributes('href')).toBe('/boards/12')
+    })
+
+    it('hides board banner in create mode or when board context is missing', () => {
+      const createWrapper = mountTaskDialog({
+        mode: 'create',
+        boardId: 7,
+        boardTitle: 'Q4 Roadmap',
+      })
+      expect(createWrapper.find('[data-testid="task-dialog-board-banner"]').exists()).toBe(false)
+
+      const editWithoutBoard = mountTaskDialog({
+        mode: 'edit',
+        task: createTaskFixture({ id: 't-local', title: 'Local Board Task' }),
+      })
+      expect(editWithoutBoard.find('[data-testid="task-dialog-board-banner"]').exists()).toBe(false)
+    })
   })
 })

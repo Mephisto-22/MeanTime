@@ -116,3 +116,9 @@ export const DatePickerStub = {
     },
   },
 }
+
+export const NuxtLinkStub = {
+  name: 'NuxtLink',
+  props: ['to'],
+  template: '<a :href="typeof to === \'string\' ? to : undefined" @click="$event.preventDefault()"><slot /></a>',
+}
