@@ -9,20 +9,20 @@
   >
     <div v-if="task" class="flex flex-col gap-5 pt-1">
       <!-- Title -->
-      <div class="border-b border-surface-200 pb-4 dark:border-surface-700">
-        <Tag value="Viewer access" severity="info" class="mb-3" />
+      <div class="flex flex-col items-start gap-2">
+        <Tag value="Viewer access" severity="info" />
         <h2 class="text-xl font-bold tracking-tight break-words">
           {{ task.title }}
         </h2>
       </div>
 
+      <Divider class="my-0" />
+
       <!-- Properties: same grouping as the editor -->
-      <div
-        class="grid grid-cols-1 gap-5 border-b border-surface-200 pb-5 dark:border-surface-800 md:grid-cols-12"
-      >
-        <dl class="flex flex-col gap-4 md:col-span-5">
-          <div>
-            <dt class="mb-2 text-xs font-semibold text-surface-500 dark:text-surface-400">
+      <div class="flex flex-col gap-5 md:flex-row md:items-stretch">
+        <dl class="flex flex-col gap-4 md:w-5/12">
+          <div class="flex flex-col gap-1.5">
+            <dt class="text-xs font-semibold text-surface-500 dark:text-surface-400">
               Column
             </dt>
             <dd class="text-sm font-medium">
@@ -30,23 +30,24 @@
             </dd>
           </div>
 
-          <div>
-            <dt class="mb-2 text-xs font-semibold text-surface-500 dark:text-surface-400">
+          <div class="flex flex-col gap-1.5">
+            <dt class="text-xs font-semibold text-surface-500 dark:text-surface-400">
               Priority
             </dt>
             <dd>
-              <span
+              <Tag
                 v-if="priorityConfig"
-                class="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-sm font-medium"
                 :class="priorityConfig.badgeClass"
               >
-                <span
-                  class="h-2 w-2 rounded-full"
-                  :class="priorityConfig.dotClass"
-                  aria-hidden="true"
-                />
-                {{ priorityConfig.label }}
-              </span>
+                <span class="inline-flex items-center gap-2">
+                  <span
+                    class="h-2 w-2 rounded-full"
+                    :class="priorityConfig.dotClass"
+                    aria-hidden="true"
+                  />
+                  {{ priorityConfig.label }}
+                </span>
+              </Tag>
               <span v-else class="text-sm text-surface-500">
                 No priority
               </span>
@@ -54,11 +55,13 @@
           </div>
         </dl>
 
+        <Divider layout="vertical" class="hidden md:flex mx-0" />
+
         <section
-          class="md:col-span-7 md:border-l md:border-surface-200 md:pl-5 dark:md:border-surface-800"
+          class="flex flex-1 flex-col gap-3 min-w-0"
           aria-labelledby="viewer-tags-heading"
         >
-          <div class="mb-3 flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3">
             <h3
               id="viewer-tags-heading"
               class="text-xs font-semibold text-surface-500 dark:text-surface-400"
@@ -71,13 +74,14 @@
           </div>
 
           <div v-if="task.tags?.length" class="flex flex-wrap gap-2">
-            <span
+            <Tag
               v-for="tag in task.tags"
               :key="tag.id"
-              class="max-w-full break-words rounded-full border border-surface-200 bg-surface-100 px-3 py-1.5 text-sm font-medium dark:border-surface-700 dark:bg-surface-800"
-            >
-              {{ tag.name }}
-            </span>
+              :value="tag.name"
+              severity="secondary"
+              rounded
+              class="max-w-full break-words"
+            />
           </div>
 
           <p v-else class="text-sm text-surface-500">
@@ -86,19 +90,26 @@
         </section>
       </div>
 
+      <Divider class="my-0" />
+
       <!-- Description -->
-      <section aria-labelledby="viewer-description-heading">
-        <h3
-          id="viewer-description-heading"
-          class="mb-2 text-xs font-semibold text-surface-500 dark:text-surface-400"
-        >
-          Notes &amp; Description
-        </h3>
+      <Panel
+        aria-labelledby="viewer-description-heading"
+        :pt="{ header: 'pb-0 border-b-0', content: 'pt-2' }"
+      >
+        <template #header>
+          <h3
+            id="viewer-description-heading"
+            class="text-xs font-semibold text-surface-500 dark:text-surface-400"
+          >
+            Notes &amp; Description
+          </h3>
+        </template>
         <div
           tabindex="0"
           role="region"
           aria-labelledby="viewer-description-heading"
-          class="max-h-48 min-h-28 overflow-y-auto rounded-xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-950/40"
+          class="max-h-48 min-h-20 overflow-y-auto"
         >
           <p
             class="whitespace-pre-wrap break-words text-sm leading-relaxed"
@@ -107,86 +118,86 @@
             {{ task.description?.trim() ? task.description : 'No description provided.' }}
           </p>
         </div>
-      </section>
+      </Panel>
 
       <!-- Recurrence -->
-      <section
-        v-if="schedule"
-        class="flex items-start gap-3 rounded-xl border border-surface-200 p-4 dark:border-surface-800"
-      >
-        <i class="pi pi-sync mt-0.5 text-surface-500" aria-hidden="true" />
-        <div>
-          <h3 class="text-sm font-semibold">Repeat schedule</h3>
-          <p class="mt-1 text-sm text-surface-500">{{ schedule }}</p>
+      <Panel v-if="schedule">
+        <div class="flex items-start gap-3">
+          <i class="pi pi-sync text-surface-500" aria-hidden="true" />
+          <div class="flex flex-col gap-1">
+            <h3 class="text-sm font-semibold">Repeat schedule</h3>
+            <p class="text-sm text-surface-500">{{ schedule }}</p>
+          </div>
         </div>
-      </section>
+      </Panel>
 
       <!-- Timer and history -->
-      <section
-        class="rounded-xl border border-surface-200 p-4 dark:border-surface-800"
-      >
-        <div
-          class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-surface-200 pb-3 dark:border-surface-800"
-        >
-          <h3 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-            <i class="pi pi-hourglass text-amber-500" aria-hidden="true" />
-            Timer
-          </h3>
-          <span class="text-xs text-surface-500">
-            {{ timerModeLabel }}
-          </span>
-        </div>
+      <Panel :pt="{ content: 'flex flex-col gap-4' }">
+        <template #header>
+          <div class="flex flex-1 flex-wrap items-center justify-between gap-2">
+            <h3 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+              <i class="pi pi-hourglass text-amber-500" aria-hidden="true" />
+              Timer
+            </h3>
+            <span class="text-xs text-surface-500">
+              {{ timerModeLabel }}
+            </span>
+          </div>
+        </template>
 
-        <div class="grid grid-cols-1 gap-5 md:grid-cols-12">
+        <div class="flex flex-col gap-5 md:flex-row md:items-stretch">
           <!-- Large timer display -->
-          <div
-            class="md:col-span-5 md:border-r md:border-surface-200 md:pr-5 dark:md:border-surface-800"
-          >
-            <div
-              class="rounded-xl border border-surface-200 bg-surface-50 px-4 py-8 text-center dark:border-surface-700 dark:bg-surface-800/60"
+          <div class="md:w-5/12">
+            <Card
+              class="border border-surface-200 bg-surface-50 shadow-none dark:border-surface-700 dark:bg-surface-800/60"
+              :pt="{ body: 'px-4 py-8 text-center', content: 'flex flex-col items-center gap-3 p-0' }"
               data-testid="viewer-timer-display"
             >
-              <template v-if="hasTimer">
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
-                  {{ timerStatusLabel }}
-                </p>
-
-                <p class="mt-3 font-mono text-5xl font-bold tabular-nums tracking-tight">
-                  {{ displayTime }}
-                </p>
-
-                <template v-if="isCountDown">
-                  <p class="mt-3 text-xs text-surface-500">
-                    Target: {{ formatDurationBadge(targetDurationSeconds) }}
+              <template #content>
+                <template v-if="hasTimer">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    {{ timerStatusLabel }}
                   </p>
-                  <ProgressBar
-                    :value="progressPercent"
-                    :show-value="false"
-                    class="mt-4 !h-1.5"
-                  />
+
+                  <p class="font-mono text-5xl font-bold tabular-nums tracking-tight">
+                    {{ displayTime }}
+                  </p>
+
+                  <template v-if="isCountDown">
+                    <p class="text-xs text-surface-500">
+                      Target: {{ formatDurationBadge(targetDurationSeconds) }}
+                    </p>
+                    <ProgressBar
+                      :value="progressPercent"
+                      :show-value="false"
+                      class="self-stretch !h-1.5"
+                    />
+                  </template>
+                </template>
+
+                <template v-else>
+                  <i class="pi pi-clock text-2xl text-surface-400" aria-hidden="true" />
+                  <p class="text-sm text-surface-500">
+                    No timer configured.
+                  </p>
                 </template>
               </template>
-
-              <template v-else>
-                <i class="pi pi-clock text-2xl text-surface-400" aria-hidden="true" />
-                <p class="mt-3 text-sm text-surface-500">
-                  No timer configured.
-                </p>
-              </template>
-            </div>
+            </Card>
           </div>
 
+          <Divider layout="vertical" class="hidden md:flex mx-0" />
+
           <!-- Time history -->
-          <div class="min-w-0 md:col-span-7">
-            <div class="mb-3 flex flex-wrap items-center gap-2">
+          <div class="flex flex-1 flex-col gap-3 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-sm font-semibold">Time history</h3>
               <Tag
-                v-if="!loading && !loadError"
+                v-if="!loading && !hasLoadError"
                 :value="String(entries.length)"
                 severity="secondary"
               />
               <span
-                v-if="!loading && !loadError"
+                v-if="!loading && !hasLoadError"
                 class="text-xs font-medium text-primary"
               >
                 {{ formatDurationBadge(totalSeconds) }} total
@@ -197,8 +208,18 @@
               Loading time history...
             </p>
 
-            <Message v-else-if="loadError" severity="error" :closable="false">
-              {{ loadError }}
+            <Message v-else-if="hasLoadError" severity="error" :closable="false">
+              <div class="flex flex-wrap items-center gap-3">
+                <span>Unable to load time history.</span>
+                <Button
+                  label="Try again"
+                  icon="pi pi-refresh"
+                  severity="danger"
+                  text
+                  size="small"
+                  @click="retryLoadTimeEntries"
+                />
+              </div>
             </Message>
 
             <p v-else-if="entries.length === 0" class="text-sm text-surface-500">
@@ -213,38 +234,44 @@
               <li
                 v-for="entry in entries"
                 :key="entry.id"
-                class="rounded-xl border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800/40"
               >
-                <div class="flex flex-wrap items-center gap-2">
-                  <Tag
-                    :value="formatDurationBadge(entry.durationSeconds)"
-                    severity="info"
-                  />
-                  <span class="text-xs text-surface-500">
-                    {{ formatDateLabel(entry.startedAt) }}
-                    &middot;
-                    {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
-                  </span>
-                </div>
-
-                <p
-                  class="mt-3 whitespace-pre-wrap break-words text-sm"
-                  :class="{ 'text-surface-500': !entry.note }"
+                <Card
+                  class="border border-surface-200 bg-surface-50 shadow-none dark:border-surface-700 dark:bg-surface-800/40"
+                  :pt="{ body: 'p-3', content: 'flex flex-col gap-3 p-0' }"
                 >
-                  {{ entry.note || 'No session note recorded.' }}
-                </p>
+                  <template #content>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Tag
+                        :value="formatDurationBadge(entry.durationSeconds)"
+                        severity="info"
+                      />
+                      <span class="text-xs text-surface-500">
+                        {{ formatDateLabel(entry.startedAt) }}
+                        &middot;
+                        {{ formatTimeRange(entry.startedAt, entry.endedAt) }}
+                      </span>
+                    </div>
 
-                <p
-                  v-if="entry.user?.email"
-                  class="mt-3 break-all text-xs text-surface-500"
-                >
-                  {{ entry.user.email }}
-                </p>
+                    <p
+                      class="whitespace-pre-wrap break-words text-sm"
+                      :class="{ 'text-surface-500': !entry.note }"
+                    >
+                      {{ entry.note || 'No session note recorded.' }}
+                    </p>
+
+                    <p
+                      v-if="entry.user?.email"
+                      class="break-all text-xs text-surface-500"
+                    >
+                      {{ entry.user.email }}
+                    </p>
+                  </template>
+                </Card>
               </li>
             </ul>
           </div>
         </div>
-      </section>
+      </Panel>
     </div>
 
     <template #footer>
@@ -281,6 +308,7 @@ const props = defineProps<{
 
 const visible = defineModel<boolean>('visible', { required: true })
 const context = inject(kanbanContextKey, null)
+const notify = useNotifications()
 
 const priorityConfig = computed(() => {
   const priority = props.task?.priority
@@ -324,7 +352,8 @@ const timerStatusLabel = computed(() => {
 
 const entries = ref<TaskTimeEntryDto[]>([])
 const loading = ref(false)
-const loadError = ref('')
+const hasLoadError = ref(false)
+let activeRequestToken = 0
 
 const totalSeconds = computed(() => sumEntryDurations(entries.value))
 
@@ -356,26 +385,42 @@ const schedule = computed(() => {
   ].filter(Boolean).join(' · ')
 })
 
+async function loadTimeEntries(taskId: string | number) {
+  const requestToken = ++activeRequestToken
+  entries.value = []
+  hasLoadError.value = false
+  loading.value = true
+
+  try {
+    const result = await kanbanApi.listTimeEntries(taskId)
+    if (requestToken === activeRequestToken) {
+      entries.value = result
+    }
+  } catch (err) {
+    if (requestToken === activeRequestToken) {
+      hasLoadError.value = true
+      notify.error(err, 'Unable to load time history.')
+    }
+  } finally {
+    if (requestToken === activeRequestToken) {
+      loading.value = false
+    }
+  }
+}
+
+function retryLoadTimeEntries() {
+  if (props.task?.id != null) {
+    void loadTimeEntries(props.task.id)
+  }
+}
+
 watch(
   () => [visible.value, props.task?.id] as const,
-  async ([isOpen, taskId], _, onCleanup) => {
-    let cancelled = false
-    onCleanup(() => { cancelled = true })
+  ([isOpen, taskId], _, onCleanup) => {
+    onCleanup(() => { activeRequestToken++ })
 
     if (!isOpen || taskId == null) return
-
-    entries.value = []
-    loadError.value = ''
-    loading.value = true
-
-    try {
-      const result = await kanbanApi.listTimeEntries(taskId)
-      if (!cancelled) entries.value = result
-    } catch {
-      if (!cancelled) loadError.value = 'Unable to load time history.'
-    } finally {
-      if (!cancelled) loading.value = false
-    }
+    void loadTimeEntries(taskId)
   },
   { immediate: true },
 )

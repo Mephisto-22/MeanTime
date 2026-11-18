@@ -23,7 +23,7 @@
             option-label="label"
             :placeholder="availableFriends.length > 0 ? 'Select a friend...' : 'No new friends to invite'"
             :disabled="availableFriends.length === 0 || isUpdatingCollaborators"
-            class="w-full"
+            fluid
             size="small"
           />
           <Select

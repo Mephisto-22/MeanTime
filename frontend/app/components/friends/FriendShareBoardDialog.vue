@@ -26,7 +26,7 @@
           option-label="title"
           :placeholder="eligibleBoards.length > 0 ? 'Select a board to share...' : 'No available boards to share'"
           :disabled="eligibleBoards.length === 0 || isLoading"
-          class="w-full"
+          fluid
           size="small"
         />
         <label for="friend-board-role-select" class="text-sm font-medium">
@@ -40,7 +40,7 @@
           option-value="value"
           option-label="label"
           :disabled="isSharing"
-          class="w-full"
+          fluid
           size="small"
         />
         <p class="text-xs text-surface-500">

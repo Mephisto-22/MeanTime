@@ -2,7 +2,7 @@
   <Card
     data-testid="kanban-board"
     class="flex flex-col flex-1 min-h-0 border border-surface-200 dark:border-surface-800 shadow-sm"
-    :pt="{ body: 'flex flex-col flex-1 min-h-0 p-4 gap-3', content: 'flex flex-col flex-1 min-h-0' }"
+    :pt="{ body: 'flex flex-col flex-1 min-h-0 p-4 gap-3', content: 'flex flex-col flex-1 min-h-0 gap-3' }"
   >
     <template #title>
       <Toolbar class="border-none bg-transparent p-0">
@@ -40,7 +40,6 @@
         v-if="!canEdit"
         severity="info"
         :closable="false"
-        class="mb-3"
         data-testid="viewer-notice"
       >
         You have viewer access. You can browse this board and its time history.
