@@ -60,6 +60,11 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
         },
         global: {
           plugins: [PrimeVue],
+          provide: {
+            [kanbanContextKey as symbol]: {
+              canEdit: { value: true },
+            },
+          },
         },
       })
 
@@ -107,6 +112,11 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
         },
         global: {
           plugins: [PrimeVue],
+          provide: {
+            [kanbanContextKey as symbol]: {
+              canEdit: { value: true },
+            },
+          },
         },
       })
 
@@ -173,6 +183,7 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       const boardData: KanbanBoardDto = {
         id: 1,
         title: 'Concurrent Timers Board',
+        isOwner: true,
         description: '',
         columns: [
           {
@@ -253,6 +264,7 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       const boardData: KanbanBoardDto = {
         id: 2,
         title: 'Neutrality Board',
+        isOwner: true,
         description: '',
         columns: [
           {
@@ -313,6 +325,7 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       const boardData: KanbanBoardDto = {
         id: 3,
         title: 'Notification Board',
+        isOwner: true,
         description: '',
         columns: [
           {
@@ -369,6 +382,7 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
           plugins: [PrimeVue],
           provide: {
             [kanbanContextKey as symbol]: {
+              canEdit: { value: true },
               stopTimer: stopMock,
             },
           },
@@ -388,6 +402,7 @@ describe('Production Card Dock Integration & Board Drag Hardening (#109)', () =>
       const boardData: KanbanBoardDto = {
         id: 4,
         title: 'Debounce Board',
+        isOwner: true,
         description: '',
         columns: [
           {

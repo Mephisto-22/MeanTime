@@ -55,6 +55,8 @@ export function createBoardFixture(overrides: Partial<KanbanBoardDto> = {}): Kan
     id,
     title: overrides.title ?? `Board ${id}`,
     description: overrides.description,
+    owner: overrides.owner,
+    collaborators: overrides.collaborators,
     isOwner: overrides.isOwner ?? true,
     columns,
   }

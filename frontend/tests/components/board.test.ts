@@ -541,6 +541,7 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
     const board = {
       id: 'board-1',
       title: 'Initial Board',
+      isOwner: true,
       columns: [
         {
           id: 'col-1',
