@@ -8,6 +8,27 @@ vi.mock('#build/fetch.mjs', () => ({
   $fetch: (...args: any[]) => mockFetch(...args),
 }))
 
+describe('AnalyticsApi.getBoardAnalytics filters (#204)', () => {
+  beforeEach(() => {
+    mockFetch.mockReset()
+    mockFetch.mockResolvedValue({})
+  })
+
+  it('sends no filters for every task', async () => {
+    await analyticsApi.getBoardAnalytics(7, { timerMode: 'ALL', tags: [] })
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/kanban/boards/7/analytics', expect.objectContaining({ query: {} }))
+  })
+
+  it('sends the timer mode and tag names in snake_case', async () => {
+    await analyticsApi.getBoardAnalytics(7, { timerMode: 'COUNT_DOWN', tags: ['bug', 'docs'] })
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/kanban/boards/7/analytics', expect.objectContaining({
+      query: { timer_mode: 'COUNT_DOWN', tags: ['bug', 'docs'] },
+    }))
+  })
+})
+
 describe('AnalyticsApi.getDailyTime (#173)', () => {
   beforeEach(() => {
     mockFetch.mockReset()
