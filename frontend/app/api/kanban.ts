@@ -212,6 +212,15 @@ export interface KanbanTaskDto {
   reminderOffsetSeconds?: number | null
   reminderAt?: string | null
   reminderSentAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TaskFeedItemDto extends KanbanTaskDto {
+  boardId: string | number
+  boardTitle: string
+  columnTitle: string
+  updatedAt: string
 }
 
 export interface KanbanColumnDto {
@@ -349,6 +358,10 @@ export class KanbanApi {
   // Task Endpoints
   // -----------------
 
+  listTaskFeed(): Promise<TaskFeedItemDto[]> {
+    return apiService.get<TaskFeedItemDto[]>(`${this.endpoint}/tasks`)
+  }
+
   createTask(columnId: string | number, payload: Partial<KanbanTaskDto>): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/columns/${columnId}/tasks`, payload)
   }
@@ -416,6 +429,10 @@ export class KanbanApi {
 
   listTags(boardId: string | number): Promise<TagDto[]> {
     return apiService.get<TagDto[]>(`${this.endpoint}/tags?board_id=${boardId}`)
+  }
+
+  listUserTags(): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
   }
 
   createTag(payload: { name: string }): Promise<TagDto> {

@@ -1,4 +1,4 @@
-import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto, TagDto } from '~/api/kanban'
+import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto, TagDto, TaskFeedItemDto } from '~/api/kanban'
 
 let nextTaskId = 1
 let nextColumnId = 1
@@ -32,6 +32,20 @@ export function createTaskFixture(overrides: Partial<KanbanTaskDto> = {}): Kanba
     reminderOffsetSeconds: overrides.reminderOffsetSeconds,
     reminderAt: overrides.reminderAt,
     reminderSentAt: overrides.reminderSentAt,
+    createdAt: overrides.createdAt,
+    updatedAt: overrides.updatedAt,
+  }
+}
+
+export function createTaskFeedItemFixture(overrides: Partial<TaskFeedItemDto> = {}): TaskFeedItemDto {
+  const baseTask = createTaskFixture(overrides)
+  return {
+    ...baseTask,
+    boardId: overrides.boardId ?? 'board-1',
+    boardTitle: overrides.boardTitle ?? 'Board 1',
+    columnTitle: overrides.columnTitle ?? 'To Do',
+    createdAt: overrides.createdAt ?? '2026-01-01T00:00:00Z',
+    updatedAt: overrides.updatedAt ?? '2026-01-01T00:00:00Z',
   }
 }
 
