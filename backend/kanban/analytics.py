@@ -62,6 +62,25 @@ class BoardAnalyticsOut(Schema):
     estimates: EstimatesOut
 
 
+def board_tasks_with_tracked_seconds(board: Board, *select_related: str, **filters):
+    """Return tasks on a board with column preloaded and total tracked seconds annotated."""
+    return (
+        Task.objects.filter(column__board=board, **filters)
+        .select_related("column", *select_related)
+        .annotate(tracked_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+    )
+
+
+def _task_identity(task: Task) -> dict:
+    """Return the common task and column fields shared across board analytics rows."""
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "column_id": task.column_id,
+        "column_title": task.column.title,
+    }
+
+
 def board_estimates(board: Board) -> dict:
     """Return planned vs actual time for each task on the board with a countdown target.
 
@@ -69,27 +88,21 @@ def board_estimates(board: Board) -> dict:
     task's time entries across sessions and contributors. Tasks are ordered from
     the furthest over their target to the furthest under.
     """
-    tasks = (
-        Task.objects.filter(
-            column__board=board,
-            timer__mode=TimerMode.COUNT_DOWN,
-            timer__target_duration_seconds__gt=0,
-        )
-        .select_related("column", "timer")
-        .annotate(actual_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
+    tasks = board_tasks_with_tracked_seconds(
+        board,
+        "timer",
+        timer__mode=TimerMode.COUNT_DOWN,
+        timer__target_duration_seconds__gt=0,
     )
 
     rows = []
     for task in tasks:
         planned = task.timer.target_duration_seconds
         rows.append({
-            "task_id": task.id,
-            "title": task.title,
-            "column_id": task.column_id,
-            "column_title": task.column.title,
+            **_task_identity(task),
             "planned_seconds": planned,
-            "actual_seconds": task.actual_seconds,
-            "difference_seconds": task.actual_seconds - planned,
+            "actual_seconds": task.tracked_seconds,
+            "difference_seconds": task.tracked_seconds - planned,
         })
     rows.sort(key=lambda row: (-row["difference_seconds"], row["title"].casefold()))
 
@@ -123,11 +136,9 @@ def get_board_analytics(request, board_id: int):
         .order_by("position", "id")
     )
     top_tasks = (
-        Task.objects.filter(column__board=board)
-        .select_related("column")
-        .annotate(total_seconds=Coalesce(Sum("time_entries__duration_seconds"), 0))
-        .filter(total_seconds__gt=0)
-        .order_by("-total_seconds", "column__position", "position", "id")
+        board_tasks_with_tracked_seconds(board)
+        .filter(tracked_seconds__gt=0)
+        .order_by("-tracked_seconds", "column__position", "position", "id")
     )
 
     return {
@@ -139,13 +150,7 @@ def get_board_analytics(request, board_id: int):
             for column in columns
         ],
         "top_tasks": [
-            {
-                "task_id": task.id,
-                "title": task.title,
-                "column_id": task.column_id,
-                "column_title": task.column.title,
-                "total_seconds": task.total_seconds,
-            }
+            {**_task_identity(task), "total_seconds": task.tracked_seconds}
             for task in top_tasks
         ],
         "estimates": board_estimates(board),
