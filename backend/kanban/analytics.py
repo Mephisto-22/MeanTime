@@ -51,7 +51,7 @@ class BoardAnalyticsOut(Schema):
     collaborators: list[CollaboratorTimeOut]
 
 
-def collaborator_totals(board: Board) -> list[dict]:
+def collaborator_totals(board: Board) -> list[CollaboratorTimeOut]:
     """Return each person's tracked time on the board, most time first.
 
     The owner and every collaborator are listed, even with no time. Someone
@@ -76,18 +76,23 @@ def collaborator_totals(board: Board) -> list[dict]:
 
     rows = sorted(
         (
-            {
-                "user_id": user.id,
-                "display_name": user.display_name,
-                "total_seconds": seconds_by_user.get(user.id, 0),
-            }
+            CollaboratorTimeOut(
+                user_id=user.id,
+                display_name=user.display_name,
+                total_seconds=seconds_by_user.get(user.id, 0),
+            )
             for user in people.values()
         ),
-        key=lambda row: (-row["total_seconds"], row["display_name"].casefold()),
+        key=lambda row: (-row.total_seconds, row.display_name.casefold()),
     )
     if seconds_by_user.get(None):
         rows.append(
-            {"user_id": None, "display_name": UNKNOWN_NAME, "total_seconds": seconds_by_user[None]})
+            CollaboratorTimeOut(
+                user_id=None,
+                display_name=UNKNOWN_NAME,
+                total_seconds=seconds_by_user[None],
+            )
+        )
     return rows
 
 
