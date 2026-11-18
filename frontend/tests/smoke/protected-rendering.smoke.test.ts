@@ -104,7 +104,7 @@ describe('Production SSR Smoke Check', () => {
     const res = await request('/')
     expect(res.status).toBe(200)
     const html = await res.text()
-    expect(html).toContain('Your way.')
+    expect(html).toContain('YOUR TIME.')
     expect(html).toContain('href="/login"')
     expect(html).toContain('href="/register"')
     expect(html).not.toContain('data-testid="boards-empty"')

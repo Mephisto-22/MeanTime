@@ -3,6 +3,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LandingPage from '~/pages/index.vue'
 import { kanbanApi } from '~/api/kanban'
+import KanbanTask from '~/components/kanban/Task.vue'
 
 const mocks = vi.hoisted(() => ({
   auth: { isAuthenticated: false, initializeSession: vi.fn() },
@@ -24,11 +25,15 @@ describe('Public landing page', () => {
     const list = vi.spyOn(kanbanApi, 'listBoards')
     wrapper = await mountSuspended(LandingPage, { route: '/' })
     await flushPromises()
-    expect(wrapper.get('h1').text()).toContain('Your way.')
+    expect(wrapper.get('h1').text()).toContain('YOUR TIME.')
     expect(wrapper.get('[data-testid="landing-login"]').attributes('href')).toBe('/login')
     expect(wrapper.get('[data-testid="landing-register"]').attributes('href')).toBe('/register')
     expect(list).not.toHaveBeenCalled()
     expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(KanbanTask).length).toBeGreaterThan(0)
+    expect(wrapper.get('[data-task-id="landing-plan"]').text()).toContain('Plan a weekend project')
+    expect(wrapper.find('[data-testid="task-timer-dock"]').exists()).toBe(true)
+    expect(wrapper.get('[data-task-id="landing-focus"]').element.closest('[inert]')).not.toBeNull()
   })
 
   it('waits for session restoration before sending signed-in users to boards', async () => {

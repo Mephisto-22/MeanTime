@@ -3,15 +3,37 @@
 `/` is a public, server-rendered introduction to MeanTime with links to `/login`
 and `/register`. It uses the `headless` layout, with a compact PrimeVue Toolbar
 for the brand and login link rather than the authenticated application navbar.
-PrimeVue Card, Tag, and Button components form a charcoal-and-cobalt composition,
-with oversized type, serif accents, and overlapping task, timer, and note cards.
-The background matches the site's dark canvas, with pale blue headings, dark
-task cards, and coral/lime stickers that retain dark text for contrast.
-Scoped styles keep this public-page treatment separate from the application
-theme. The page fills the headless layout with responsive spacing; its entrance
-animation respects reduced-motion preferences. The board and timer are static,
-labeled illustrations, not interactive controls or live data. Visiting as a
-guest does not request protected board data.
+The local design preview uses PrimeVue Card, Tag, Toolbar, and Button components
+with the shared PrimeVue primary blue as the dominant background, accented by
+black product cards, a white text strip, and contrasting black/white sections.
+Hard diagonal section separators distinguish the feature chapters. Cards and
+buttons use the product's corner-radius tokens, fine borders, and soft shadows;
+headline and card frames are straight rather than comic-style cutouts.
+Large typography and subtle background texture remain. Three scrollable
+feature sections introduce boards, focus sessions, and shared workspaces.
+Copy focuses on everyday plans and casual use. Dark surfaces use the shared
+text colors, and primary actions use the shared blue and contrast-color tokens.
+The design keeps decoration restrained: a static text divider replaces the
+marquee, and background lettering, stars, timer stickers, and extra symbols have
+been removed. Section reveals and staggered headline entrances remain, with
+slow four-pixel movement on product previews instead of rotating graphics.
+The focus section includes a large sample timer and animated progress bar above
+the real task card. Its 20-minute readout matches the paused sample task timer.
+The header and footer use the text wordmark without a star.
+Section animations run only while their section intersects the viewport.
+A navigation button pauses/resumes motion;
+system reduced-motion preferences disable it. Content remains visible without
+JavaScript or IntersectionObserver. The observer and preference listener are
+cleaned up when leaving the page.
+Scoped styles keep the design separate from the application theme. The boards
+and timers are labeled illustrations, not interactive controls or live data.
+Visiting as a guest does not request protected board data.
+
+Task examples render the product's `kanban/Task.vue` through
+`LandingTaskSample.vue`, using typed local data from `app/data/landingTasks.ts`.
+The preview wrapper is inert, with an accessible description outside the inert
+content. Priority, tags, descriptions, tracked time, and the paused timer dock
+come from the real component; no live board context or API mutations are used.
 
 After browser session restoration, authenticated visitors are redirected to
 `/boards`. The existing boards dashboard now lives there and remains protected
