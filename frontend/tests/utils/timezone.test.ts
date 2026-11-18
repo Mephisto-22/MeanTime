@@ -20,6 +20,14 @@ describe('getClientTimezone', () => {
     expect(getClientTimezone()).toBe('America/New_York')
   })
 
+  it('normalizes legacy ICU timezone IDs returned by Intl.DateTimeFormat to canonical IANA IDs', () => {
+    vi.spyOn(Intl, 'DateTimeFormat').mockReturnValue({
+      resolvedOptions: () => ({ timeZone: 'Asia/Calcutta' }),
+    } as unknown as Intl.DateTimeFormat)
+
+    expect(getClientTimezone()).toBe('Asia/Kolkata')
+  })
+
   it('falls back to UTC when resolvedOptions().timeZone is empty or undefined', () => {
     vi.spyOn(Intl, 'DateTimeFormat').mockReturnValue({
       resolvedOptions: () => ({ timeZone: '' }),
@@ -69,6 +77,51 @@ describe('getAvailableTimezones', () => {
     })
 
     expect(getAvailableTimezones(['America/New_York'])).toEqual(['America/New_York', 'UTC'])
+  })
+
+  it('normalizes all 18 legacy ICU/CLDR timezone IDs to modern canonical IANA IDs accepted by backend zoneinfo', () => {
+    vi.spyOn(Intl, 'supportedValuesOf').mockReturnValue([
+      'Africa/Asmera',
+      'America/Buenos_Aires',
+      'America/Catamarca',
+      'America/Cordoba',
+      'America/Godthab',
+      'America/Indianapolis',
+      'America/Jujuy',
+      'America/Louisville',
+      'America/Mendoza',
+      'Asia/Calcutta',
+      'Asia/Katmandu',
+      'Asia/Rangoon',
+      'Asia/Saigon',
+      'Atlantic/Faeroe',
+      'Europe/Kiev',
+      'Pacific/Enderbury',
+      'Pacific/Ponape',
+      'Pacific/Truk',
+    ])
+
+    expect(getAvailableTimezones()).toEqual([
+      'Africa/Asmara',
+      'America/Argentina/Buenos_Aires',
+      'America/Argentina/Catamarca',
+      'America/Argentina/Cordoba',
+      'America/Argentina/Jujuy',
+      'America/Argentina/Mendoza',
+      'America/Indiana/Indianapolis',
+      'America/Kentucky/Louisville',
+      'America/Nuuk',
+      'Asia/Ho_Chi_Minh',
+      'Asia/Kathmandu',
+      'Asia/Kolkata',
+      'Asia/Yangon',
+      'Atlantic/Faroe',
+      'Europe/Kyiv',
+      'Pacific/Chuuk',
+      'Pacific/Kanton',
+      'Pacific/Pohnpei',
+      'UTC',
+    ])
   })
 })
 

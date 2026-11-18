@@ -76,15 +76,16 @@
           <!-- Row 3: Timezone (Editable) -->
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
             <div class="flex flex-col sm:w-1/3">
-              <label for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
+              <label id="label-timezone" for="input-timezone" class="text-sm font-medium text-surface-900 dark:text-surface-100">Timezone</label>
               <span class="text-xs text-surface-500 dark:text-surface-400">Used for timer logs and daily summaries</span>
             </div>
             <div class="flex flex-1 items-center justify-between gap-4">
               <div class="flex-1">
                 <Select
                   v-if="isEditingTimezone"
-                  id="input-timezone"
                   v-model="draftTimezone"
+                  label-id="input-timezone"
+                  aria-labelledby="label-timezone"
                   data-testid="input-timezone"
                   :options="timezoneOptions"
                   filter

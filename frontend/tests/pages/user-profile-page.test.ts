@@ -124,9 +124,15 @@ describe('UserProfilePage Redesign Suite', () => {
     const selectComp = wrapper.findComponent({ name: 'Select' })
     expect(selectComp.exists()).toBe(true)
     expect(selectComp.props('filter')).toBe(true)
+    expect(selectComp.props('labelId')).toBe('input-timezone')
+    expect(selectComp.props('ariaLabelledby')).toBe('label-timezone')
+    expect(wrapper.find('label#label-timezone[for="input-timezone"]').exists()).toBe(true)
+    const combobox = selectComp.find('[role="combobox"]')
+    expect(combobox.attributes('id')).toBe('input-timezone')
+    expect(combobox.attributes('aria-labelledby')).toBe('label-timezone')
     expect(selectComp.props('modelValue')).toBe('America/New_York')
     expect(selectComp.props('options')).toEqual(
-      expect.arrayContaining(['UTC', 'America/New_York', 'Europe/London']),
+      expect.arrayContaining(['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Europe/Kyiv']),
     )
 
     // Selecting a new timezone and canceling restores original timezone on next edit
