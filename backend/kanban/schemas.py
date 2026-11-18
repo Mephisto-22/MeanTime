@@ -4,9 +4,8 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
-from typing import Literal
 from users.schemas import UserOut
-from .models import TaskPriority, TimerMode, TimerState, RecurrenceCadence
+from .models import BoardMembership, TaskPriority, TimerMode, TimerState, RecurrenceCadence
 
 # Timer schemas
 class TaskTimerOut(Schema):
@@ -318,7 +317,7 @@ class BoardIn(Schema):
 
 class BoardCollaboratorOut(UserOut):
     """A board member's public profile and board-specific role."""
-    role: Literal["EDITOR", "VIEWER"]
+    role: BoardMembership.Role
 
 class BoardOut(Schema):
     """Shape of a board returned to clients."""
@@ -350,7 +349,7 @@ class TaskMoveIn(Schema):
 class BoardShareIn(Schema):
     """Payload expected when sharing a board with a friend."""
     friend_id: int
-    role: Literal["EDITOR", "VIEWER"] = "EDITOR"
+    role: BoardMembership.Role = BoardMembership.Role.EDITOR
 
 
 # Tag Schemas
