@@ -8,6 +8,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from .api import get_accessible_boards, reconcile_expired_countdowns
+from .breakdown_analytics import TimeBreakdownOut, time_breakdown
 from .models import TaskTimeEntry
 
 router = Router(tags=["Analytics"])
@@ -45,6 +46,8 @@ class DailyTimeOut(Schema):
     timezone: str
     total_seconds: int
     days: list[DayTimeOut]
+    # The range's time per tag and per priority.
+    breakdown: TimeBreakdownOut
 
 
 def serialize_entry(entry: TaskTimeEntry) -> dict:
@@ -99,8 +102,10 @@ def get_daily_time(request, start: date | None = None, end: date | None = None):
     )
 
     entries_by_day = defaultdict(list)
+    seconds_by_task = defaultdict(int)
     for entry in entries:
         entries_by_day[entry.started_at.astimezone(tz).date()].append(entry)
+        seconds_by_task[entry.task_id] += entry.duration_seconds
 
     days = []
     for offset in range(span_days):
@@ -118,4 +123,5 @@ def get_daily_time(request, start: date | None = None, end: date | None = None):
         "timezone": user.timezone,
         "total_seconds": sum(day["total_seconds"] for day in days),
         "days": days,
+        "breakdown": time_breakdown(seconds_by_task),
     }

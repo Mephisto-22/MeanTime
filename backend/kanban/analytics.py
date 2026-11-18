@@ -11,6 +11,7 @@ from ninja import Query, Router, Schema
 
 from .api import get_accessible_boards, reconcile_expired_countdowns
 from .average_analytics import TaskAveragesOut, task_averages
+from .breakdown_analytics import TimeBreakdownOut, time_breakdown
 from .models import Board, BoardColumn, Tag, Task, TaskTimeEntry
 
 router = Router(tags=["Analytics"])
@@ -43,7 +44,8 @@ class CollaboratorTimeOut(Schema):
 
 
 class BoardAnalyticsOut(Schema):
-    """Tracked time on a board: in total, per column, for its top tasks, on average and per person."""
+    """Tracked time on a board: in total, per column, for its top tasks, on average, per person,
+    per tag and per priority."""
     board_id: int
     title: str
     is_shared: bool
@@ -53,6 +55,7 @@ class BoardAnalyticsOut(Schema):
     top_tasks: list[TaskTimeOut]
     averages: TaskAveragesOut
     collaborators: list[CollaboratorTimeOut]
+    breakdown: TimeBreakdownOut
     # The names of the tags used on the board, for the tag filter. Not filtered.
     tags: list[str]
 
@@ -188,5 +191,6 @@ def get_board_analytics(
         ],
         "averages": task_averages(tracked_tasks),
         "collaborators": collaborator_totals(board, tasks),
+        "breakdown": time_breakdown({task.id: task.total_seconds for task in tracked_tasks}),
         "tags": list(tag_names),
     }

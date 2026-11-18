@@ -58,6 +58,10 @@ function dailyFixture(overrides: Partial<DailyTimeDto> = {}): DailyTimeDto {
       { day: '2026-11-10', totalSeconds: 0, entries: [] },
       { day: '2026-11-11', totalSeconds: 5400, entries: [entry(2, 'Write tests', '2026-11-11T13:00:00Z', 5400)] },
     ],
+    breakdown: {
+      tags: [{ name: 'tests', totalSeconds: 5400 }, { name: null, totalSeconds: 3600 }],
+      priorities: [{ name: 'HIGH', totalSeconds: 5400 }, { name: null, totalSeconds: 3600 }],
+    },
     ...overrides,
   }
 }
@@ -110,6 +114,17 @@ describe('Personal analytics page (/analytics)', () => {
     expect(days[0]!.text()).toContain('Write tests')
     expect(days[1]!.text()).toContain('Plan sprint')
     expect(wrapper.find('[data-testid="day-select"]').exists()).toBe(false)
+  })
+
+  it('shows the range\'s time per tag and per priority (#191)', async () => {
+    vi.spyOn(analyticsApi, 'getDailyTime').mockResolvedValue(dailyFixture())
+
+    const wrapper = await mountPage()
+
+    const tagChart = wrapper.find('[data-testid="breakdown-tags"]').findComponent(ChartStub)
+    expect(tagChart.props('data').labels).toEqual(['tests', 'None'])
+    const priorityChart = wrapper.find('[data-testid="breakdown-priorities"]').findComponent(ChartStub)
+    expect(priorityChart.props('data').labels).toEqual(['High', 'None'])
   })
 
   describe('entry limit', () => {

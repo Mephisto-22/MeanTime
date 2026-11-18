@@ -38,7 +38,23 @@ export interface CollaboratorTimeDto {
   totalSeconds: number
 }
 
-/** Tracked time on a board: in total, per column, for its top tasks, on average and per person. */
+/** Tracked time in one tag or priority group. A null name is the "None" group. */
+export interface BreakdownRowDto {
+  name: string | null
+  totalSeconds: number
+}
+
+/**
+ * Tracked time per tag (most first, "None" last) and per priority (HIGH,
+ * MEDIUM, LOW, then "None"). A task with several tags counts toward each, so
+ * the tag totals can add up to more than the overall total.
+ */
+export interface TimeBreakdownDto {
+  tags: BreakdownRowDto[]
+  priorities: BreakdownRowDto[]
+}
+
+/** Tracked time on a board: in total, per column, for its top tasks, on average, per person, tag and priority. */
 export interface BoardAnalyticsDto {
   boardId: number
   title: string
@@ -48,6 +64,7 @@ export interface BoardAnalyticsDto {
   topTasks: TaskTimeDto[]
   averages: TaskAveragesDto
   collaborators: CollaboratorTimeDto[]
+  breakdown: TimeBreakdownDto
   /** The names of the tags used on the board, for the tag filter. */
   tags: string[]
 }
@@ -89,6 +106,8 @@ export interface DailyTimeDto {
   timezone: string
   totalSeconds: number
   days: DayTimeDto[]
+  /** The range's time per tag and per priority. */
+  breakdown: TimeBreakdownDto
 }
 
 /** An inclusive range of days, written as YYYY-MM-DD. */
