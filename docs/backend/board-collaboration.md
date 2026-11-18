@@ -56,6 +56,7 @@ Each event contains a common envelope:
 - `column.created`, `column.updated`, `column.deleted`
 - `task.created`, `task.updated`, `task.deleted`, `task.moved`
 - `task.timer_updated`
+- `chat.message_created`
 
 The frontend applies incoming events to the open board. If the connection is
 interrupted, it reconnects and refreshes board data after reconnecting. The stream is

@@ -6,8 +6,10 @@ from users.authentication import AppJWTAuth
 from users.api import auth_router, users_router
 from users.oauth import oauth_router
 
+from chat.api import chat_router
 from kanban.analytics import router as analytics_router
 from kanban.api import router as kanban_router
+from kanban.personal_analytics import router as personal_analytics_router
 
 
 api = NinjaAPI(
@@ -20,6 +22,7 @@ api = NinjaAPI(
 # router registrations (import above)
 api.add_router("/kanban", kanban_router)
 api.add_router("/kanban", analytics_router)
+api.add_router("/analytics", personal_analytics_router)
 
 @api.exception_handler(APIException)
 def api_exception_handler(request, exc):
@@ -45,6 +48,7 @@ def api_exception_handler(request, exc):
 api.add_router("/auth", auth_router, tags=["Authentication"])
 api.add_router("/auth/oauth", oauth_router, tags=["Authentication"])
 api.add_router("/users", users_router, tags=["Users"])
+api.add_router("/chat", chat_router, tags=["Chat"])
 
 
 class HealthResponse(Schema):

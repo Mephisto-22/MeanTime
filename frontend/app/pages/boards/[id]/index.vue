@@ -70,7 +70,7 @@
           <Button
             as="router-link"
             :to="`/boards/${board.id}/analytics`"
-            label="Analytics"
+            label="Stats"
             icon="pi pi-chart-bar"
             severity="secondary"
             data-testid="board-analytics-link"

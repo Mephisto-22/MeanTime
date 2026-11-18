@@ -2,7 +2,7 @@
   <div class="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 data-testid="analytics-title" class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-        {{ analytics ? `${analytics.title} analytics` : 'Board analytics' }}
+        Board Stats
       </h1>
       <Button
         as="router-link"
@@ -55,7 +55,7 @@
 
     <!-- No tracked time yet -->
     <Message
-      v-else-if="analytics && analytics.totalSeconds === 0"
+      v-else-if="analytics && analytics.totalSeconds === 0 && !hasFilters"
       data-testid="analytics-empty"
       severity="secondary"
       icon="pi pi-clock"
@@ -63,12 +63,28 @@
       No time has been tracked on this board yet. Start a timer or log past work on a task to see it here.
     </Message>
 
-    <BoardAnalyticsSummary v-else-if="analytics" :analytics="analytics" />
+    <template v-else-if="analytics">
+      <BoardAnalyticsFilters
+        v-model:timer-mode="timerMode"
+        v-model:tags="tags"
+        :available-tags="analytics.tags"
+      />
+      <Message
+        v-if="analytics.totalSeconds === 0"
+        data-testid="analytics-filtered-empty"
+        severity="secondary"
+        icon="pi pi-filter"
+      >
+        No tracked time matches these filters.
+      </Message>
+      <BoardAnalyticsSummary v-else :analytics="analytics" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import {analyticsApi} from '~/api/analytics';
+import {analyticsApi, type TimerModeFilter} from '~/api/analytics';
+import BoardAnalyticsFilters from '~/components/analytics/BoardAnalyticsFilters.vue';
 import BoardAnalyticsSummary from '~/components/analytics/BoardAnalyticsSummary.vue';
 
 // Board ids are whole numbers; anything else gets Nuxt's 404 page without
@@ -80,6 +96,11 @@ definePageMeta({
 const route = useRoute();
 const notify = useNotifications();
 
+// Every card follows these; changing one fetches the analytics again.
+const timerMode = ref<TimerModeFilter>('ALL');
+const tags = ref<string[]>([]);
+const hasFilters = computed(() => timerMode.value !== 'ALL' || tags.value.length > 0);
+
 const {
   data: analytics,
   status,
@@ -87,7 +108,11 @@ const {
   refresh,
 } = await useAsyncData(
   () => `board-analytics-${route.params.id}`,
-  () => analyticsApi.getBoardAnalytics(String(route.params.id)),
+  () => analyticsApi.getBoardAnalytics(String(route.params.id), {
+    timerMode: timerMode.value,
+    tags: tags.value,
+  }),
+  {watch: [timerMode, tags]},
 );
 
 // The backend answers 404 both for boards that don't exist and for boards

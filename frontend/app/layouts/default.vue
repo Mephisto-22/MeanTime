@@ -88,6 +88,7 @@ const isBoardsActive = computed(
 const isFriendsActive = computed(
   () => route.path === '/friends' || route.path.startsWith('/friends/')
 )
+const isAnalyticsActive = computed(() => route.path === '/analytics')
 
 const menuItems = computed(() => {
   if (!authStore.isAuthenticated) return []
@@ -107,6 +108,13 @@ const menuItems = computed(() => {
       testId: 'friends-nav-link',
       badge: pendingIncomingCount.value > 0 ? pendingIncomingCount.value : undefined,
       badgeTestId: 'friends-pending-badge',
+    },
+    {
+      label: 'Analytics',
+      icon: 'pi pi-chart-bar',
+      route: '/analytics',
+      active: isAnalyticsActive.value,
+      testId: 'analytics-nav-link',
     },
   ]
 })
