@@ -135,8 +135,8 @@ const onUpdate = (event: any) => {
   if (!props.draggable) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const targetPosition = event.newDraggableIndex ?? event.newIndex
-  if (taskId !== undefined && targetPosition !== undefined && kanbanContext) {
-    kanbanContext.moveTask({
+  if (taskId !== undefined && targetPosition !== undefined) {
+    kanbanContext?.moveTask?.({
       taskId,
       fromColumnId: props.column.id,
       toColumnId: props.column.id,
@@ -153,8 +153,8 @@ const onAdd = (event: any) => {
     event.from?.closest('[data-column-id]')?.getAttribute('data-column-id')
   const targetPosition = event.newDraggableIndex ?? event.newIndex
 
-  if (taskId !== undefined && fromColumnId !== undefined && targetPosition !== undefined && kanbanContext) {
-    kanbanContext.moveTask({
+  if (taskId !== undefined && fromColumnId !== undefined && targetPosition !== undefined) {
+    kanbanContext?.moveTask?.({
       taskId,
       fromColumnId,
       toColumnId: props.column.id,

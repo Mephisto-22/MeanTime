@@ -6,6 +6,7 @@ import { kanbanApi, type KanbanBoardDto, type TaskFeedItemDto, type TaskTimerDto
 import HomePage from '~/pages/index.vue'
 import { useAuthStore } from '~/stores/auth'
 import {
+  AppDialogStub,
   createBoardFixture,
   createColumnFixture,
   createTagFixture,
@@ -19,13 +20,6 @@ import {
   ToggleSwitchStub,
 } from '../fixtures'
 
-const HomeDialogStub = {
-  name: 'Dialog',
-  inheritAttrs: false,
-  props: ['visible', 'header'],
-  template: '<div v-if="visible" v-bind="$attrs" class="p-dialog" :data-header="header"><slot /><slot name="footer" /></div>',
-}
-
 let mountedWrappers: VueWrapper[] = []
 
 async function mountHomePage() {
@@ -33,7 +27,7 @@ async function mountHomePage() {
     route: '/',
     global: {
       stubs: {
-        Dialog: HomeDialogStub,
+        Dialog: AppDialogStub,
         Popover: PopoverStub,
         Select: SelectStub,
         ToggleSwitch: ToggleSwitchStub,
@@ -310,7 +304,7 @@ describe('Home Page (/) with Task Feed', () => {
         startedAt: '2026-11-18T10:00:00Z',
         endedAt: '2026-11-18T10:02:00Z',
         durationSeconds: 120,
-        note: 'Continuous stopwatch session',
+        note: 'Continuous focus timer session',
       },
     ])
 
@@ -627,5 +621,47 @@ describe('Home Page (/) with Task Feed', () => {
     const visibleTasks = rail.findAll('[data-testid="kanban-task"]')
     expect(visibleTasks).toHaveLength(1)
     expect(visibleTasks[0]!.text()).toContain('Prepare release checklist')
+  })
+
+  it('does not change Most Recent order when inspecting an older task with unchanged time entry total', async () => {
+    const { boards, feedTasks } = buildSampleData()
+    feedTasks[0]!.updatedAt = '2026-11-18T10:00:00Z'
+    feedTasks[0]!.totalSeconds = 300
+    boards[0]!.columns[0]!.tasks[0]!.updatedAt = '2026-11-18T10:00:00Z'
+    boards[0]!.columns[0]!.tasks[0]!.totalSeconds = 300
+
+    feedTasks[1]!.updatedAt = '2026-11-18T12:00:00Z'
+    boards[1]!.columns[0]!.tasks[0]!.updatedAt = '2026-11-18T12:00:00Z'
+
+    vi.spyOn(kanbanApi, 'listBoards').mockResolvedValue(boards)
+    vi.spyOn(kanbanApi, 'listTaskFeed').mockResolvedValue(feedTasks)
+    const listEntriesSpy = vi.spyOn(kanbanApi, 'listTimeEntries').mockResolvedValue([
+      {
+        id: 701,
+        taskId: 101,
+        startedAt: '2026-11-18T09:00:00Z',
+        endedAt: '2026-11-18T09:05:00Z',
+        durationSeconds: 300,
+        note: 'Existing focus session',
+      },
+    ])
+
+    const wrapper = await mountHomePage()
+    const rail = wrapper.find('[data-testid="task-feed-rail"]')
+    const visibleIds = () =>
+      rail.findAll('[data-testid="kanban-task"]').map(el => el.attributes('data-task-id'))
+
+    expect(visibleIds()).toEqual(['102', '101'])
+
+    await rail.find('[data-task-id="101"]').trigger('click')
+    await flushPromises()
+
+    expect(listEntriesSpy).toHaveBeenCalledWith(101)
+    expect(wrapper.find('[data-testid="task-dialog"]').exists()).toBe(true)
+    expect(visibleIds()).toEqual(['102', '101'])
+
+    await wrapper.find('[data-testid="task-cancel-button"]').trigger('click')
+    await flushPromises()
+    expect(visibleIds()).toEqual(['102', '101'])
   })
 })

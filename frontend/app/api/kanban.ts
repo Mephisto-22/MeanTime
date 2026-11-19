@@ -287,10 +287,10 @@ export interface KanbanContext {
   isShared?: ComputedRef<boolean>
   boardMembers?: ComputedRef<UserOut[]>
   createTag?: (payload: { name: string } | string) => Promise<TagDto>
-  moveTask: (req: TaskMoveContext) => Promise<void> | void
-  openCreateTaskDialog: (columnId: string | number) => void
+  moveTask?: (req: TaskMoveContext) => Promise<void> | void
+  openCreateTaskDialog?: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void
-  createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
+  createTask?: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto> & { applyToFuture?: boolean }) => Promise<void> | void
   deleteTask: (taskId: string | number, options?: { cancelRecurrence?: boolean }) => Promise<void> | void
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void

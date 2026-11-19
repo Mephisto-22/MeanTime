@@ -99,10 +99,11 @@ import ChatSidebar from '~/components/chat/ChatSidebar.vue'
 import { useBoardChat } from '~/composables/useBoardChat'
 import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
 import {
-  applyTaskUpdates,
   getBoardMembers,
   isBoardShared,
+  reindexTasks,
   sameId,
+  syncTaskFields,
   useKanbanTaskActions,
 } from '~/composables/useKanbanTaskActions'
 
@@ -407,12 +408,6 @@ onBeforeUnmount(() => {
   boardEvents.stop()
 })
 
-const reindexTasks = (tasks: KanbanTaskDto[]): void => {
-  tasks.forEach((t, i) => {
-    t.position = i
-  })
-}
-
 const insertTaskAtPosition = (
   tasks: KanbanTaskDto[],
   task: KanbanTaskDto,
@@ -588,13 +583,7 @@ const handleCreateTask = async (
           createdTask.columnId ?? optimisticLocation.task.columnId
         optimisticLocation.task.position =
           createdTask.position ?? optimisticLocation.task.position
-        applyTaskUpdates(optimisticLocation.task, createdTask)
-        if (createdTask.recurringTaskId !== undefined) {
-          optimisticLocation.task.recurringTaskId = createdTask.recurringTaskId
-        }
-        if (createdTask.recurringTask !== undefined) {
-          optimisticLocation.task.recurringTask = createdTask.recurringTask
-        }
+        syncTaskFields(optimisticLocation.task, createdTask)
       }
     }
   } catch (err) {

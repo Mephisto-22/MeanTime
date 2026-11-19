@@ -9,7 +9,9 @@ import {
   applyTaskUpdates,
   getBoardMembers,
   isBoardShared,
+  reindexTasks,
   sameId,
+  syncTaskFields,
   useKanbanTaskActions,
   type KanbanTaskActionsOptions,
 } from '~/composables/useKanbanTaskActions'
@@ -140,8 +142,32 @@ describe('useKanbanTaskActions pure helpers', () => {
     expect(isBoardShared(sharedByCollab)).toBe(true)
     expect(getBoardMembers(sharedByCollab)).toEqual([owner, collab])
 
-    const sharedAsGuest = { ...createBoardFixture({ isOwner: false }), collaborators: [] }
-    expect(isBoardShared(sharedAsGuest)).toBe(true)
+    const sharedAsCollaborator = { ...createBoardFixture({ isOwner: false }), collaborators: [] }
+    expect(isBoardShared(sharedAsCollaborator)).toBe(true)
+  })
+
+  it('reindexTasks assigns sequential positions and syncTaskFields copies shared metadata', () => {
+    const first = createTaskFixture({ id: 't-1', position: 5 })
+    const second = createTaskFixture({ id: 't-2', position: 9 })
+    reindexTasks([first, second])
+    expect(first.position).toBe(0)
+    expect(second.position).toBe(1)
+
+    const target = createTaskFixture({ id: 't-sync', title: 'Old', totalSeconds: 10 })
+    syncTaskFields(target, {
+      title: 'Synced',
+      totalSeconds: 120,
+      updatedAt: '2026-11-18T14:00:00Z',
+      reminderAt: '2026-11-19T10:00:00Z',
+      reminderSentAt: null,
+      recurringTaskId: 7,
+    })
+    expect(target.title).toBe('Synced')
+    expect(target.totalSeconds).toBe(120)
+    expect(target.updatedAt).toBe('2026-11-18T14:00:00Z')
+    expect(target.reminderAt).toBe('2026-11-19T10:00:00Z')
+    expect(target.reminderSentAt).toBeNull()
+    expect(target.recurringTaskId).toBe(7)
   })
 })
 
@@ -539,7 +565,7 @@ describe('useKanbanTaskActions timer lifecycle', () => {
     expect(task.timer?.elapsedSeconds).toBe(0)
     expect(task.timeEntries).toEqual([entry])
     expect(task.totalSeconds).toBe(70)
-    expect(onAfterTaskTotalChange).toHaveBeenCalledWith('t-stop', 70)
+    expect(onAfterTaskTotalChange).toHaveBeenCalledWith('t-stop', 70, true)
 
     // Duplicate call within 2000ms is debounced
     task.timer!.state = 'RUNNING'
@@ -572,7 +598,16 @@ describe('useKanbanTaskActions timer lifecycle', () => {
     actions.setTaskTotal('t-exp', 300)
     expect(task.timeEntries).toEqual(entries)
     expect(task.totalSeconds).toBe(300)
-    expect(onAfterTaskTotalChange).toHaveBeenCalledWith('t-exp', 300)
+    expect(onAfterTaskTotalChange).toHaveBeenCalledWith('t-exp', 300, true)
+
+    actions.setTaskTotal('t-exp', 300)
+    expect(onAfterTaskTotalChange).toHaveBeenLastCalledWith('t-exp', 300, false)
+
+    const unsetTotalTask = createTaskFixture({ id: 't-unset', title: 'Unset Total' })
+    tasks.value.push(unsetTotalTask)
+    actions.setTaskTotal('t-unset', 0)
+    expect(unsetTotalTask.totalSeconds).toBe(0)
+    expect(onAfterTaskTotalChange).toHaveBeenLastCalledWith('t-unset', 0, false)
 
     const emitSpy = vi.spyOn(ToastEventBus, 'emit')
     emitSpy.mockClear()

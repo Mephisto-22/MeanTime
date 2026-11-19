@@ -50,7 +50,7 @@
             size="small"
             :severity="activeFilterCount > 0 ? 'primary' : 'secondary'"
             :variant="activeFilterCount > 0 ? undefined : 'outlined'"
-            class="!px-2 !text-xs"
+            class="px-2 text-xs"
             aria-label="Filter tasks"
             @click="toggleFilterPopover"
           >
@@ -139,7 +139,7 @@
                 :key="`p-${priority}`"
                 :label="`Priority: ${priorityLabel(priority)}`"
                 removable
-                class="!py-0.5 !px-2 !text-[11px]"
+                class="py-0.5 px-2 text-[11px]"
                 @remove="togglePriorityFilter(priority)"
               />
               <Chip
@@ -147,7 +147,7 @@
                 :key="`t-${tag}`"
                 :label="`Tag: ${tag === TASK_FEED_UNTAGGED_VALUE ? 'Untagged' : tag}`"
                 removable
-                class="!py-0.5 !px-2 !text-[11px]"
+                class="py-0.5 px-2 text-[11px]"
                 @remove="toggleTagFilter(tag)"
               />
               <Button
@@ -157,7 +157,7 @@
                 severity="secondary"
                 text
                 size="small"
-                class="!py-0.5 !px-1.5 !text-[11px]"
+                class="py-0.5 px-1.5 text-[11px]"
                 @click="resetFilters"
               />
             </div>
@@ -210,7 +210,7 @@
               :severity="selectedPriorities.includes(opt.value) ? 'primary' : 'secondary'"
               :variant="selectedPriorities.includes(opt.value) ? undefined : 'outlined'"
               :aria-pressed="selectedPriorities.includes(opt.value)"
-              class="!justify-start !text-xs"
+              class="justify-start text-xs"
               @click="togglePriorityFilter(opt.value)"
             >
               <span class="h-2 w-2 rounded-full shrink-0" :class="opt.dotClass" />

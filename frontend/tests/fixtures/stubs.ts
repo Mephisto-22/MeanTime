@@ -123,6 +123,13 @@ export const NuxtLinkStub = {
   template: '<a :href="typeof to === \'string\' ? to : undefined" @click="$event.preventDefault()"><slot /></a>',
 }
 
+export const AppDialogStub = {
+  name: 'Dialog',
+  inheritAttrs: false,
+  props: ['visible', 'header'],
+  template: '<div v-if="visible" v-bind="$attrs" class="p-dialog" :data-header="header"><slot /><slot name="footer" /></div>',
+}
+
 export const PopoverStub = {
   name: 'Popover',
   inheritAttrs: false,

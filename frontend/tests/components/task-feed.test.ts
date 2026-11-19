@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
-import { describe, expect, it, vi } from 'vitest'
-import { computed, nextTick } from 'vue'
+import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import { kanbanContextKey, type TagDto, type TaskFeedItemDto } from '~/api/kanban'
 import TaskFeed from '~/components/kanban/TaskFeed.vue'
 import {
+  createKanbanContextMock,
   createTagFixture,
   createTaskFeedItemFixture,
   PopoverStub,
@@ -21,19 +22,7 @@ function mountTaskFeed(
   } = {},
   slots: Record<string, any> = {},
 ) {
-  const kanbanContext = {
-    columns: computed(() => []),
-    availableTags: computed(() => []),
-    openCreateTaskDialog: vi.fn(),
-    openEditTaskDialog: vi.fn(),
-    moveTask: vi.fn(),
-    createTask: vi.fn(),
-    updateTask: vi.fn(),
-    deleteTask: vi.fn(),
-    startTimer: vi.fn(),
-    pauseTimer: vi.fn(),
-    stopTimer: vi.fn(),
-  }
+  const kanbanContext = createKanbanContextMock()
 
   const wrapper = mount(TaskFeed, {
     props: {

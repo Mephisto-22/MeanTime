@@ -150,12 +150,12 @@ import {
 import KanbanTaskDialog from '~/components/kanban/TaskDialog.vue'
 import KanbanTaskFeed from '~/components/kanban/TaskFeed.vue'
 import {
-  applyTaskUpdates,
   getBoardMembers,
   isBoardShared,
   sameId,
   useKanbanTaskActions,
 } from '~/composables/useKanbanTaskActions'
+import { useTaskFeedSync } from '~/composables/useTaskFeedSync'
 
 const notify = useNotifications()
 
@@ -236,70 +236,12 @@ const activeBoardColumns = computed<KanbanColumnSummary[]>(() => {
 const activeBoardIsShared = computed(() => isBoardShared(activeBoard.value))
 const activeBoardMembers = computed(() => getBoardMembers(activeBoard.value))
 
-const reindexTasks = (tasks: KanbanTaskDto[]): void => {
-  tasks.forEach((task, index) => {
-    task.position = index
-  })
-}
-
-const findFeedTask = (taskId: string | number): TaskFeedItemDto | undefined => {
-  return feedTasks.value.find(task => sameId(task.id, taskId))
-}
-
-const findBoardTaskLocation = (taskId: string | number, boardId?: string | number) => {
-  const targetBoards = boardId != null
-    ? boards.value.filter(board => sameId(board.id, boardId))
-    : boards.value
-  for (const board of targetBoards) {
-    for (const column of board.columns || []) {
-      const index = (column.tasks || []).findIndex(task => sameId(task.id, taskId))
-      if (index !== -1) {
-        return {
-          board,
-          column,
-          index,
-          task: column.tasks[index]!,
-        }
-      }
-    }
-  }
-  return undefined
-}
-
-const syncUpdatedTask = (feedTask: TaskFeedItemDto, updatedFromServer?: KanbanTaskDto): void => {
-  const timestamp = updatedFromServer?.updatedAt ?? new Date().toISOString()
-  feedTask.updatedAt = timestamp
-  if (updatedFromServer?.totalSeconds !== undefined) {
-    feedTask.totalSeconds = updatedFromServer.totalSeconds
-  }
-  if (updatedFromServer?.reminderAt !== undefined) {
-    feedTask.reminderAt = updatedFromServer.reminderAt
-  }
-  if (updatedFromServer?.reminderSentAt !== undefined) {
-    feedTask.reminderSentAt = updatedFromServer.reminderSentAt
-  }
-
-  const parentBoard = boards.value.find(board => sameId(board.id, feedTask.boardId))
-  const matchedColumn = parentBoard?.columns?.find(col => sameId(col.id, feedTask.columnId))
-  if (matchedColumn) {
-    feedTask.columnTitle = matchedColumn.title
-  }
-
-  const boardLocation = findBoardTaskLocation(feedTask.id, feedTask.boardId)
-  if (boardLocation) {
-    const boardTask = boardLocation.task
-    applyTaskUpdates(boardTask, feedTask)
-    boardTask.columnId = feedTask.columnId
-    boardTask.position = feedTask.position
-    boardTask.totalSeconds = feedTask.totalSeconds
-    boardTask.updatedAt = timestamp
-    boardTask.recurringTaskId = feedTask.recurringTaskId
-    boardTask.recurringTask = feedTask.recurringTask
-    boardTask.reminderAt = feedTask.reminderAt
-    boardTask.reminderSentAt = feedTask.reminderSentAt
-    boardTask.timer = feedTask.timer ? { ...feedTask.timer } : null
-  }
-}
+const taskFeedSync = useTaskFeedSync({
+  boards,
+  feedTasks,
+  userTags,
+  activeTask,
+})
 
 const {
   updateTask,
@@ -312,98 +254,15 @@ const {
   setTaskTotal,
   handleTimerExpired,
 } = useKanbanTaskActions({
-  findTask: findFeedTask,
+  findTask: taskFeedSync.findFeedTask,
   availableTags: activeBoardTags,
-  createSnapshot: () => {
-    const feedSnapshot = JSON.parse(JSON.stringify(feedTasks.value)) as TaskFeedItemDto[]
-    const boardsSnapshot = JSON.parse(JSON.stringify(boards.value)) as KanbanBoardDto[]
-    const activeTaskId = activeTask.value?.id
-    return () => {
-      feedTasks.value = feedSnapshot
-      boards.value = boardsSnapshot
-      if (activeTaskId != null) {
-        activeTask.value = feedTasks.value.find(t => sameId(t.id, activeTaskId)) ?? null
-      }
-    }
-  },
-  moveTaskLocally: (task, destinationColumnId) => {
-    const feedTask = task as TaskFeedItemDto
-    const board = boards.value.find(b => sameId(b.id, feedTask.boardId))
-    const destCol = board?.columns?.find(col => sameId(col.id, destinationColumnId))
-    if (!board || !destCol) return null
-
-    feedTask.columnId = destCol.id
-    feedTask.columnTitle = destCol.title
-
-    let existingBoardTask: KanbanTaskDto | undefined
-    for (const col of board.columns) {
-      const idx = (col.tasks || []).findIndex(t => sameId(t.id, feedTask.id))
-      if (idx !== -1) {
-        existingBoardTask = col.tasks.splice(idx, 1)[0]
-        reindexTasks(col.tasks)
-        break
-      }
-    }
-
-    if (!destCol.tasks) destCol.tasks = []
-    const targetPosition = destCol.tasks.length
-    const movedBoardTask: KanbanTaskDto = existingBoardTask
-      ? { ...existingBoardTask, columnId: destCol.id, position: targetPosition }
-      : { ...feedTask, columnId: destCol.id, position: targetPosition }
-    destCol.tasks.push(movedBoardTask)
-    reindexTasks(destCol.tasks)
-    feedTask.position = targetPosition
-    return targetPosition
-  },
-  removeTaskLocally: (taskId) => {
-    const feedIndex = feedTasks.value.findIndex(t => sameId(t.id, taskId))
-    if (feedIndex === -1) return false
-    const [removed] = feedTasks.value.splice(feedIndex, 1)
-    if (removed) {
-      const location = findBoardTaskLocation(taskId, removed.boardId)
-      if (location) {
-        location.column.tasks.splice(location.index, 1)
-        reindexTasks(location.column.tasks)
-      }
-    }
-    if (activeTask.value && sameId(activeTask.value.id, taskId)) {
-      activeTask.value = null
-    }
-    return true
-  },
-  onAfterTaskUpdate: (task, updatedFromServer) => {
-    syncUpdatedTask(task as TaskFeedItemDto, updatedFromServer)
-  },
-  onAfterTagCreate: (created) => {
-    const exists = userTags.value.some(
-      tag => sameId(tag.id, created.id) || tag.name.toLowerCase() === created.name.toLowerCase(),
-    )
-    if (!exists) {
-      userTags.value = [...userTags.value, created]
-    }
-  },
-  onAfterTimerChange: (task) => {
-    const feedTask = task as TaskFeedItemDto
-    const timestamp = new Date().toISOString()
-    feedTask.updatedAt = timestamp
-    const boardTask = findBoardTaskLocation(feedTask.id, feedTask.boardId)?.task
-    if (boardTask) {
-      boardTask.timer = feedTask.timer ? { ...feedTask.timer } : null
-      boardTask.updatedAt = timestamp
-    }
-  },
-  onAfterTaskTotalChange: (taskId, totalSeconds) => {
-    const timestamp = new Date().toISOString()
-    const feedTask = findFeedTask(taskId)
-    if (feedTask) {
-      feedTask.updatedAt = timestamp
-    }
-    const boardTask = findBoardTaskLocation(taskId, feedTask?.boardId)?.task
-    if (boardTask) {
-      boardTask.totalSeconds = totalSeconds
-      boardTask.updatedAt = timestamp
-    }
-  },
+  createSnapshot: taskFeedSync.createSnapshot,
+  moveTaskLocally: taskFeedSync.moveTaskLocally,
+  removeTaskLocally: taskFeedSync.removeTaskLocally,
+  onAfterTaskUpdate: taskFeedSync.onAfterTaskUpdate,
+  onAfterTagCreate: taskFeedSync.onAfterTagCreate,
+  onAfterTimerChange: taskFeedSync.onAfterTimerChange,
+  onAfterTaskTotalChange: taskFeedSync.onAfterTaskTotalChange,
 })
 
 const openEditTaskDialog = (task: KanbanTaskDto): void => {
@@ -437,10 +296,7 @@ provide(kanbanContextKey, {
   isShared: activeBoardIsShared,
   boardMembers: activeBoardMembers,
   createTag,
-  moveTask: () => {},
-  openCreateTaskDialog: () => {},
   openEditTaskDialog,
-  createTask: () => {},
   updateTask,
   deleteTask,
   startTimer,

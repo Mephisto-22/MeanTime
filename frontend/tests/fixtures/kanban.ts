@@ -1,4 +1,15 @@
-import type { KanbanBoardDto, KanbanColumnDto, KanbanTaskDto, TagDto, TaskFeedItemDto } from '~/api/kanban'
+import { vi } from 'vitest'
+import { computed } from 'vue'
+import type { UserOut } from '~/api/friends'
+import type {
+  KanbanBoardDto,
+  KanbanColumnDto,
+  KanbanColumnSummary,
+  KanbanContext,
+  KanbanTaskDto,
+  TagDto,
+  TaskFeedItemDto,
+} from '~/api/kanban'
 
 let nextTaskId = 1
 let nextColumnId = 1
@@ -83,4 +94,26 @@ export const DialogStub = {
   name: 'Dialog',
   props: ['visible', 'header'],
   template: '<div v-if="visible" data-testid="task-dialog" class="p-dialog" :data-header="header"><slot /></div>',
+}
+
+export function createKanbanContextMock(overrides: Partial<KanbanContext> = {}): KanbanContext {
+  return {
+    columns: computed<KanbanColumnSummary[]>(() => []),
+    availableTags: computed<TagDto[]>(() => []),
+    isShared: computed<boolean>(() => false),
+    boardMembers: computed<UserOut[]>(() => []),
+    createTag: vi.fn(),
+    moveTask: vi.fn(),
+    openCreateTaskDialog: vi.fn(),
+    openEditTaskDialog: vi.fn(),
+    createTask: vi.fn(),
+    updateTask: vi.fn(),
+    deleteTask: vi.fn(),
+    startTimer: vi.fn(),
+    pauseTimer: vi.fn(),
+    stopTimer: vi.fn(),
+    setTaskTotal: vi.fn(),
+    onTimerExpired: vi.fn(),
+    ...overrides,
+  }
 }

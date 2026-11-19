@@ -24,7 +24,7 @@ export interface KanbanTaskActionsOptions {
   onAfterTaskDelete?: (taskId: string | number) => void
   onAfterTagCreate?: (tag: TagDto) => void
   onAfterTimerChange?: (task: KanbanTaskDto) => void
-  onAfterTaskTotalChange?: (taskId: string | number, totalSeconds: number) => void
+  onAfterTaskTotalChange?: (taskId: string | number, totalSeconds: number, changed: boolean) => void
 }
 
 export interface TaskUpdateFields {
@@ -44,6 +44,13 @@ export function sameId(
 ): boolean {
   if (a == null || b == null) return false
   return String(a) === String(b)
+}
+
+/** Reassign zero-based sequential position indices to tasks in a column. */
+export function reindexTasks(tasks: KanbanTaskDto[]): void {
+  tasks.forEach((task, index) => {
+    task.position = index
+  })
 }
 
 /** Mutate a task DTO in place with the supplied partial task field updates. */
@@ -71,6 +78,29 @@ export function applyTaskUpdates(target: KanbanTaskDto, source: TaskUpdateFields
         elapsedSeconds: source.timer.elapsedSeconds ?? target.timer?.elapsedSeconds ?? 0,
       }
     }
+  }
+}
+
+/** Copy shared non-positional task metadata fields from source to target when defined. */
+export function syncTaskFields(target: KanbanTaskDto, source: Partial<KanbanTaskDto>): void {
+  applyTaskUpdates(target, source)
+  if (source.recurringTaskId !== undefined) {
+    target.recurringTaskId = source.recurringTaskId
+  }
+  if (source.recurringTask !== undefined) {
+    target.recurringTask = source.recurringTask
+  }
+  if (source.reminderAt !== undefined) {
+    target.reminderAt = source.reminderAt
+  }
+  if (source.reminderSentAt !== undefined) {
+    target.reminderSentAt = source.reminderSentAt
+  }
+  if (source.totalSeconds !== undefined) {
+    target.totalSeconds = source.totalSeconds
+  }
+  if (source.updatedAt !== undefined) {
+    target.updatedAt = source.updatedAt
   }
 }
 
@@ -228,13 +258,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
 
       notify.success('Task updated.')
       if (updateResult) {
-        applyTaskUpdates(targetTask, updateResult)
-        if (updateResult.recurringTaskId !== undefined) {
-          targetTask.recurringTaskId = updateResult.recurringTaskId
-        }
-        if (updateResult.recurringTask !== undefined) {
-          targetTask.recurringTask = updateResult.recurringTask
-        }
+        syncTaskFields(targetTask, updateResult)
         if (updateResult.timer !== undefined) {
           targetTask.timer =
             updateResult.timer && updateResult.timer.mode !== 'NONE' ? updateResult.timer : null
@@ -394,10 +418,12 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
 
   const setTaskTotal = (taskId: string | number, totalSeconds: number): void => {
     const task = options.findTask(taskId)
+    const previousTotal = task ? (task.totalSeconds ?? 0) : undefined
     if (task) {
       task.totalSeconds = totalSeconds
     }
-    options.onAfterTaskTotalChange?.(taskId, totalSeconds)
+    const changed = previousTotal !== undefined ? previousTotal !== totalSeconds : true
+    options.onAfterTaskTotalChange?.(taskId, totalSeconds, changed)
   }
 
   const setTaskTimeEntries = (taskId: string | number, entries: TaskTimeEntryDto[]): void => {

@@ -147,7 +147,7 @@ export function filterTaskFeedTasks(
   })
 }
 
-const PRIORITY_RANK: Record<'HIGH' | 'MEDIUM' | 'LOW', number> = {
+const PRIORITY_WEIGHT: Record<'HIGH' | 'MEDIUM' | 'LOW', number> = {
   HIGH: 3,
   MEDIUM: 2,
   LOW: 1,
@@ -201,9 +201,9 @@ export function sortTaskFeedTasks(
     }
 
     if (sortBy === 'PRIORITY') {
-      const rankA = a.priority ? (PRIORITY_RANK[a.priority] ?? null) : null
-      const rankB = b.priority ? (PRIORITY_RANK[b.priority] ?? null) : null
-      const diff = compareNullableNumbersNullsLast(rankA, rankB, sortDirection)
+      const weightA = a.priority ? (PRIORITY_WEIGHT[a.priority] ?? null) : null
+      const weightB = b.priority ? (PRIORITY_WEIGHT[b.priority] ?? null) : null
+      const diff = compareNullableNumbersNullsLast(weightA, weightB, sortDirection)
       return diff !== 0 ? diff : compareUpdatedDescThenId(a, b)
     }
 
