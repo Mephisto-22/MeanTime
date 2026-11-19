@@ -6,13 +6,15 @@ viewing a shared board.
 ## Sharing a board
 
 Only the board owner can invite collaborators, change their roles, or remove other
-collaborators. Sharing and role changes require an accepted friendship. Collaborators
-with either role can leave a board themselves.
+collaborators. New invitations require an accepted friendship. Existing collaborators'
+roles can still be changed after unfriending. Collaborators with either role can leave
+a board themselves.
 
 | Permission | Owner | `EDITOR` | `VIEWER` |
 | --- | --- | --- | --- |
 | Read the board, analytics, tags, time entries, and live events | Yes | Yes | Yes |
-| Update board details, columns, tasks, recurring tasks, timers, and time entries | Yes | Yes | No |
+| Update board title and description | Yes | No | No |
+| Update columns, tasks, recurring tasks, timers, and time entries | Yes | Yes | No |
 | Invite collaborators or change roles | Yes | No | No |
 | Remove other collaborators or delete the board | Yes | No | No |
 | Leave a shared board | N/A | Yes | Yes |
@@ -20,7 +22,8 @@ with either role can leave a board themselves.
 Board ownership remains with the user who created it. Viewer writes to editable
 board resources return `403`. Users without board access receive `404` for board
 resources. Access is also denied when the owner and collaborator have blocked one
-another. Owner-only routes return `404` for non-owners.
+another. Owner-only routes, including board title and description updates, return
+`404` for non-owners.
 
 The relevant API routes are:
 

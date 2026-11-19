@@ -120,7 +120,6 @@
 
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
-import {useAuthStore} from '~/stores/auth';
 import { useBoardPermissions } from '~/composables/useBoardPermissions'
 
 interface Props {
@@ -151,21 +150,12 @@ const isDeleting = ref(false);
 // Deleting asks for confirmation first, in place of the editor's buttons.
 const isConfirmingDelete = ref(false);
 const notify = useNotifications();
-const authStore = useAuthStore();
 
 const isEditing = computed(() => props.board !== null);
-const isOwner = computed(() => {
-  if (!props.board) return true;
-  if (typeof props.board.isOwner === 'boolean') {
-    return props.board.isOwner;
-  }
-  return Boolean(props.board.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id);
-});
-const { canEdit: canEditExistingBoard } =
-  useBoardPermissions(() => props.board)
+const { isOwner } = useBoardPermissions(() => props.board)
 
 const canSave = computed(() =>
-  props.board === null || canEditExistingBoard.value,
+  props.board === null || isOwner.value,
 )
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());

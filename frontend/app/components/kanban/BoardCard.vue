@@ -17,7 +17,7 @@
           {{ board.title }}
         </NuxtLink>
         <Button
-          v-if="canEdit"
+          v-if="isOwner"
           icon="pi pi-pencil"
           severity="secondary"
           text
@@ -25,7 +25,7 @@
           size="small"
           class="relative z-10 shrink-0 text-surface-400 opacity-60 group-hover:opacity-100 transition-opacity"
           :aria-label="`Edit ${board.title}`"
-          @click="canEdit && emit('edit', board)"
+          @click="isOwner && emit('edit', board)"
         />
       </div>
     </template>
@@ -111,7 +111,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { canEdit } = useBoardPermissions(() => props.board)
+const { isOwner } = useBoardPermissions(() => props.board)
 
 const activeTimerCount = computed(() => {
   return (props.board.columns || []).reduce((acc, col) => {

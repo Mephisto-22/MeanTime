@@ -278,6 +278,42 @@ class BoardSharingApiTests(TestCase):
         )
         self.assertEqual(membership.role, BoardMembership.Role.VIEWER)
 
+    def test_owner_can_change_collaborator_role_after_unfriending(self):
+        self.add_collaborator()
+        headers = self.auth_headers("owner@example.com")
+        response = self.client.delete(
+            f"/api/users/friends/{self.friend.id}",
+            **headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.owner.is_friends_with(self.friend))
+
+        for role in (BoardMembership.Role.VIEWER, BoardMembership.Role.EDITOR):
+            with self.subTest(role=role):
+                response = self.client.post(
+                    f"/api/kanban/boards/{self.board.id}/collaborators",
+                    data=json.dumps({"friend_id": self.friend.id, "role": role}),
+                    content_type="application/json",
+                    **headers,
+                )
+                self.assertEqual(response.status_code, 200)
+                membership = BoardMembership.objects.get(
+                    board=self.board, user=self.friend,
+                )
+                self.assertEqual(membership.role, role)
+
+    def test_owner_cannot_invite_non_friend(self):
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board.id}/collaborators",
+            data=json.dumps({"friend_id": self.stranger.id}),
+            content_type="application/json",
+            **self.auth_headers("owner@example.com"),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            BoardMembership.objects.filter(board=self.board, user=self.stranger).exists()
+        )
+
     def test_board_serializes_membership_users_and_roles(self):
         for role in BoardMembership.Role.values:
             with self.subTest(role=role):
@@ -320,22 +356,53 @@ class BoardSharingApiTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.title, "Task 1")
 
-    def test_viewer_cannot_update_board(self):
-        self.add_collaborator(role=BoardMembership.Role.VIEWER)
+    def test_collaborators_cannot_update_board(self):
+        headers = self.auth_headers("friend@example.com")
+        for role in BoardMembership.Role.values:
+            with self.subTest(role=role):
+                self.add_collaborator(role=role)
+                response = self.client.patch(
+                    f"/api/kanban/boards/{self.board.id}",
+                    data=json.dumps({
+                        "title": "Changed title",
+                        "description": "Changed description",
+                    }),
+                    content_type="application/json",
+                    **headers,
+                )
+                self.assertEqual(response.status_code, 404)
+                self.board.refresh_from_db()
+                self.assertEqual(self.board.title, "Project X")
+                self.assertEqual(self.board.description, "")
 
+    def test_owner_can_update_board(self):
         response = self.client.patch(
             f"/api/kanban/boards/{self.board.id}",
             data=json.dumps({
                 "title": "Changed title",
-                "description": "",
+                "description": "Changed description",
             }),
+            content_type="application/json",
+            **self.auth_headers("owner@example.com"),
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.board.refresh_from_db()
+        self.assertEqual(self.board.title, "Changed title")
+        self.assertEqual(self.board.description, "Changed description")
+
+    def test_editor_can_create_column(self):
+        self.add_collaborator()
+        response = self.client.post(
+            f"/api/kanban/boards/{self.board.id}/columns",
+            data=json.dumps({"title": "In Progress"}),
             content_type="application/json",
             **self.auth_headers("friend@example.com"),
         )
-        self.assertEqual(response.status_code, 403)
-
-        self.board.refresh_from_db()
-        self.assertEqual(self.board.title, "Project X")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            BoardColumn.objects.filter(board=self.board, title="In Progress").exists()
+        )
 
     def test_viewer_cannot_create_column(self):
         self.add_collaborator(role=BoardMembership.Role.VIEWER)

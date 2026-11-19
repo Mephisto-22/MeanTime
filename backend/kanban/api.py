@@ -510,8 +510,8 @@ def board_events(request, board_id: int):
 
 @router.patch("/boards/{board_id}", response=BoardOut)
 def update_board(request, board_id: int, payload: BoardIn):
-    """Update a board's title and description."""
-    board = get_editable_board(request.auth, board_id)
+    """Update a board's title and description as its owner."""
+    board = get_owned_board(request.auth, board_id)
     board.title = payload.title
     board.description = payload.description
     board.save()
@@ -561,17 +561,20 @@ def share_board(request, board_id: int, payload: BoardShareIn):
     # retrieve the user who will receive access
     friend = get_object_or_404(User, id=payload.friend_id)
 
-    # verify the user is an accepted friend
-    if not request.auth.is_friends_with(friend):
-        raise HttpError(403, "You can only share boards with accepted friends.")
-
     # Lock existing memberships so concurrent role changes are applied in order.
     with transaction.atomic():
-        membership, created = BoardMembership.objects.select_for_update().get_or_create(
-            board=board,
-            user=friend,
-            defaults={"role": payload.role},
-        )
+        memberships = BoardMembership.objects.select_for_update()
+        membership = memberships.filter(board=board, user=friend).first()
+        created = False
+        if membership is None:
+            # Friendship is required for new invitations, not existing role changes.
+            if not request.auth.is_friends_with(friend):
+                raise HttpError(403, "You can only share boards with accepted friends.")
+            membership, created = memberships.get_or_create(
+                board=board,
+                user=friend,
+                defaults={"role": payload.role},
+            )
         role_changed = membership.role != payload.role
         if role_changed:
             membership.role = payload.role

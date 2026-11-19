@@ -1,8 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import FriendsList from '~/components/friends/FriendsList.vue'
 import type { UserOut } from '~/api/friends'
+
+enableAutoUnmount(afterEach)
 
 const DialogStub = {
   name: 'Dialog',
