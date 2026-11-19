@@ -1,8 +1,14 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
+
+enableAutoUnmount(afterEach)
+
+afterEach(() => {
+  document.body.querySelectorAll('.p-tooltip').forEach(el => el.remove())
+})
 
 describe('Activity Chronicle & Past Work Journal (#108)', () => {
   const defaultTimer: TaskTimerDto = {
@@ -287,7 +293,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     expect(updated[0].durationSeconds).toBe(1200) // Preserved!
   })
 
-  it('renders contributor avatar with initials and tooltip on a shared board', () => {
+  it('renders contributor avatar with initials and tooltip on a shared board', async () => {
     const entries: TaskTimeEntryDto[] = [
       {
         id: 'entry-collab-1',
@@ -313,6 +319,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
         timeEntries: entries,
         isShared: true,
       },
+      attachTo: document.body,
       global: {
         plugins: [PrimeVue],
       },
@@ -321,10 +328,18 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-1"]')
     expect(avatar.exists()).toBe(true)
     expect(avatar.text()).toBe('SC')
-    expect(avatar.attributes('title')).toBe('Sarah Connor\nsarah@example.com')
+    expect(avatar.attributes('aria-label')).toBe('Sarah Connor')
+    await avatar.trigger('mouseenter')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')?.textContent).toBe('Sarah Connor')
+    })
+    await avatar.trigger('mouseleave')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')).toBeNull()
+    })
   })
 
-  it('renders fallback avatar with user icon and Unknown user tooltip when user data is missing on a shared board', () => {
+  it('renders fallback avatar with user icon and Unknown user tooltip when user data is missing on a shared board', async () => {
     const entries: TaskTimeEntryDto[] = [
       {
         id: 'entry-collab-anonymous',
@@ -344,6 +359,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
         timeEntries: entries,
         isShared: true,
       },
+      attachTo: document.body,
       global: {
         plugins: [PrimeVue],
       },
@@ -351,8 +367,16 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
 
     const avatar = wrapper.find('[data-testid="time-entry-avatar-entry-collab-anonymous"]')
     expect(avatar.exists()).toBe(true)
-    expect(avatar.attributes('title')).toBe('Unknown user')
+    expect(avatar.attributes('aria-label')).toBe('Unknown user')
     expect(avatar.find('.pi-user').exists()).toBe(true)
+    await avatar.trigger('mouseenter')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')?.textContent).toBe('Unknown user')
+    })
+    await avatar.trigger('mouseleave')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')).toBeNull()
+    })
   })
 
   it('omits contributor avatars completely on an unshared/solo board', () => {
@@ -509,6 +533,7 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
         boardMembers: [member1, member2],
         currentUserId: member1.id,
       },
+      attachTo: document.body,
       global: {
         plugins: [PrimeVue],
       },
@@ -543,7 +568,15 @@ describe('Activity Chronicle & Past Work Journal (#108)', () => {
     const avatarAfter = wrapper.find('[data-testid="time-entry-avatar-session-reassign-1"]')
     expect(avatarAfter.exists()).toBe(true)
     expect(avatarAfter.text()).toBe('BD')
-    expect(avatarAfter.attributes('title')).toBe('Bob Dylan\nbob@example.com')
+    expect(avatarAfter.attributes('aria-label')).toBe('Bob Dylan')
+    await avatarAfter.trigger('mouseenter')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')?.textContent).toBe('Bob Dylan')
+    })
+    await avatarAfter.trigger('mouseleave')
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('.p-tooltip-text')).toBeNull()
+    })
   })
 
   it('omits Recorded by dropdown in inline session editor on a private/solo board', async () => {

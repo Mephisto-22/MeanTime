@@ -2,17 +2,17 @@
   <form class="flex flex-col gap-4" :aria-busy="loading" novalidate @submit.prevent="submit">
     <div class="field-group">
       <Label for="register-display-name">Display name</Label>
-      <InputText :invalid="!requiredText(displayName)" :aria-invalid="!requiredText(displayName)" :aria-describedby="!requiredText(displayName) ? 'register-display-name-error' : undefined" id="register-display-name" v-model="displayName" name="display_name" maxlength="50" autocomplete="nickname" required />
-      <small v-if="!requiredText(displayName)" id="register-display-name-error" class="field-error-text">Enter a display name.</small>
+      <InputText :invalid="showDisplayNameError" :aria-invalid="showDisplayNameError" :aria-describedby="showDisplayNameError ? 'register-display-name-error' : undefined" id="register-display-name" v-model="displayName" name="display_name" maxlength="50" autocomplete="nickname" required @input="markDirty('displayName')" @blur="markBlurred('displayName')" />
+      <small v-if="showDisplayNameError" id="register-display-name-error" class="field-error-text">Enter a display name.</small>
     </div>
     <div class="field-group">
       <Label for="register-email">Email</Label>
-      <InputText :invalid="!validEmail(email)" :aria-invalid="!validEmail(email)" :aria-describedby="!validEmail(email) ? 'register-email-error' : undefined" id="register-email" v-model="email" name="email" type="email" maxlength="254" autocomplete="email" required />
-      <small v-if="!validEmail(email)" id="register-email-error" class="field-error-text">Enter a valid email address.</small>
+      <InputText :invalid="showEmailError" :aria-invalid="showEmailError" :aria-describedby="showEmailError ? 'register-email-error' : undefined" id="register-email" v-model="email" name="email" type="email" maxlength="254" autocomplete="email" required @input="markDirty('email')" @blur="markBlurred('email')" />
+      <small v-if="showEmailError" id="register-email-error" class="field-error-text">Enter a valid email address.</small>
     </div>
     <div class="field-group">
       <Label for="register-password">Password</Label>
-      <InputText :invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" :aria-invalid="!validPassword(password) || (checkedKey === inputKey && requirements.some(rule => !rule.met))" id="register-password" v-model="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-requirements" required />
+      <InputText :invalid="showPasswordError" :aria-invalid="showPasswordError" id="register-password" v-model="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="password-requirements" required @input="markDirty('password')" @blur="markBlurred('password')" />
       <section id="password-requirements" aria-labelledby="password-requirements-title" :aria-busy="checking" class="flex flex-col gap-2">
         <h3 id="password-requirements-title" class="text-sm font-semibold">Password requirements</h3>
         <ul class="flex flex-col gap-1.5 text-sm" aria-live="polite">
@@ -29,9 +29,9 @@
     </div>
     <div class="field-group">
       <Label for="register-password-confirm">Confirm password</Label>
-      <InputText id="register-password-confirm" v-model="passwordConfirm" name="password_confirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required :invalid="!passwordsMatch" :aria-invalid="!passwordsMatch" aria-describedby="register-password-match" />
-      <small id="register-password-match" :class="passwordsMatch ? 'text-green-700 dark:text-green-400' : 'field-error-text'" aria-live="polite">
-        {{ passwordsMatch ? 'Passwords match.' : passwordConfirm ? 'Passwords do not match.' : 'Re-enter your password to confirm it.' }}
+      <InputText id="register-password-confirm" v-model="passwordConfirm" name="password_confirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" required :invalid="showConfirmError" :aria-invalid="showConfirmError" aria-describedby="register-password-match" @input="markDirty('passwordConfirm')" @blur="markBlurred('passwordConfirm')" />
+      <small id="register-password-match" :class="passwordsMatch ? 'text-green-700 dark:text-green-400' : showConfirmError ? 'field-error-text' : 'text-surface-600 dark:text-surface-400'" aria-live="polite">
+        {{ passwordsMatch ? 'Passwords match.' : showConfirmError && passwordConfirm ? 'Passwords do not match.' : 'Re-enter your password to confirm it.' }}
       </small>
     </div>
     <Button type="submit" label="Register" :loading="loading" :disabled="loading || !canSubmit" />
@@ -43,6 +43,7 @@ export { getClientTimezone } from '~/utils/timezone'
 </script>
 
 <script setup lang="ts">
+import { useFormValidation } from '~/composables/useFormValidation'
 import { getClientTimezone } from '~/utils/timezone'
 import { requiredText, validEmail, validPassword } from '~/utils/validation'
 import { authApi, type PasswordRequirement, type RegistrationRequest } from '~/api/auth'
@@ -52,6 +53,7 @@ const displayName = ref('')
 const email = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
+const { markDirty, markBlurred, markSubmitted, shouldShowError } = useFormValidation()
 const checking = ref(false)
 const checkError = ref('')
 const checkedKey = ref('')
@@ -64,6 +66,15 @@ const requirements = ref<PasswordRequirement[]>([
 ])
 const inputKey = computed(() => JSON.stringify([password.value, email.value.trim(), displayName.value.trim()]))
 const passwordsMatch = computed(() => password.value.length > 0 && password.value === passwordConfirm.value)
+const showDisplayNameError = computed(() => shouldShowError('displayName', !requiredText(displayName.value)))
+const showEmailError = computed(() => shouldShowError('email', !validEmail(email.value)))
+const showPasswordError = computed(() =>
+  shouldShowError(
+    'password',
+    !validPassword(password.value) || (checkedKey.value === inputKey.value && requirements.value.some(rule => !rule.met)),
+  ),
+)
+const showConfirmError = computed(() => shouldShowError('passwordConfirm', !passwordsMatch.value))
 const canSubmit = computed(() =>
   requiredText(displayName.value) && displayName.value.length <= 50 &&
   validEmail(email.value) && validPassword(password.value) &&
@@ -111,6 +122,7 @@ async function checkRequirements() {
 onBeforeUnmount(() => { clearTimeout(timer); requestId++ })
 
 function submit() {
+  markSubmitted()
   if (props.loading || !canSubmit.value) return
   // Confirmation is a local check; preserve the backend registration contract.
   emit('submit', { display_name: displayName.value.trim(), email: email.value.trim(), password: password.value, timezone: getClientTimezone() })

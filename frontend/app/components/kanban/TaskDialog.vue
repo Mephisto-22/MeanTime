@@ -38,16 +38,18 @@
           data-testid="task-title-input"
           autofocus
           required
-          :class="isSaveDisabled ? '!border-red-500 dark:!border-red-400' : ''"
+          :class="showTitleError ? '!border-red-500 dark:!border-red-400' : ''"
           maxlength="200"
-          :invalid="isSaveDisabled"
-          :aria-invalid="isSaveDisabled"
-          :aria-describedby="isSaveDisabled ? 'task-title-error' : undefined"
+          :invalid="showTitleError"
+          :aria-invalid="showTitleError"
+          :aria-describedby="showTitleError ? 'task-title-error' : undefined"
           fluid
           placeholder="Task title..."
           class="text-xl font-bold tracking-tight border-b border-surface-200/90 rounded-none px-0 py-2 focus:ring-0 focus:border-primary-500 dark:border-surface-700 bg-transparent placeholder-surface-400 border-0"
+          @input="markDirty('title')"
+          @blur="markBlurred('title')"
         />
-        <small v-if="isSaveDisabled" id="task-title-error" class="field-error-text">Enter a title for the task.</small>
+        <small v-if="showTitleError" id="task-title-error" class="field-error-text">Enter a title for the task.</small>
       </div>
 
       <!-- Properties Section: Left (Stacked Dropdowns) & Right (Static Add Tag + Flowing Attached Tags + In-Layout Suggestions) -->
@@ -555,6 +557,7 @@ import {
 } from '~/api/kanban'
 import type { TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
 import { useAuthStore } from '~/stores/auth'
+import { useFormValidation } from '~/composables/useFormValidation'
 import DatePicker from 'primevue/datepicker'
 import TaskTimerEditor from '~/components/kanban/TaskTimerEditor.vue'
 import KanbanTaskDueDateSection from '~/components/kanban/TaskDueDateSection.vue'
@@ -806,8 +809,10 @@ const tagLibrary = computed<TagDto[]>(() => {
   return []
 })
 
+const { markDirty, markBlurred, markSubmitted, shouldShowError, reset: resetValidation } = useFormValidation()
 const trimmedTitle = computed(() => title.value.trim())
 const isSaveDisabled = computed(() => trimmedTitle.value === '')
+const showTitleError = computed(() => shouldShowError('title', isSaveDisabled.value))
 
 const getPriorityDot = (val: TaskPriorityType) => {
   if (val && val in TASK_PRIORITY_CONFIG) {
@@ -824,6 +829,7 @@ const getPriorityLabel = (val: TaskPriorityType) => {
 }
 
 const syncFormWithProps = () => {
+  resetValidation()
   isConfirmingDelete.value = false
   isConfirmingSaveScope.value = false
   tagInputText.value = ''
@@ -1081,6 +1087,7 @@ const hasCoreMetadataChanged = computed(() => {
 })
 
 const save = () => {
+  markSubmitted()
   if (isSaveDisabled.value || isConfirmingDelete.value || isConfirmingSaveScope.value) {
     return
   }

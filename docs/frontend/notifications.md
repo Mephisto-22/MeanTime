@@ -34,7 +34,9 @@ network errors offer a retry message. Never put credentials into error messages.
 - Disable save/submit while data is missing, whitespace-only, invalid, or pending.
   Handlers also reject invalid submissions, including keyboard submissions.
 - Set PrimeVue `invalid`, `aria-invalid`, and associated inline guidance to explain
-  the red outline. Keep field guidance inline instead of toasting each keystroke.
+  the red outline only after the user has modified and blurred the field or
+  attempted to submit (via `useFormValidation()`), never before initial input.
+  Keep field guidance inline instead of toasting each keystroke.
 - Optional descriptions may be empty. Shared text/email/password helpers live in
   `app/utils/validation.ts`. Passwords are never trimmed before sending.
 - Backend validation remains authoritative. Keep input available after failed

@@ -59,12 +59,10 @@
       >
         <!-- Friend Details -->
         <div class="flex items-center gap-3">
-          <Avatar
-            :label="getInitials(friend.display_name, friend.email)"
-            shape="circle"
+          <UserAvatar
+            :user="friend"
             size="large"
             data-testid="friend-avatar"
-            class="user-avatar-primary"
           />
           <div class="flex flex-col gap-0.5">
             <span
@@ -207,6 +205,7 @@
 
 <script setup lang="ts">
 import FriendShareBoardDialog from '~/components/friends/FriendShareBoardDialog.vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import { ref } from 'vue'
 import type { UserOut } from '~/api/friends'
 
@@ -234,26 +233,6 @@ const targetShareFriend = ref<UserOut | null>(null)
 function openShareDialog(friend: UserOut) {
   targetShareFriend.value = friend
   isShareDialogOpen.value = true
-}
-
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
 }
 
 function openUnfriendDialog(friend: UserOut) {

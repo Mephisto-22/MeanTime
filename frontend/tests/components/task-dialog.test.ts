@@ -67,7 +67,7 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(wrapper.find('[data-testid="task-cancel-button"]').exists()).toBe(true)
   })
 
-  it('in create mode: initializes blank and disables Save button when title is empty or whitespace', async () => {
+  it('in create mode: initializes blank without premature errors and shows error only after editing/submitting empty title', async () => {
     const wrapper = mountTaskDialog({ mode: 'create' })
     const titleInput = wrapper.find<HTMLInputElement>('[data-testid="task-title-input"]')
     const descInput = wrapper.find<HTMLTextAreaElement>('[data-testid="task-description-input"]')
@@ -76,15 +76,26 @@ describe('TaskDialog Component DOM Suite', () => {
     expect(titleInput.element.value).toBe('')
     expect(descInput.element.value).toBe('')
     expect(saveButton.attributes('disabled')).toBeDefined()
-    expect(titleInput.attributes('aria-invalid')).toBe('true')
-    expect(titleInput.classes()).toContain('p-invalid')
+    expect(titleInput.attributes('aria-invalid')).toBe('false')
+    expect(titleInput.classes()).not.toContain('p-invalid')
+    expect(wrapper.find('#task-title-error').exists()).toBe(false)
+
+    // Focusing/blurring without input does not show premature error.
+    await titleInput.trigger('blur')
+    expect(titleInput.attributes('aria-invalid')).toBe('false')
+    expect(wrapper.find('#task-title-error').exists()).toBe(false)
 
     await titleInput.setValue('   ')
+    await titleInput.trigger('blur')
     expect(saveButton.attributes('disabled')).toBeDefined()
+    expect(titleInput.attributes('aria-invalid')).toBe('true')
+    expect(titleInput.classes()).toContain('p-invalid')
+    expect(wrapper.find('#task-title-error').exists()).toBe(true)
 
     await titleInput.setValue('Valid Title')
     expect(saveButton.attributes('disabled')).toBeUndefined()
     expect(titleInput.attributes('aria-invalid')).toBe('false')
+    expect(wrapper.find('#task-title-error').exists()).toBe(false)
   })
 
   it('in edit mode: populates fields from active task and enables Save', () => {

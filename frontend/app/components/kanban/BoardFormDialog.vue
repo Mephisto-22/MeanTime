@@ -27,6 +27,8 @@
           :invalid="showTitleError"
           :aria-invalid="showTitleError"
           :aria-describedby="showTitleError ? 'board-title-error' : undefined"
+          @input="markDirty('title')"
+          @blur="markBlurred('title')"
         />
         <Message
           v-if="showTitleError"
@@ -111,7 +113,7 @@
           data-testid="board-save-button"
           :label="isEditing ? 'Save' : 'Create'"
           :loading="isSaving"
-          :disabled="!canSave || isBusy || showTitleError"
+          :disabled="!canSave || isBusy || isTitleInvalid"
         />
       </template>
     </template>
@@ -121,6 +123,7 @@
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
 import { useBoardPermissions } from '~/composables/useBoardPermissions'
+import { useFormValidation } from '~/composables/useFormValidation'
 
 interface Props {
   /** The board to edit, or null to create a new one. */
@@ -159,8 +162,10 @@ const canSave = computed(() =>
 )
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
+const isTitleInvalid = computed(() => trimmedTitle.value === '');
+const { markDirty, markBlurred, markSubmitted, shouldShowError, reset: resetValidation } = useFormValidation();
 const showTitleError = computed(
-  () => trimmedTitle.value === '',
+  () => shouldShowError('title', isTitleInvalid.value),
 );
 
 // Start from a clean form every time the dialog opens, so values and errors
@@ -169,12 +174,14 @@ watch(visible, isOpen => {
   if (!isOpen) {
     return;
   }
+  resetValidation();
   title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
   isConfirmingDelete.value = false;
 }, {immediate: true});
 
 async function save(): Promise<void> {
+  markSubmitted();
   if (!canSave.value) return
   // Enter in a field still submits the form while the confirmation shows.
   if (trimmedTitle.value === '' || isBusy.value || isConfirmingDelete.value) {
