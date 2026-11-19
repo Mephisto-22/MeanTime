@@ -175,7 +175,7 @@ def dispatch_due_date_reminders(as_of: datetime | None = None) -> int:
             reminder_at__lte=now,
             reminder_sent_at__isnull=True,
             archived_at__isnull=True,
-        ).select_related("column__board__owner").prefetch_related("column__board__collaborators")
+        ).select_related("column__board__owner").prefetch_related("column__board__memberships__user")
     )
 
     for task in due_tasks:
@@ -183,8 +183,9 @@ def dispatch_due_date_reminders(as_of: datetime | None = None) -> int:
         recipients = set()
         if board.owner and getattr(board.owner, "is_active", True) and board.owner.email:
             recipients.add(board.owner.email)
-        for collab in board.collaborators.filter(is_active=True):
-            if collab.email:
+        for membership in board.memberships.all():
+            collab = membership.user
+            if getattr(collab, "is_active", True) and collab.email:
                 recipients.add(collab.email)
 
         formatted_due_date = (

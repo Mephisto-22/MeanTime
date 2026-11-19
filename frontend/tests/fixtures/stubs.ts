@@ -116,3 +116,90 @@ export const DatePickerStub = {
     },
   },
 }
+
+export const NuxtLinkStub = {
+  name: 'NuxtLink',
+  props: ['to'],
+  template: '<a :href="typeof to === \'string\' ? to : undefined" @click="$event.preventDefault()"><slot /></a>',
+}
+
+export const AppDialogStub = {
+  name: 'Dialog',
+  inheritAttrs: false,
+  props: ['visible', 'header'],
+  template: '<div v-if="visible" v-bind="$attrs" class="p-dialog" :data-header="header"><slot /><slot name="footer" /></div>',
+}
+
+export const PopoverStub = {
+  name: 'Popover',
+  inheritAttrs: false,
+  emits: ['show', 'hide'],
+  expose: ['toggle', 'show', 'hide'],
+  data() {
+    return {
+      visible: false,
+    }
+  },
+  methods: {
+    toggle(_event?: Event) {
+      this.visible = !this.visible
+      this.$emit(this.visible ? 'show' : 'hide')
+    },
+    show(_event?: Event) {
+      if (!this.visible) {
+        this.visible = true
+        this.$emit('show')
+      }
+    },
+    hide() {
+      if (this.visible) {
+        this.visible = false
+        this.$emit('hide')
+      }
+    },
+  },
+  template: '<div v-if="visible" v-bind="$attrs" class="p-popover"><slot /></div>',
+}
+
+export const SelectStub = {
+  name: 'Select',
+  inheritAttrs: false,
+  props: ['modelValue', 'options', 'optionLabel', 'optionValue', 'disabled'],
+  emits: ['update:modelValue', 'change'],
+  template: `
+    <select
+      v-bind="$attrs"
+      :value="modelValue ?? ''"
+      :disabled="disabled"
+      @change="onChange"
+    >
+      <option
+        v-for="o in options"
+        :key="String(getOptionValue(o))"
+        :value="getOptionValue(o) ?? ''"
+      >
+        {{ getOptionLabel(o) }}
+      </option>
+    </select>
+  `,
+  methods: {
+    getOptionValue(option: any) {
+      return this.optionValue ? option[this.optionValue] : (option.id !== undefined ? option.id : option.value)
+    },
+    getOptionLabel(option: any) {
+      return this.optionLabel ? option[this.optionLabel] : (option.title || option.label || option.display_name)
+    },
+    onChange(event: any) {
+      const raw = event.target.value
+      if (raw === '' || raw === 'null') {
+        this.$emit('update:modelValue', null)
+        this.$emit('change', { value: null })
+        return
+      }
+      const matched = (this.options || []).find((o: any) => String(this.getOptionValue(o)) === String(raw))
+      const val = matched ? this.getOptionValue(matched) : raw
+      this.$emit('update:modelValue', val)
+      this.$emit('change', { value: val })
+    },
+  },
+}

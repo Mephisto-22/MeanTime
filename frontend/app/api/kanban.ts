@@ -212,6 +212,15 @@ export interface KanbanTaskDto {
   reminderOffsetSeconds?: number | null
   reminderAt?: string | null
   reminderSentAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TaskFeedItemDto extends KanbanTaskDto {
+  boardId: string | number
+  boardTitle: string
+  columnTitle: string
+  updatedAt: string
 }
 
 export interface KanbanColumnDto {
@@ -305,15 +314,16 @@ export interface TaskDialogSavePayload {
 
 export interface KanbanContext {
   canEdit: ComputedRef<boolean>
+  canEditTask?: (task: KanbanTaskDto) => boolean
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
   isShared?: ComputedRef<boolean>
   boardMembers?: ComputedRef<UserOut[]>
   createTag?: (payload: { name: string } | string) => Promise<TagDto>
-  moveTask: (req: TaskMoveContext) => Promise<void> | void
-  openCreateTaskDialog: (columnId: string | number) => void
+  moveTask?: (req: TaskMoveContext) => Promise<void> | void
+  openCreateTaskDialog?: (columnId: string | number) => void
   openEditTaskDialog: (task: KanbanTaskDto) => void
-  createTask: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
+  createTask?: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void> | void
   updateTask: (taskId: string | number, payload: Partial<KanbanTaskDto> & { applyToFuture?: boolean }) => Promise<void> | void
   deleteTask: (taskId: string | number, options?: { cancelRecurrence?: boolean }) => Promise<void> | void
   startTimer?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
@@ -380,6 +390,10 @@ export class KanbanApi {
   // -----------------
   // Task Endpoints
   // -----------------
+
+  listTaskFeed(): Promise<TaskFeedItemDto[]> {
+    return apiService.get<TaskFeedItemDto[]>(`${this.endpoint}/tasks`)
+  }
 
   createTask(columnId: string | number, payload: Partial<KanbanTaskDto>): Promise<KanbanTaskDto> {
     return apiService.post<KanbanTaskDto>(`${this.endpoint}/columns/${columnId}/tasks`, payload)
@@ -448,6 +462,10 @@ export class KanbanApi {
 
   listTags(boardId: string | number): Promise<TagDto[]> {
     return apiService.get<TagDto[]>(`${this.endpoint}/tags?board_id=${boardId}`)
+  }
+
+  listUserTags(): Promise<TagDto[]> {
+    return apiService.get<TagDto[]>(`${this.endpoint}/tags`)
   }
 
   createTag(payload: { name: string }): Promise<TagDto> {

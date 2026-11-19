@@ -2,7 +2,7 @@
 
 from django.contrib.auth import get_user_model
 
-from kanban.models import Tag, TaskTimer, TimerMode
+from kanban.models import BoardMembership, Tag, TaskTimer, TimerMode
 from kanban.tests.test_board_analytics_api import PASSWORD, BoardAnalyticsTestCase
 
 User = get_user_model()
@@ -90,7 +90,7 @@ class TagFilterTests(BoardAnalyticsFilterTestCase):
     def test_collaborators_tag_with_the_same_name_matches(self):
         alice = User.objects.create_user(
             email="alice@example.com", password=PASSWORD, display_name="Alice")
-        self.board.collaborators.add(alice)
+        BoardMembership.objects.create(board=self.board, user=alice)
         shared = self.add_task(self.todo, "Alice's bug", 120)
         shared.tags.add(Tag.objects.create(user=alice, name="bug"))
 
@@ -109,7 +109,7 @@ class TagFilterTests(BoardAnalyticsFilterTestCase):
     def test_time_per_collaborator_follows_the_filters(self):
         alice = User.objects.create_user(
             email="alice@example.com", password=PASSWORD, display_name="Alice")
-        self.board.collaborators.add(alice)
+        BoardMembership.objects.create(board=self.board, user=alice)
         alices_task = self.add_task(self.todo, "Alice's docs")
         alices_task.time_entries.create(
             user=alice, started_at=alices_task.created_at, duration_seconds=900)

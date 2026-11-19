@@ -1,6 +1,7 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { analyticsApi, type BoardAnalyticsDto } from '~/api/analytics'
 import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
 import BoardAnalyticsFilters from '~/components/analytics/BoardAnalyticsFilters.vue'
@@ -24,6 +25,13 @@ beforeEach(() => {
       created_at: '2026-01-01T00:00:00Z',
     },
   })
+})
+
+// Chart.js needs a canvas, which happy-dom doesn't support.
+const ChartStub = defineComponent({
+  name: 'Chart',
+  props: ['type', 'data', 'options', 'canvasProps'],
+  setup: () => () => h('div'),
 })
 
 // Each test uses its own board id so useAsyncData never serves a cached result.
@@ -54,6 +62,14 @@ function analyticsFixture(overrides: Partial<BoardAnalyticsDto> = {}): BoardAnal
       { userId: 2, displayName: 'Alice', totalSeconds: 3600 },
       { userId: 1, displayName: 'Owner', totalSeconds: 1800 },
     ],
+    breakdown: {
+      tags: [
+        { name: 'bug', totalSeconds: 3600 },
+        { name: 'docs', totalSeconds: 3600 },
+        { name: null, totalSeconds: 1800 },
+      ],
+      priorities: [{ name: 'MEDIUM', totalSeconds: 3600 }, { name: null, totalSeconds: 1800 }],
+    },
     tags: ['bug', 'docs'],
     ...overrides,
   }
@@ -65,7 +81,10 @@ const mountedPages: Array<{ unmount: () => void }> = []
 
 async function mountAnalyticsPage() {
   const boardId = nextBoardId++
-  const wrapper = await mountSuspended(BoardAnalyticsPage, { route: `/boards/${boardId}/analytics` })
+  const wrapper = await mountSuspended(BoardAnalyticsPage, {
+    route: `/boards/${boardId}/analytics`,
+    global: { stubs: { Chart: ChartStub } },
+  })
   mountedPages.push(wrapper)
   await flushPromises()
   return { wrapper, boardId }
@@ -118,6 +137,17 @@ describe('Board analytics page (/boards/[id]/analytics)', () => {
       expect.stringContaining('Alice'),
       expect.stringContaining('Owner'),
     ])
+  })
+
+  it('shows time per tag and per priority (#191)', async () => {
+    vi.spyOn(analyticsApi, 'getBoardAnalytics').mockResolvedValue(analyticsFixture())
+
+    const { wrapper } = await mountAnalyticsPage()
+
+    const tagChart = wrapper.find('[data-testid="breakdown-tags"]').findComponent(ChartStub)
+    expect(tagChart.props('data').labels).toEqual(['bug', 'docs', 'None'])
+    const priorityChart = wrapper.find('[data-testid="breakdown-priorities"]').findComponent(ChartStub)
+    expect(priorityChart.props('data').labels).toEqual(['Medium', 'None'])
   })
 
   it('fetches again for countdown or stopwatch tasks when the toggle changes', async () => {

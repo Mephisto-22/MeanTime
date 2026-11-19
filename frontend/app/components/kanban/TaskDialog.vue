@@ -8,6 +8,27 @@
     class="dialog-lg"
   >
     <form class="flex flex-col gap-5 pt-1" novalidate @submit.prevent="save">
+      <div
+        v-if="showBoardLink"
+        data-testid="task-dialog-board-banner"
+        class="flex items-center justify-between gap-3 rounded-lg border border-surface-200/80 bg-surface-100/60 px-3 py-2 text-xs dark:border-surface-800 dark:bg-surface-800/50"
+      >
+        <span class="min-w-0 truncate text-surface-600 dark:text-surface-300">
+          Board:
+          <strong class="font-semibold text-surface-900 dark:text-surface-100">{{ resolvedBoardTitle }}</strong>
+          &rsaquo; {{ currentColumnTitle }}
+        </span>
+        <NuxtLink
+          :to="`/boards/${resolvedBoardId}`"
+          data-testid="task-dialog-board-link"
+          class="inline-flex shrink-0 items-center gap-1 font-semibold text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+          @click="isVisible = false"
+        >
+          <span>Open board</span>
+          <i class="pi pi-external-link text-[10px]" aria-hidden="true" />
+        </NuxtLink>
+      </div>
+
       <!-- Frameless / Editorial Title Input -->
       <div class="flex flex-col gap-1">
         <Label for="task-title-input" class="sr-only">Task Title</Label>
@@ -543,6 +564,8 @@ interface Props {
   mode: 'create' | 'edit'
   task?: KanbanTaskDto | null
   columnId?: string | number | null
+  boardId?: string | number | null
+  boardTitle?: string | null
   availableTags?: TagDto[]
   columns?: KanbanColumnSummary[]
 }
@@ -551,6 +574,8 @@ const props = withDefaults(defineProps<Props>(), {
   visible: false,
   task: null,
   columnId: null,
+  boardId: null,
+  boardTitle: null,
   availableTags: () => [],
   columns: () => [],
 })
@@ -765,10 +790,14 @@ const availableColumns = computed(() => {
   return []
 })
 
+const resolvedBoardId = computed(() => props.boardId ?? (props.task as { boardId?: string | number } | null)?.boardId ?? null)
+const resolvedBoardTitle = computed(() => props.boardTitle ?? (props.task as { boardTitle?: string } | null)?.boardTitle ?? null)
+const showBoardLink = computed(() => props.mode === 'edit' && resolvedBoardId.value != null && Boolean(resolvedBoardTitle.value))
+
 const currentColumnTitle = computed(() => {
   const colId = selectedColumnId.value ?? props.columnId ?? props.task?.columnId ?? (props.task as any)?.column_id
   const col = availableColumns.value.find(c => String(c.id) === String(colId))
-  return col?.title ?? 'Default Column'
+  return col?.title ?? (props.task as { columnTitle?: string } | null)?.columnTitle ?? 'Default Column'
 })
 
 const tagLibrary = computed<TagDto[]>(() => {

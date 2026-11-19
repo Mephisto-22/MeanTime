@@ -244,6 +244,26 @@ class TaskOut(Schema):
             total = obj.time_entries.aggregate(total=Sum("duration_seconds"))["total"]
         return total or 0
 
+
+class TaskFeedItemOut(TaskOut):
+    """Shape of an active task returned in the cross-board Task Feed."""
+    board_id: int
+    board_title: str
+    column_title: str
+
+    @staticmethod
+    def resolve_board_id(obj):
+        return obj.column.board_id
+
+    @staticmethod
+    def resolve_board_title(obj):
+        return obj.column.board.title
+
+    @staticmethod
+    def resolve_column_title(obj):
+        return obj.column.title
+
+
 # Allows us to update only part of a task without having to send a full TaskIn Schema
 class TaskUpdateIn(Schema):
     """Payload expected for partially updating a task"""

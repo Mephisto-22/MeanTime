@@ -5,6 +5,7 @@ from django.test import Client, TestCase
 from ninja_jwt.tokens import RefreshToken
 
 from chat.models import Message
+from kanban.event_schemas import BoardEventType
 from kanban.models import Board, BoardMembership
 from users.models import UserBlock
 

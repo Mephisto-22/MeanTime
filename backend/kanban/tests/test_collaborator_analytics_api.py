@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from kanban.models import Board, BoardColumn, TaskTimeEntry
+from kanban.models import Board, BoardColumn, BoardMembership, TaskTimeEntry
 from kanban.tests.test_board_analytics_api import PASSWORD, BoardAnalyticsTestCase
 
 User = get_user_model()
@@ -55,7 +55,8 @@ class CollaboratorTotalsTests(CollaboratorAnalyticsTestCase):
     def test_shared_board_lists_each_person_with_most_time_first(self):
         alice = self.add_user("Alice")
         bob = self.add_user("Bob")
-        self.board.collaborators.add(alice, bob)
+        BoardMembership.objects.create(board=self.board, user=alice)
+        BoardMembership.objects.create(board=self.board, user=bob)
         self.log(self.owner, 300)
         self.log(alice, 900)
         self.log(alice, 600)
@@ -72,7 +73,7 @@ class CollaboratorTotalsTests(CollaboratorAnalyticsTestCase):
 
     def test_people_without_time_are_listed_with_zero(self):
         carol = self.add_user("Carol")
-        self.board.collaborators.add(carol)
+        BoardMembership.objects.create(board=self.board, user=carol)
         self.log(self.owner, 60)
 
         _, rows = self.get_collaborators()
@@ -82,7 +83,8 @@ class CollaboratorTotalsTests(CollaboratorAnalyticsTestCase):
     def test_ties_are_ordered_by_name(self):
         zed = self.add_user("Zed")
         amy = self.add_user("amy")
-        self.board.collaborators.add(zed, amy)
+        BoardMembership.objects.create(board=self.board, user=zed)
+        BoardMembership.objects.create(board=self.board, user=amy)
 
         _, rows = self.get_collaborators()
 
@@ -118,7 +120,7 @@ class CollaboratorTotalsTests(CollaboratorAnalyticsTestCase):
 
     def test_no_email_addresses_are_returned(self):
         alice = self.add_user("Alice")
-        self.board.collaborators.add(alice)
+        BoardMembership.objects.create(board=self.board, user=alice)
         self.log(alice, 60)
 
         res = self.get_analytics(**self.auth_for("owner@example.com"))
@@ -134,7 +136,7 @@ class CollaboratorAccessTests(CollaboratorAnalyticsTestCase):
     def setUp(self):
         super().setUp()
         self.alice = self.add_user("Alice")
-        self.board.collaborators.add(self.alice)
+        BoardMembership.objects.create(board=self.board, user=self.alice)
         self.log(self.owner, 300)
         self.log(self.alice, 600)
 

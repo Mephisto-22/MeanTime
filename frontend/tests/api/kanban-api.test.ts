@@ -186,4 +186,134 @@ describe('KanbanApi Contract Suite', () => {
     expect(tagCreateCall.options.headers['Content-Type']).toBe('application/json')
     expect(tagCreateCall.options.body).toEqual({ name: 'Important' })
   })
+
+  it('fetches the cross-board Task Feed via GET /api/kanban/tasks and converts DTO fields to camelCase', async () => {
+    mockFetch.mockResolvedValue([
+      {
+        id: 101,
+        title: 'Audit API schema',
+        description: 'Verify Task Feed payload',
+        priority: 'HIGH',
+        position: 0,
+        column_id: 12,
+        board_id: 3,
+        board_title: 'Platform',
+        column_title: 'In Progress',
+        due_at: '2026-11-25T15:00:00Z',
+        reminder_offset_seconds: 3600,
+        total_seconds: 1800,
+        created_at: '2026-11-18T10:00:00Z',
+        updated_at: '2026-11-18T12:30:00Z',
+        tags: [
+          {
+            id: 7,
+            name: 'Backend',
+            created_at: '2026-11-01T08:00:00Z',
+          },
+        ],
+        timer: {
+          id: 55,
+          task_id: 101,
+          mode: 'COUNT_DOWN',
+          target_duration_seconds: 1500,
+          state: 'PAUSED',
+          started_at: '2026-11-18T12:00:00Z',
+          last_resumed_at: null,
+          last_paused_at: '2026-11-18T12:10:00Z',
+          elapsed_seconds: 600,
+        },
+      },
+    ])
+
+    apiService.setAuthHandler({
+      getAccessToken: () => 'valid-bearer-token',
+      async refresh() {},
+      async expireSession() {},
+    })
+
+    const tasks = await kanbanApi.listTaskFeed()
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/kanban/tasks',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer valid-bearer-token',
+        }),
+      }),
+    )
+
+    expect(tasks).toEqual([
+      {
+        id: 101,
+        title: 'Audit API schema',
+        description: 'Verify Task Feed payload',
+        priority: 'HIGH',
+        position: 0,
+        columnId: 12,
+        boardId: 3,
+        boardTitle: 'Platform',
+        columnTitle: 'In Progress',
+        dueAt: '2026-11-25T15:00:00Z',
+        reminderOffsetSeconds: 3600,
+        totalSeconds: 1800,
+        createdAt: '2026-11-18T10:00:00Z',
+        updatedAt: '2026-11-18T12:30:00Z',
+        tags: [
+          {
+            id: 7,
+            name: 'Backend',
+            createdAt: '2026-11-01T08:00:00Z',
+          },
+        ],
+        timer: {
+          id: 55,
+          taskId: 101,
+          mode: 'COUNT_DOWN',
+          targetDurationSeconds: 1500,
+          state: 'PAUSED',
+          startedAt: '2026-11-18T12:00:00Z',
+          lastResumedAt: null,
+          lastPausedAt: '2026-11-18T12:10:00Z',
+          elapsedSeconds: 600,
+        },
+      },
+    ])
+  })
+
+  it('fetches the authenticated user tags via GET /api/kanban/tags without board_id and converts DTO fields to camelCase', async () => {
+    mockFetch.mockResolvedValue([
+      {
+        id: 9,
+        name: 'Deep Work',
+        created_at: '2026-11-10T09:15:00Z',
+      },
+    ])
+
+    apiService.setAuthHandler({
+      getAccessToken: () => 'valid-bearer-token',
+      async refresh() {},
+      async expireSession() {},
+    })
+
+    const tags = await kanbanApi.listUserTags()
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/kanban/tags',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer valid-bearer-token',
+        }),
+      }),
+    )
+
+    expect(tags).toEqual([
+      {
+        id: 9,
+        name: 'Deep Work',
+        createdAt: '2026-11-10T09:15:00Z',
+      },
+    ])
+  })
 })
