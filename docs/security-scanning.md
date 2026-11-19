@@ -1,4 +1,4 @@
-
+# Automated ZAP active scans
 
 Every push to `ZAP-test` runs the **ZAP active security scan** GitHub Actions
 workflow. There is no path filter, so documentation and configuration updates
