@@ -68,15 +68,14 @@
           <!-- Collaborators preview if available -->
           <div
             v-if="board.collaborators && board.collaborators.length > 0"
-            class="avatar-stack shrink-0"
+            class="avatar-stack relative z-10 shrink-0"
           >
-            <Avatar
+            <UserAvatar
               v-for="c in board.collaborators.slice(0, 3)"
               :key="c.id"
-              :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
-              shape="circle"
+              :user="c"
               size="small"
-              class="border-2 border-surface-0 user-avatar-primary text-[10px] font-bold dark:border-surface-900"
+              class="border-2 border-surface-0 font-bold dark:border-surface-900"
             />
             <span
               v-if="board.collaborators.length > 3"
@@ -96,6 +95,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import UserAvatar from '~/components/UserAvatar.vue'
 import type { KanbanBoardDto } from '~/api/kanban';
 import { useBoardPermissions } from '~/composables/useBoardPermissions'
 

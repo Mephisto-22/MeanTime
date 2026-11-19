@@ -52,12 +52,11 @@
             data-testid="collaborators-preview"
             class="avatar-stack"
           >
-            <Avatar
+            <UserAvatar
               v-for="c in board.collaborators.slice(0, 3)"
               :key="c.id"
-              :label="(c.display_name?.charAt(0) || 'U').toUpperCase()"
-              shape="circle"
-              class="border-2 border-surface-0 user-avatar-primary text-xs font-semibold dark:border-surface-900"
+              :user="c"
+              class="border-2 border-surface-0 text-xs font-semibold dark:border-surface-900"
             />
             <span
               v-if="board.collaborators.length > 3"
@@ -108,6 +107,7 @@
 
 <script setup lang="ts">
 import {kanbanApi} from '~/api/kanban';
+import UserAvatar from '~/components/UserAvatar.vue';
 import BoardShareDialog from '~/components/kanban/BoardShareDialog.vue';
 
 // Board ids are whole numbers; anything else gets Nuxt's 404 page without

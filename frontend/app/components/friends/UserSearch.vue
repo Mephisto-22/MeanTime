@@ -108,12 +108,10 @@
         >
           <!-- User Details -->
           <div class="flex items-center gap-3">
-            <Avatar
-              :label="getInitials(user.display_name, user.email || undefined)"
-              shape="circle"
+            <UserAvatar
+              :user="user"
               size="large"
               data-testid="user-avatar"
-              class="user-avatar-primary"
             />
             <div class="flex flex-col gap-0.5">
               <span
@@ -317,6 +315,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import { friendsApi, type UserSearchResultOut } from '~/api/friends'
 import { useAuthStore } from '~/stores/auth'
 
@@ -342,26 +341,6 @@ const errorMessage = ref<string | null>(null)
 const isUnfriendDialogOpen = ref(false)
 const isBlockDialogOpen = ref(false)
 const targetUser = ref<UserSearchResultOut | null>(null)
-
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
 
 async function handleSearch() {
   const query = searchQuery.value.trim()

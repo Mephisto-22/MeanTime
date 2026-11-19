@@ -332,11 +332,10 @@
                 >
                   <template #value="slotProps">
                     <div v-if="slotProps.value" class="flex items-center gap-2">
-                      <Avatar
-                        :label="getUserInitials(getMemberById(slotProps.value))"
-                        shape="circle"
+                      <UserAvatar
+                        :user="getMemberById(slotProps.value)"
                         size="small"
-                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                        class="font-bold"
                       />
                       <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
                     </div>
@@ -344,11 +343,10 @@
                   </template>
                   <template #option="slotProps">
                     <div class="flex items-center gap-2 py-0.5">
-                      <Avatar
-                        :label="getUserInitials(slotProps.option)"
-                        shape="circle"
+                      <UserAvatar
+                        :user="slotProps.option"
                         size="small"
-                        class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                        class="font-bold"
                       />
                       <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
                     </div>
@@ -460,16 +458,10 @@
                     >
                       {{ entry.note || '(No session note recorded)' }}
                     </p>
-                    <Avatar
+                    <UserAvatar
                       v-if="isShared"
-                      v-tooltip="getUserTooltip(entry.user)"
-                      :title="getUserTooltip(entry.user)"
-                      :label="entry.user ? getUserInitials(entry.user) : undefined"
-                      :icon="entry.user ? undefined : 'pi pi-user'"
-                      shape="circle"
-                      size="normal"
-                      class="shrink-0 text-[10px] font-bold"
-                      :class="entry.user ? 'user-avatar-primary' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300'"
+                      :user="entry.user"
+                      class="text-[10px] font-bold"
                       :data-testid="`time-entry-avatar-${entry.id}`"
                     />
                   </div>
@@ -556,11 +548,10 @@
                       >
                         <template #value="slotProps">
                           <div v-if="slotProps.value" class="flex items-center gap-2">
-                            <Avatar
-                              :label="getUserInitials(getMemberById(slotProps.value))"
-                              shape="circle"
+                            <UserAvatar
+                              :user="getMemberById(slotProps.value)"
                               size="small"
-                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                              class="font-bold"
                             />
                             <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
                           </div>
@@ -568,11 +559,10 @@
                         </template>
                         <template #option="slotProps">
                           <div class="flex items-center gap-2 py-0.5">
-                            <Avatar
-                              :label="getUserInitials(slotProps.option)"
-                              shape="circle"
+                            <UserAvatar
+                              :user="slotProps.option"
                               size="small"
-                              class="user-avatar-primary !w-5 !h-5 text-[10px] font-bold"
+                              class="font-bold"
                             />
                             <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
                           </div>
@@ -630,6 +620,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, inject, onMounted } from 'vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import type { TaskTimerDto, TaskTimeEntryDto, TimerMode } from '~/api/kanban'
 import {
   TIMER_MODE_CONFIG,
@@ -737,47 +728,6 @@ function getMemberName(id: number | string | null | undefined): string {
 function getUserDisplayName(user?: any): string {
   if (!user) return ''
   return user.displayName || user.display_name || ''
-}
-
-function getUserEmail(user?: any): string {
-  if (!user) return ''
-  return user.email || ''
-}
-
-function getUserInitials(user?: any): string {
-  const name = getUserDisplayName(user).trim()
-  const email = getUserEmail(user).trim()
-  if (name) {
-    const parts = name.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  if (email) {
-    return email.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
-
-function getUserTooltip(user?: any): string {
-  if (!user) return 'Unknown user'
-  const name = getUserDisplayName(user).trim()
-  const email = getUserEmail(user).trim()
-  if (name && email) {
-    return `${name}\n${email}`
-  }
-  if (name) {
-    return name
-  }
-  if (email) {
-    return email
-  }
-  return 'Unknown user'
 }
 
 const modeOptions = [

@@ -75,11 +75,10 @@
               :data-testid="'message-item-' + msg.id"
             >
               <div class="flex items-center gap-2">
-                <Avatar
+                <UserAvatar
                   v-if="msg.sender_id !== authStore.user?.id"
-                  :label="getInitials(msg.sender_name)"
-                  shape="circle"
-                  size="normal"
+                  :user="{ display_name: msg.sender_name }"
+                  variant="secondary"
                 />
                 <span
                   class="text-xs font-medium text-surface-600 dark:text-surface-400"
@@ -135,6 +134,7 @@
 
 <script setup lang="ts">
 import { ref, computed, inject } from 'vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import { kanbanContextKey } from '~/api/kanban'
 import type { BoardChatComposable } from '~/composables/useBoardChat'
 import { useAuthStore } from '~/stores/auth'
@@ -154,18 +154,6 @@ const chat = computed(() => props.boardChat ?? kanbanCtx?.boardChat ?? null)
 
 const messageText = ref('')
 const isSending = ref(false)
-
-function getInitials(name?: string | null): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const first = parts[0]
-  if (!first) return '?'
-  if (parts.length === 1) return first.slice(0, 2).toUpperCase()
-  const last = parts[parts.length - 1]
-  const firstChar = first[0] ?? ''
-  const lastChar = last?.[0] ?? ''
-  return (firstChar + lastChar).toUpperCase() || '?'
-}
 
 function formatTimestamp(dateStr?: string | null): string {
   if (!dateStr) return ''

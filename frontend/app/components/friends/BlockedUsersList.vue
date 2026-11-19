@@ -57,12 +57,11 @@
       >
         <!-- User Details -->
         <div class="flex items-center gap-3">
-          <Avatar
-            :label="getInitials(user.display_name, user.email)"
-            shape="circle"
+          <UserAvatar
+            :user="user"
             size="large"
+            variant="secondary"
             data-testid="blocked-user-avatar"
-            class="user-avatar-secondary"
           />
           <div class="flex flex-col gap-0.5">
             <span
@@ -97,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import UserAvatar from '~/components/UserAvatar.vue'
 import type { UserOut } from '~/api/friends'
 
 interface Props {
@@ -112,26 +112,6 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'unblock', userId: number): void
 }>()
-
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
 
 function handleUnblock(userId: number) {
   emit('unblock', userId)

@@ -78,10 +78,9 @@
               class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800"
             >
               <div class="flex items-center gap-3">
-                <Avatar
-                  :label="getInitials(board.owner.display_name, board.owner.email)"
-                  shape="circle"
-                  class="user-avatar-primary text-xs font-bold"
+                <UserAvatar
+                  :user="board.owner"
+                  class="text-xs font-bold"
                 />
                 <div class="flex flex-col">
                   <span class="text-sm font-medium">
@@ -105,10 +104,10 @@
                 class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
               >
                 <div class="flex items-center gap-3">
-                  <Avatar
-                    :label="getInitials(collaborator.display_name, collaborator.email)"
-                    shape="circle"
-                    class="user-avatar-secondary text-xs font-bold"
+                  <UserAvatar
+                    :user="collaborator"
+                    variant="secondary"
+                    class="text-xs font-bold"
                   />
                   <div class="flex flex-col">
                     <span class="text-sm font-medium">
@@ -227,6 +226,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import { 
   BOARD_ROLE_CONFIG,
   BOARD_ROLE_OPTIONS, 
@@ -312,26 +312,6 @@ onMounted(() => {
     loadFriends()
   }
 })
-
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
 
 async function handleInviteFriend() {
   if (!isOwner.value || !selectedFriendId.value || isUpdatingCollaborators.value) return

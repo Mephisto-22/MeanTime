@@ -6,11 +6,8 @@
       data-testid="collaborator-time-row"
       class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 py-2 text-sm"
     >
-      <Avatar
-        :label="person.userId === null ? undefined : initial(person.displayName)"
-        :icon="person.userId === null ? 'pi pi-user' : undefined"
-        shape="circle"
-        :class="person.userId === null ? 'user-avatar-secondary' : 'user-avatar-primary'"
+      <UserAvatar
+        :user="person.userId === null ? null : person"
         class="row-span-2 text-xs"
       />
       <span class="truncate font-medium">
@@ -38,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import UserAvatar from '~/components/UserAvatar.vue'
 import type { CollaboratorTimeDto } from '~/api/analytics'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 import { useAuthStore } from '~/stores/auth'
@@ -57,6 +55,4 @@ const rows = computed(() =>
     share: props.totalSeconds > 0 ? Math.round((person.totalSeconds / props.totalSeconds) * 100) : 0,
   })),
 )
-
-const initial = (name: string): string => (name.charAt(0) || 'U').toUpperCase()
 </script>

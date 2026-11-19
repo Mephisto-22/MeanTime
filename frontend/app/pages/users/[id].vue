@@ -10,11 +10,9 @@
           Manage your personal details, workspace preferences, and security credentials.
         </p>
       </div>
-      <Avatar
-        :label="getInitials(currentUser?.display_name, currentUser?.email)"
-        shape="circle"
+      <UserAvatar
+        :user="currentUser"
         size="large"
-        class="user-avatar-primary"
       />
     </div>
 
@@ -206,6 +204,7 @@
 import { useAuthStore } from '~/stores/auth'
 import { usersApi } from '~/api/users'
 import { getAvailableTimezones } from '~/utils/timezone'
+import UserAvatar from '~/components/UserAvatar.vue'
 import SaveConfirmDialog from '~/components/user/SaveConfirmDialog.vue'
 import DeleteAccountDialog from '~/components/user/DeleteAccountDialog.vue'
 
@@ -228,26 +227,6 @@ const isSaving = ref(false)
 const isDeleteDialogOpen = ref(false)
 const isDeleting = ref(false)
 const deleteError = ref<string | null>(null)
-
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
 
 function syncDraft() {
   draftDisplayName.value = currentUser.value?.display_name || ''
