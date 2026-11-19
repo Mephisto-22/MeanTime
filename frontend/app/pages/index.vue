@@ -106,6 +106,7 @@
     >
       <KanbanTaskFeed
         :tasks="feedTasks"
+        :user-tags="userTags"
         :loading="feedStatus === 'pending'"
         :error="feedError"
         @retry="() => refreshFeed()"
@@ -173,6 +174,11 @@ const [
     error: feedError,
     refresh: refreshFeed,
   },
+  {
+    data: userTags,
+    error: userTagsError,
+    refresh: refreshUserTags,
+  },
 ] = await Promise.all([
   useAsyncData('kanban-boards', () => kanbanApi.listBoards(), {
     default: () => [],
@@ -182,10 +188,13 @@ const [
     default: () => [],
     deep: true,
   }),
+  useAsyncData('kanban-user-tags', () => kanbanApi.listUserTags(), {
+    default: () => [],
+  }),
 ])
 
 const refreshAll = async (): Promise<void> => {
-  await Promise.all([refreshBoards(), refreshFeed()])
+  await Promise.all([refreshBoards(), refreshFeed(), refreshUserTags()])
 }
 
 // State for the board create/edit dialog. A null boardBeingEdited means creating a new board.
@@ -365,6 +374,14 @@ const {
   onAfterTaskUpdate: (task, updatedFromServer) => {
     syncUpdatedTask(task as TaskFeedItemDto, updatedFromServer)
   },
+  onAfterTagCreate: (created) => {
+    const exists = userTags.value.some(
+      tag => sameId(tag.id, created.id) || tag.name.toLowerCase() === created.name.toLowerCase(),
+    )
+    if (!exists) {
+      userTags.value = [...userTags.value, created]
+    }
+  },
   onAfterTimerChange: (task) => {
     const feedTask = task as TaskFeedItemDto
     const timestamp = new Date().toISOString()
@@ -439,5 +456,9 @@ watch(boardsError, (value) => {
 
 watch(feedError, (value) => {
   if (value) notify.error(value, 'Unable to load task feed')
+}, { immediate: true })
+
+watch(userTagsError, (value) => {
+  if (value) notify.error(value, 'Unable to load tags')
 }, { immediate: true })
 </script>

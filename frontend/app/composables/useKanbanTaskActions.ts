@@ -22,6 +22,7 @@ export interface KanbanTaskActionsOptions {
   removeTaskLocally?: (taskId: string | number) => boolean
   onAfterTaskUpdate?: (task: KanbanTaskDto, updatedFromServer?: KanbanTaskDto) => void
   onAfterTaskDelete?: (taskId: string | number) => void
+  onAfterTagCreate?: (tag: TagDto) => void
   onAfterTimerChange?: (task: KanbanTaskDto) => void
   onAfterTaskTotalChange?: (taskId: string | number, totalSeconds: number) => void
 }
@@ -163,6 +164,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
       if (!exists) {
         options.availableTags.value.push(created)
       }
+      options.onAfterTagCreate?.(created)
       return created
     } catch (err) {
       notify.error(err, 'Unable to create tag')
