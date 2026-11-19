@@ -19,11 +19,15 @@
           autofocus
           maxlength="100"
           placeholder="Enter column title"
-          :invalid="!!errorMessage && !title.trim()"
+          :invalid="showTitleError || (!!errorMessage && !title.trim())"
+          :aria-invalid="showTitleError || (!!errorMessage && !title.trim())"
+          :aria-describedby="showTitleError ? 'column-title-error' : undefined"
           :disabled="busy"
+          @input="markDirty('title')"
+          @blur="markBlurred('title')"
         />
 
-        <small v-if="!title.trim() && attemptedSave" class="text-red-500">
+        <small v-if="showTitleError" id="column-title-error" class="field-error-text">
           A column title is required.
         </small>
       </div>
@@ -151,9 +155,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { kanbanApi } from '~/api/kanban'
 import type { KanbanColumnDto } from '~/api/kanban'
+import { useFormValidation } from '~/composables/useFormValidation'
 
 const props = defineProps<{
   boardId: string | number
@@ -186,16 +191,17 @@ const autoClearEnabled = ref(false)
 const selectedPreset = ref<number | string>(259200)
 const customDays = ref<number | null>(3)
 const busy = ref(false)
-const attemptedSave = ref(false)
 const confirmingDelete = ref(false)
 const errorMessage = ref('')
+const { markDirty, markBlurred, markSubmitted, shouldShowError, reset: resetValidation } = useFormValidation()
+const showTitleError = computed(() => shouldShowError('title', !title.value.trim()))
 
 watch(
   () => [visible.value, props.column] as const,
   ([isVisible, column]) => {
     if (isVisible) {
+      resetValidation()
       title.value = column?.title ?? ''
-      attemptedSave.value = false
       confirmingDelete.value = false
       errorMessage.value = ''
 
@@ -221,7 +227,7 @@ watch(
 )
 
 const handleSave = async () => {
-  attemptedSave.value = true
+  markSubmitted()
   errorMessage.value = ''
 
   const trimmedTitle = title.value.trim()
