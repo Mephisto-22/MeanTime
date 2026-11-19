@@ -7,11 +7,10 @@
             <NuxtLink
               to="/"
               data-testid="brand-link"
-              class="flex items-center gap-3 no-underline"
+              class="inline-flex items-center text-2xl font-black tracking-tight uppercase text-surface-0 no-underline focus-visible:rounded"
               aria-label="MeanTime Home"
             >
-              <i class="pi pi-clock text-2xl text-primary" />
-              <span class="text-xl font-bold tracking-tight text-[var(--p-text-color)]">MeanTime</span>
+              MEAN<span class="text-primary-400">TIME</span>
             </NuxtLink>
           </template>
 

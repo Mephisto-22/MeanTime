@@ -101,16 +101,12 @@ describe('Default Layout Header Suite', () => {
       const wrapper = mountLayout()
       await flushPromises()
 
-      const clockIcon = wrapper.find('.pi-clock')
-      expect(clockIcon.exists()).toBe(true)
-      expect(wrapper.text()).toContain('MeanTime')
-
-      const brandLink = clockIcon.element.closest('a')
-      expect(brandLink).not.toBeNull()
-      expect(brandLink?.getAttribute('href') || brandLink?.getAttribute('to')).toBe('/')
-
       const brandWrapper = wrapper.find('[data-testid="brand-link"]')
       expect(brandWrapper.exists()).toBe(true)
+      expect(brandWrapper.text()).toBe('MEANTIME')
+      expect(wrapper.find('.pi-clock').exists()).toBe(false)
+      expect(brandWrapper.attributes('href') || brandWrapper.attributes('to')).toBe('/')
+
       await brandWrapper.trigger('click')
       await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
     })
@@ -289,13 +285,13 @@ describe('Default Layout Header Suite', () => {
       await flushPromises()
 
       const header = wrapper.find('header')
-      const brandIcon = header.find('.pi-clock').element
+      const brandLink = header.find('[data-testid="brand-link"]').element
       const boardsLink = header.find('[data-testid="boards-nav-link"]').element
       const friendsLink = header.find('[data-testid="friends-nav-link"]').element
       const profileBtn = header.find('[data-testid="user-profile-button"]').element
       const logoutBtn = header.find('[data-testid="logout-button"]').element
 
-      expect(brandIcon.compareDocumentPosition(boardsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(brandLink.compareDocumentPosition(boardsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(boardsLink.compareDocumentPosition(friendsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(friendsLink.compareDocumentPosition(profileBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(profileBtn.compareDocumentPosition(logoutBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
