@@ -101,7 +101,7 @@
       <template #subheader>
         <slot name="subheader">
           <div class="flex flex-col gap-2 shrink-0">
-            <label for="feed-search-input" class="sr-only">Search tasks by title</label>
+            <Label for="feed-search-input" class="sr-only">Search tasks by title</Label>
             <IconField>
               <InputIcon class="pi pi-search" />
               <InputText

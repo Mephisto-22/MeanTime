@@ -66,10 +66,18 @@
         @update="onUpdate"
         @add="onAdd"
       >
-        <template v-for="task in tasks" :key="task.id">
-          <slot name="task" :task="task">
-            <KanbanTask :task="task" :draggable="draggable" />
-          </slot>
+        <template v-if="$slots.task">
+          <template v-for="task in tasks" :key="task.id">
+            <slot name="task" :task="task" />
+          </template>
+        </template>
+        <template v-else>
+          <KanbanTask
+            v-for="task in tasks"
+            :key="task.id"
+            :task="task"
+            :draggable="draggable"
+          />
         </template>
       </VueDraggable>
     </div>

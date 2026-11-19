@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import ToastEventBus from 'primevue/toasteventbus'
-import { defineComponent, h, inject } from 'vue'
+import { defineComponent, h, inject, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kanbanApi, kanbanContextKey } from '~/api/kanban'
 import Board from '~/components/kanban/Board.vue'
@@ -880,5 +880,114 @@ describe('Board Component DOM & Optimistic Mutation Verification', () => {
 
     await flushPromises()
     expect(taskOnBoard.timer).toBeNull()
+  })
+
+  it('real Sortable drag across columns removes the task DOM node from the source column without duplicating', async () => {
+    const getSortable = (el: Element): any => {
+      const key = Object.keys(el).find(k => k.startsWith('Sortable'))
+      return key ? (el as any)[key] : null
+    }
+    const getDomTaskIds = (colEl: Element): Array<string | null> =>
+      Array.from(colEl.querySelectorAll('[data-testid="kanban-task"]')).map(el =>
+        el.getAttribute('data-task-id'),
+      )
+
+    const dragTaskAcrossColumns = async (
+      sourceColEl: Element,
+      targetColEl: Element,
+      taskId: string | number,
+      clientY = 100,
+    ) => {
+      const taskEl = sourceColEl.querySelector(
+        `[data-testid="kanban-task"][data-task-id="${taskId}"]`,
+      ) as HTMLElement
+      expect(taskEl).toBeTruthy()
+      const sourceSortable = getSortable(sourceColEl)
+      expect(sourceSortable).toBeTruthy()
+
+      taskEl.dispatchEvent(
+        new MouseEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: 10,
+          clientY: 10,
+        }),
+      )
+
+      const origFromPoint = document.elementFromPoint
+      document.elementFromPoint = () => targetColEl
+      try {
+        document.dispatchEvent(
+          new MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 }),
+        )
+        await new Promise(resolve => setTimeout(resolve, 20))
+        document.dispatchEvent(
+          new MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 300, clientY }),
+        )
+        sourceSortable._emulateDragOver()
+        document.dispatchEvent(
+          new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: 300, clientY }),
+        )
+      } finally {
+        document.elementFromPoint = origFromPoint
+      }
+
+      await flushPromises()
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await flushPromises()
+    }
+
+    const task1 = createTaskFixture({ id: 101, title: 'Task One', columnId: 1, position: 0 })
+    const task2 = createTaskFixture({ id: 102, title: 'Task Two', columnId: 1, position: 1 })
+    const task3 = createTaskFixture({ id: 103, title: 'Task Three', columnId: 2, position: 0 })
+    const board = createBoardFixture({
+      id: 1,
+      columns: [
+        createColumnFixture({ id: 1, title: 'To Do', position: 0, tasks: [task1, task2] }),
+        createColumnFixture({ id: 2, title: 'Doing', position: 1, tasks: [task3] }),
+      ],
+    })
+    const moveSpy = vi.spyOn(kanbanApi, 'moveTask').mockImplementation(async (taskId, payload) => ({
+      ...task1,
+      id: taskId,
+      columnId: payload.toColumnId,
+      position: payload.targetPosition,
+    }))
+
+    const wrapper = mount(Board, {
+      props: { board },
+      attachTo: document.body,
+      global: {
+        plugins: [PrimeVue, ToastService],
+        stubs: { Dialog: DialogStub },
+      },
+    })
+    try {
+      await flushPromises()
+      await nextTick()
+
+      const containers = wrapper.findAll('[data-testid="kanban-tasks-container"]')
+      const col1El = containers[0]!.element
+      const col2El = containers[1]!.element
+
+      await dragTaskAcrossColumns(col1El, col2El, 101, 100)
+      expect(getDomTaskIds(col1El)).toEqual(['102'])
+      expect(getDomTaskIds(col2El)).toEqual(['103', '101'])
+      expect(moveSpy).toHaveBeenCalledWith('101', { toColumnId: 2, targetPosition: 1 })
+
+      // Drag the remaining task to col2 (leaving col1 empty)
+      await dragTaskAcrossColumns(col1El, col2El, 102, 100)
+      expect(getDomTaskIds(col1El)).toEqual([])
+      expect(getDomTaskIds(col2El)).toEqual(['103', '101', '102'])
+
+      // Drag task 101 back into empty col1
+      await dragTaskAcrossColumns(col2El, col1El, 101, 100)
+      expect(getDomTaskIds(col1El)).toEqual(['101'])
+      expect(getDomTaskIds(col2El)).toEqual(['103', '102'])
+    } finally {
+      wrapper.unmount()
+    }
   })
 })
