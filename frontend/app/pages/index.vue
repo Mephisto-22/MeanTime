@@ -146,7 +146,11 @@
                   20:00
                 </div>
                 <div class="h-2 w-full rounded-full bg-surface-800 overflow-hidden" aria-hidden="true">
-                  <div class="h-full w-2/3 rounded-full bg-primary-500" />
+                  <div
+                    ref="focusProgressBar"
+                    class="focus-progress-fill h-full w-2/3 rounded-full bg-primary-500"
+                    :class="{ 'is-ready': progressReady, 'is-revealed': progressRevealed }"
+                  />
                 </div>
                 <LandingTaskSample :task="landingTasks.focus" />
               </div>
@@ -269,6 +273,10 @@ useSeoMeta({
 })
 
 const auth = useAuthStore()
+const focusProgressBar = ref<HTMLElement | null>(null)
+const progressReady = ref(false)
+const progressRevealed = ref(false)
+let progressObserver: IntersectionObserver | undefined
 
 const columns = [
   { title: 'To Do', task: landingTasks.plan },
@@ -277,10 +285,32 @@ const columns = [
 ]
 
 onMounted(async () => {
+  if (
+    focusProgressBar.value &&
+    typeof IntersectionObserver !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: no-preference)').matches
+  ) {
+    progressReady.value = true
+    progressObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          progressRevealed.value = true
+          progressObserver?.disconnect()
+        }
+      },
+      { threshold: 0.5, rootMargin: '0px 0px -40% 0px' }
+    )
+    progressObserver.observe(focusProgressBar.value)
+  }
+
   await auth.initializeSession()
   if (auth.isAuthenticated) {
     await navigateTo('/boards', { replace: true })
   }
+})
+
+onBeforeUnmount(() => {
+  progressObserver?.disconnect()
 })
 </script>
 
@@ -305,11 +335,24 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .focus-progress-fill {
+    transform-origin: left;
+    transition: transform 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .focus-progress-fill.is-ready:not(.is-revealed) {
+    transform: scaleX(0.05);
+  }
+
+  .focus-progress-fill.is-revealed {
+    transform: scaleX(1);
+  }
+
   @supports ((animation-timeline: view()) and (animation-range: entry)) {
     @keyframes section-reveal {
       from {
-        opacity: 0.2;
-        translate: 0 1.25rem;
+        opacity: 0;
+        translate: 0 2rem;
       }
       to {
         opacity: 1;
@@ -318,9 +361,9 @@ a:focus-visible {
     }
 
     [data-reveal] {
-      animation: section-reveal auto ease-out both;
+      animation: section-reveal auto linear both;
       animation-timeline: view();
-      animation-range: entry 0% entry 40%;
+      animation-range: entry 0% entry 55%;
     }
   }
 }
