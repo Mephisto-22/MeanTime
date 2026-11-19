@@ -96,7 +96,7 @@ const menuItems = computed(() => {
     {
       label: 'Boards',
       icon: 'pi pi-th-large',
-      route: '/',
+      route: '/boards',
       active: isBoardsActive.value,
       testId: 'boards-nav-link',
     },

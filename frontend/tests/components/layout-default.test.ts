@@ -115,17 +115,17 @@ describe('Default Layout Header Suite', () => {
       await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
     })
 
-    it('renders boards navigation button when authenticated pointing to /', async () => {
+    it('renders boards navigation button pointing to /boards', async () => {
       const wrapper = mountLayout()
       await flushPromises()
 
       const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
       expect(boardsLink.exists()).toBe(true)
-      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/boards')
       expect(boardsLink.text()).toContain('Boards')
     })
 
-    it('navigates to / when boards navigation button is clicked', async () => {
+    it('navigates to /boards when boards navigation button is clicked', async () => {
       const router = useRouter()
       await router.push('/friends')
       const wrapper = mountLayout()
@@ -133,10 +133,10 @@ describe('Default Layout Header Suite', () => {
 
       const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
       expect(boardsLink.exists()).toBe(true)
-      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/boards')
 
       await boardsLink.trigger('click')
-      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/boards'))
     })
 
     it('displays active visual highlight on boards navigation button when route is / or /boards/*', async () => {

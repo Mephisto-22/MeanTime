@@ -1,344 +1,90 @@
 <template>
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-    <section class="lg:col-span-8 flex flex-col gap-6 min-w-0">
-      <!-- Header Toolbar -->
-      <Toolbar class="border-none bg-transparent p-0">
-        <template #start>
-          <div class="flex flex-col gap-1">
-            <h1 class="text-3xl font-extrabold tracking-tight text-surface-900 dark:text-surface-0">
-              Your boards
-            </h1>
-            <p class="text-sm text-surface-600 dark:text-surface-400">
-              Pick a board to open, or work directly from your docked Task Feed.
-            </p>
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+    <section class="overflow-hidden rounded-3xl border border-surface-800 bg-surface-900" aria-labelledby="landing-title">
+      <div class="grid items-center gap-12 p-6 sm:p-10 lg:grid-cols-2 lg:p-16">
+        <div>
+          <p class="mb-5 flex items-center gap-2 text-sm font-semibold text-primary-400">
+            <i class="pi pi-clock" aria-hidden="true" /> Make time for what matters
+          </p>
+          <h1 id="landing-title" class="max-w-xl text-4xl font-bold tracking-tight text-surface-0 sm:text-5xl lg:text-6xl">
+            Your tasks. Your time.<br><span class="text-primary-400">One clear workspace.</span>
+          </h1>
+          <p class="mt-6 max-w-lg text-lg leading-relaxed text-surface-400">
+            Bring your plans into focus with MeanTime. Organize tasks on boards,
+            track your focus sessions, and keep moving forward with your team.
+          </p>
+          <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+            <NuxtLink to="/register" class="landing-action bg-primary-500 text-white hover:bg-primary-600" data-testid="landing-register">
+              Create an account <i class="pi pi-arrow-right" aria-hidden="true" />
+            </NuxtLink>
+            <NuxtLink to="/login" class="landing-action border border-surface-700 text-surface-0 hover:bg-surface-800" data-testid="landing-login">
+              Log in
+            </NuxtLink>
           </div>
-        </template>
-        <template #end>
-          <Button
-            v-if="boards.length !== 0"
-            data-testid="new-board-button"
-            label="New board"
-            icon="pi pi-plus"
-            @click="openCreateDialog"
-          />
-        </template>
-      </Toolbar>
+        </div>
 
-      <!-- Loading (first load only; a re-fetch keeps showing the current boards) -->
-      <div
-        v-if="boardsStatus === 'pending' && boards.length === 0"
-        data-testid="boards-loading"
-        class="grid grid-cols-1 gap-5 sm:grid-cols-2"
-      >
-        <Skeleton
-          v-for="n in 3"
-          :key="n"
-          height="14rem"
-          border-radius="16px"
-        />
-      </div>
-
-      <!-- Error -->
-      <div
-        v-else-if="boardsError"
-        data-testid="boards-error"
-        class="error-state-card"
-      >
-        <div class="flex flex-wrap items-center gap-3">
-          <span>We couldn't load your boards.</span>
-          <Button
-            label="Try again"
-            icon="pi pi-refresh"
-            severity="danger"
-            text
-            size="small"
-            @click="() => refreshBoards()"
-          />
+        <div class="rounded-2xl border border-surface-700 bg-surface-950 p-5 sm:p-6" aria-label="Example task board">
+          <div class="mb-6 flex items-center justify-between gap-3">
+            <span class="font-semibold text-surface-0">A little progress, every day</span>
+            <i class="pi pi-th-large text-surface-500" aria-hidden="true" />
+          </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div v-for="column in preview" :key="column.title" class="rounded-xl border border-surface-800 bg-surface-900 p-3">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-surface-400">{{ column.title }}</p>
+              <div class="rounded-lg border border-surface-700 bg-surface-800 p-3">
+                <span class="mb-3 block h-1 w-7 rounded-full" :class="column.accent" />
+                <p class="text-sm leading-relaxed text-surface-100">{{ column.task }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-5 flex items-center gap-3 rounded-xl border border-primary-900 bg-primary-950/40 px-4 py-3 text-sm text-primary-300">
+            <i class="pi pi-stopwatch" aria-hidden="true" /> Room for your next focus session
+          </div>
+          <p class="mt-4 text-xs text-surface-500">An example of your workspace. Your boards start with you.</p>
         </div>
       </div>
-
-      <!-- Empty -->
-      <Panel
-        v-else-if="boards.length === 0"
-        data-testid="boards-empty"
-        class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
-      >
-        <div class="flex flex-col items-center justify-center gap-5 py-20 text-center">
-          <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50 shadow-sm">
-            <i class="pi pi-th-large text-4xl" />
-          </div>
-          <div class="flex flex-col gap-1.5 max-w-sm">
-            <h2 class="text-xl font-bold text-surface-900 dark:text-surface-0">
-              You have no boards yet
-            </h2>
-            <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-              Create your first board to start tracking tasks and recording focused time sessions.
-            </p>
-          </div>
-          <Button
-            label="New board"
-            icon="pi pi-plus"
-            @click="openCreateDialog"
-          />
-        </div>
-      </Panel>
-
-      <!-- Boards Grid -->
-      <ul
-        v-else
-        class="grid grid-cols-1 gap-5 sm:grid-cols-2 list-none p-0 m-0"
-      >
-        <li
-          v-for="board in boards"
-          :key="board.id"
-        >
-          <KanbanBoardCard
-            :board="board"
-            @edit="openEditDialog"
-          />
-        </li>
-      </ul>
     </section>
 
-    <aside
-      data-testid="task-feed-rail"
-      class="lg:col-span-4 lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)] flex flex-col min-h-[420px] min-w-0"
-    >
-      <KanbanTaskFeed
-        :tasks="feedTasks"
-        :user-tags="userTags"
-        :loading="feedStatus === 'pending'"
-        :error="feedError"
-        @retry="() => refreshFeed()"
-      />
-    </aside>
-
-    <KanbanBoardFormDialog
-      v-model:visible="isDialogOpen"
-      :board="boardBeingEdited"
-      @saved="refreshAll"
-      @deleted="refreshAll"
-    />
-
-    <KanbanTaskDialog
-      v-if="!activeTask || canEditFeedTask(activeTask)"
-      v-model:visible="isTaskDialogOpen"
-      mode="edit"
-      :task="activeTask"
-      :column-id="activeTask?.columnId ?? null"
-      :board-id="activeTask?.boardId ?? null"
-      :board-title="activeTask?.boardTitle ?? null"
-      :columns="activeBoardColumns"
-      :available-tags="activeBoardTags"
-      @save="saveTask"
-      @delete="deleteTask"
-      @timer-expired="handleDialogTimerExpired"
-    />
-    <ViewerTaskDialog
-      v-else
-      v-model:visible="isTaskDialogOpen"
-      :task="activeTask"
-    />
+    <section class="mt-8 grid gap-4 md:grid-cols-3" aria-label="What you can do with MeanTime">
+      <article v-for="feature in features" :key="feature.title" class="rounded-2xl border border-surface-800 bg-surface-900 p-6">
+        <i :class="feature.icon" class="mb-4 text-xl text-primary-400" aria-hidden="true" />
+        <h2 class="text-lg font-semibold text-surface-0">{{ feature.title }}</h2>
+        <p class="mt-2 text-sm leading-relaxed text-surface-400">{{ feature.description }}</p>
+      </article>
+    </section>
+    <footer class="mt-10 text-center text-sm text-surface-500">MeanTime · Make your time count.</footer>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  kanbanApi,
-  kanbanContextKey,
-  type KanbanBoardDto,
-  type KanbanColumnSummary,
-  type KanbanTaskDto,
-  type TagDto,
-  type TaskFeedItemDto,
-  type TaskTimeEntryDto,
-} from '~/api/kanban'
-import KanbanTaskDialog from '~/components/kanban/TaskDialog.vue'
-import KanbanTaskFeed from '~/components/kanban/TaskFeed.vue'
-import ViewerTaskDialog from '~/components/kanban/ViewerTaskDialog.vue'
-import { canEditBoard } from '~/composables/useBoardPermissions'
-import {
-  getBoardMembers,
-  isBoardShared,
-  sameId,
-  useKanbanTaskActions,
-} from '~/composables/useKanbanTaskActions'
-import { useTaskFeedSync } from '~/composables/useTaskFeedSync'
 import { useAuthStore } from '~/stores/auth'
 
-const notify = useNotifications()
+definePageMeta({ public: true })
+useSeoMeta({
+  title: 'MeanTime — Your tasks. Your time.',
+  description: 'Organize your tasks, track focused time, and collaborate with your team in MeanTime.',
+})
+
 const auth = useAuthStore()
-
-// The backend is the source of truth: after every board create, edit, or delete
-// both boards and the Task Feed are fetched again in parallel.
-const [
-  {
-    data: boards,
-    status: boardsStatus,
-    error: boardsError,
-    refresh: refreshBoards,
-  },
-  {
-    data: feedTasks,
-    status: feedStatus,
-    error: feedError,
-    refresh: refreshFeed,
-  },
-  {
-    data: userTags,
-    error: userTagsError,
-    refresh: refreshUserTags,
-  },
-] = await Promise.all([
-  useAsyncData('kanban-boards', () => kanbanApi.listBoards(), {
-    default: () => [],
-    deep: true,
-  }),
-  useAsyncData('kanban-task-feed', () => kanbanApi.listTaskFeed(), {
-    default: () => [],
-    deep: true,
-  }),
-  useAsyncData('kanban-user-tags', () => kanbanApi.listUserTags(), {
-    default: () => [],
-  }),
-])
-
-const refreshAll = async (): Promise<void> => {
-  await Promise.all([refreshBoards(), refreshFeed(), refreshUserTags()])
-}
-
-// State for the board create/edit dialog. A null boardBeingEdited means creating a new board.
-const isDialogOpen = ref(false)
-const boardBeingEdited = ref<KanbanBoardDto | null>(null)
-
-function openCreateDialog(): void {
-  boardBeingEdited.value = null
-  isDialogOpen.value = true
-}
-
-function openEditDialog(board: KanbanBoardDto): void {
-  boardBeingEdited.value = board
-  isDialogOpen.value = true
-}
-
-const isTaskDialogOpen = ref(false)
-const activeTask = ref<TaskFeedItemDto | null>(null)
-const activeBoardTags = ref<TagDto[]>([])
-let tagRequestCounter = 0
-
-const activeBoard = computed(() => {
-  if (!activeTask.value) return undefined
-  return boards.value.find(board => sameId(board.id, activeTask.value?.boardId))
+onMounted(async () => {
+  await auth.initializeSession()
+  if (auth.isAuthenticated) await navigateTo('/boards', { replace: true })
 })
 
-const activeBoardColumns = computed<KanbanColumnSummary[]>(() => {
-  if (activeBoard.value?.columns && activeBoard.value.columns.length > 0) {
-    return [...activeBoard.value.columns]
-      .sort((a, b) => a.position - b.position)
-      .map(col => ({ id: col.id, title: col.title }))
-  }
-  if (activeTask.value) {
-    return [{ id: activeTask.value.columnId, title: activeTask.value.columnTitle }]
-  }
-  return []
-})
-
-const activeBoardIsShared = computed(() => isBoardShared(activeBoard.value))
-const activeBoardMembers = computed(() => getBoardMembers(activeBoard.value))
-
-const canEditFeedTask = (task: KanbanTaskDto): boolean => {
-  const feedTask = task as TaskFeedItemDto
-  const board = boards.value.find(b => sameId(b.id, feedTask.boardId))
-  if (!board) return false
-  return canEditBoard(board, auth.user?.id)
-}
-
-const taskFeedSync = useTaskFeedSync({
-  boards,
-  feedTasks,
-  userTags,
-  activeTask,
-})
-
-const {
-  updateTask,
-  deleteTask,
-  saveTask,
-  createTag,
-  startTimer,
-  pauseTimer,
-  stopTimer,
-  setTaskTotal,
-  handleTimerExpired,
-} = useKanbanTaskActions({
-  canEdit: (taskId) => {
-    if (taskId == null) return activeTask.value ? canEditFeedTask(activeTask.value) : true
-    const feedTask = taskFeedSync.findFeedTask(taskId)
-    return feedTask ? canEditFeedTask(feedTask) : false
-  },
-  findTask: taskFeedSync.findFeedTask,
-  availableTags: activeBoardTags,
-  createSnapshot: taskFeedSync.createSnapshot,
-  moveTaskLocally: taskFeedSync.moveTaskLocally,
-  removeTaskLocally: taskFeedSync.removeTaskLocally,
-  onAfterTaskUpdate: taskFeedSync.onAfterTaskUpdate,
-  onAfterTagCreate: taskFeedSync.onAfterTagCreate,
-  onAfterTimerChange: taskFeedSync.onAfterTimerChange,
-  onAfterTaskTotalChange: taskFeedSync.onAfterTaskTotalChange,
-})
-
-const openEditTaskDialog = (task: KanbanTaskDto): void => {
-  const feedTask = task as TaskFeedItemDto
-  activeTask.value = feedTask
-  activeBoardTags.value = []
-  isTaskDialogOpen.value = true
-
-  const requestId = ++tagRequestCounter
-  void kanbanApi.listTags(feedTask.boardId).then(
-    (tags) => {
-      if (requestId !== tagRequestCounter) return
-      activeBoardTags.value = tags || []
-    },
-    (err) => {
-      if (requestId !== tagRequestCounter) return
-      notify.error(err, 'Unable to fetch tags')
-    },
-  )
-}
-
-const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
-  if (activeTask.value) {
-    handleTimerExpired(activeTask.value, entry)
-  }
-}
-
-provide(kanbanContextKey, {
-  canEdit: computed(() => activeTask.value ? canEditFeedTask(activeTask.value) : true),
-  canEditTask: canEditFeedTask,
-  columns: activeBoardColumns,
-  availableTags: computed(() => activeBoardTags.value),
-  isShared: activeBoardIsShared,
-  boardMembers: activeBoardMembers,
-  createTag,
-  openEditTaskDialog,
-  updateTask,
-  deleteTask,
-  startTimer,
-  pauseTimer,
-  stopTimer,
-  setTaskTotal,
-  onTimerExpired: handleTimerExpired,
-})
-
-watch(boardsError, (value) => {
-  if (value) notify.error(value, 'Unable to load boards')
-}, { immediate: true })
-
-watch(feedError, (value) => {
-  if (value) notify.error(value, 'Unable to load task feed')
-}, { immediate: true })
-
-watch(userTagsError, (value) => {
-  if (value) notify.error(value, 'Unable to load tags')
-}, { immediate: true })
+const preview = [
+  { title: 'To do', task: 'Plan the next step', accent: 'bg-surface-500' },
+  { title: 'In progress', task: 'Make space to focus', accent: 'bg-primary-400' },
+  { title: 'Done', task: 'Celebrate progress', accent: 'bg-emerald-400' },
+]
+const features = [
+  { title: 'See the bigger picture', icon: 'pi pi-th-large', description: 'Turn your plans into tasks and move them across boards as your work progresses.' },
+  { title: 'Find your focus', icon: 'pi pi-clock', description: 'Track time on your tasks and make room for focused work sessions.' },
+  { title: 'Move forward together', icon: 'pi pi-users', description: 'Connect with friends and share boards to keep your team on the same page.' },
+]
 </script>
+
+<style scoped>
+.landing-action {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold no-underline transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-400;
+}
+</style>
