@@ -4,6 +4,7 @@ import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import Card from 'primevue/card'
 import Divider from 'primevue/divider'
+import Select from 'primevue/select'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import UserProfilePage from '~/pages/users/[id].vue'
 import { usersApi } from '~/api/users'
@@ -32,6 +33,7 @@ async function mountPage() {
       components: {
         Card,
         Divider,
+        Select,
       },
     },
   })
@@ -106,6 +108,75 @@ describe('UserProfilePage Redesign Suite', () => {
     await wrapper.find('[data-testid="cancel-edit-button"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="input-display-name"]').exists()).toBe(false)
+  })
+
+  it('toggles timezone editing mode with a searchable Select dropdown containing valid timezones', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[data-testid="input-timezone"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="edit-timezone-button"]').trigger('click')
+    await flushPromises()
+
+    const selectEl = wrapper.find('[data-testid="input-timezone"]')
+    expect(selectEl.exists()).toBe(true)
+
+    const selectComp = wrapper.findComponent({ name: 'Select' })
+    expect(selectComp.exists()).toBe(true)
+    expect(selectComp.props('filter')).toBe(true)
+    expect(selectComp.props('labelId')).toBe('input-timezone')
+    expect(selectComp.props('ariaLabelledby')).toBe('label-timezone')
+    expect(wrapper.find('label#label-timezone[for="input-timezone"]').exists()).toBe(true)
+    const combobox = selectComp.find('[role="combobox"]')
+    expect(combobox.attributes('id')).toBe('input-timezone')
+    expect(combobox.attributes('aria-labelledby')).toBe('label-timezone')
+    expect(selectComp.props('modelValue')).toBe('America/New_York')
+    expect(selectComp.props('options')).toEqual(
+      expect.arrayContaining(['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Europe/Kyiv']),
+    )
+
+    // Selecting a new timezone and canceling restores original timezone on next edit
+    selectComp.vm.$emit('update:modelValue', 'Europe/London')
+    await flushPromises()
+    await wrapper.find('[data-testid="cancel-edit-button"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="input-timezone"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="edit-timezone-button"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'Select' }).props('modelValue')).toBe('America/New_York')
+  })
+
+  it('saves selected timezone from the dropdown when confirmed', async () => {
+    const updateSpy = vi.spyOn(usersApi, 'updateMe').mockResolvedValue({
+      id: 42,
+      email: 'alex@example.com',
+      display_name: 'Alex Johnson',
+      timezone: 'Europe/London',
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    })
+
+    const wrapper = await mountPage()
+    await wrapper.find('[data-testid="edit-timezone-button"]').trigger('click')
+    await flushPromises()
+
+    const selectComp = wrapper.findComponent({ name: 'Select' })
+    selectComp.vm.$emit('update:modelValue', 'Europe/London')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="save-profile-button"]').trigger('click')
+    await flushPromises()
+
+    const confirmSaveBtn = document.body.querySelector('[data-testid="save-confirm-save-button"]') as HTMLButtonElement
+    expect(confirmSaveBtn).not.toBeNull()
+    confirmSaveBtn.click()
+    await flushPromises()
+
+    expect(updateSpy).toHaveBeenCalledWith({
+      display_name: 'Alex Johnson',
+      timezone: 'Europe/London',
+    })
   })
 
   it('handles save confirmation flow, updates user store, and triggers success toast notification', async () => {

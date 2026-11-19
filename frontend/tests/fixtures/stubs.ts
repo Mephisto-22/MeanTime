@@ -92,6 +92,8 @@ export const DatePickerStub = {
       const val = e.target.value
       if (this.isTimeOnly) {
         this.$emit('update:modelValue', val)
+      } else if (typeof val === 'string' && (val.includes('-') || val.includes('/'))) {
+        this.$emit('update:modelValue', new Date(val))
       } else {
         const num = parseInt(val, 10)
         if (!isNaN(num)) {

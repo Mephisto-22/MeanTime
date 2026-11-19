@@ -93,7 +93,7 @@ class BoardAnalyticsTotalsTests(BoardAnalyticsTestCase):
 
         self.assertEqual([column["title"] for column in data["columns"]], ["Done", "To Do"])
 
-    def test_top_tasks_are_the_five_longest_with_tracked_time(self):
+    def test_top_tasks_are_every_task_with_tracked_time_longest_first(self):
         for minutes in (1, 7, 3, 9, 5, 2):
             self.add_task(self.todo, f"{minutes} min", minutes * 60)
         self.add_task(self.done, "Untracked")
@@ -102,7 +102,7 @@ class BoardAnalyticsTotalsTests(BoardAnalyticsTestCase):
 
         self.assertEqual(
             [task["title"] for task in data["top_tasks"]],
-            ["9 min", "7 min", "5 min", "3 min", "2 min"],
+            ["9 min", "7 min", "5 min", "3 min", "2 min", "1 min"],
         )
         first = data["top_tasks"][0]
         self.assertEqual(first["column_id"], self.todo.id)

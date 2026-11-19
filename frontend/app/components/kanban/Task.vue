@@ -28,6 +28,19 @@
           </h4>
 
           <div class="flex items-center gap-1.5 shrink-0">
+            <!-- Due Date Badge -->
+            <span
+              v-if="hasDueDate"
+              data-testid="task-due-date-badge"
+              :data-status="dueDateStatus"
+              class="kanban-due-date-badge inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide"
+              :class="dueDateBadgeClass"
+              :title="`Due: ${fullDueDateString}`"
+            >
+              <i :class="dueDateIcon" class="text-[10px]" aria-hidden="true" />
+              <span>{{ dueDateLabel }}</span>
+            </span>
+
             <!-- Recurring Icon Badge -->
             <span
               v-if="isRecurring"
@@ -113,10 +126,18 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
-import { kanbanContextKey, TASK_PRIORITY_CONFIG, DEFAULT_TASK_PRIORITY_BORDER_CLASS } from '~/api/kanban'
+import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto, DueDateStatus } from '~/api/kanban'
+import {
+  kanbanContextKey,
+  TASK_PRIORITY_CONFIG,
+  DEFAULT_TASK_PRIORITY_BORDER_CLASS,
+  TASK_DUE_DATE_STATUS_CONFIG,
+  getDueDateStatus,
+  formatDueDateBadge,
+} from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
+import { useNow } from '~/composables/useNow'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
 const props = defineProps<{
@@ -172,6 +193,36 @@ const isRecurring = computed(() => {
   return Boolean(props.task.recurringTaskId || props.task.recurringTask)
 })
 
+const rawDueAt = computed(() => props.task.dueAt)
+
+const hasDueDate = computed(() => Boolean(rawDueAt.value))
+
+const now = useNow()
+
+const dueDateStatus = computed<DueDateStatus | null>(() => {
+  if (!rawDueAt.value) return null
+  return getDueDateStatus(rawDueAt.value, now.value)
+})
+
+const dueDateConfig = computed(() => {
+  if (!dueDateStatus.value) return null
+  return TASK_DUE_DATE_STATUS_CONFIG[dueDateStatus.value]
+})
+
+const dueDateBadgeClass = computed(() => dueDateConfig.value?.badgeClass ?? '')
+const dueDateIcon = computed(() => dueDateConfig.value?.icon ?? 'pi pi-calendar')
+
+const dueDateLabel = computed(() => {
+  if (!rawDueAt.value) return ''
+  return formatDueDateBadge(rawDueAt.value)
+})
+
+const fullDueDateString = computed(() => {
+  if (!rawDueAt.value) return ''
+  const d = new Date(rawDueAt.value)
+  return isNaN(d.getTime()) ? '' : d.toLocaleString()
+})
+
 const priorityConfig = computed(() => {
   const p = props.task.priority
   return (p && p in TASK_PRIORITY_CONFIG) ? TASK_PRIORITY_CONFIG[p] : null
@@ -221,6 +272,12 @@ defineExpose({
   priorityLabel,
   priorityBadgeClass,
   priorityDotClass,
+  hasDueDate,
+  dueDateStatus,
+  dueDateBadgeClass,
+  dueDateIcon,
+  dueDateLabel,
+  fullDueDateString,
   hasDescription,
   hasTotal,
   formattedTotal,

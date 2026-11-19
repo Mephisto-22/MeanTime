@@ -397,6 +397,20 @@ const handleBoardEvent = (event: BoardEvent): void => {
       void refreshTaskTotal(data.taskId)
       break
     }
+
+    case 'chat.message_created': {
+      if (data.message) {
+        boardChat.receiveMessage(data.message)
+      }
+      break
+    }
+  }
+}
+
+const handleBoardReconnect = async (): Promise<void> => {
+  await refreshNuxtData()
+  if (boardChat.isOpen.value) {
+    await boardChat.loadHistory()
   }
 }
 
@@ -404,9 +418,7 @@ const handleBoardEvent = (event: BoardEvent): void => {
 const boardEvents = useBoardEvents({
   boardId: props.board.id,
   onEvent: handleBoardEvent,
-  onReconnect: async () => {
-    await refreshNuxtData()
-  },
+  onReconnect: handleBoardReconnect,
 })
 
 watch(
@@ -559,6 +571,8 @@ const handleCreateTask = async (
     columnId,
     priority: payload.priority ?? null,
     tags: payload.tags ?? [],
+    dueAt: payload.dueAt ?? null,
+    reminderOffsetSeconds: payload.reminderOffsetSeconds ?? null,
     recurringTaskId: null,
     recurringTask: null,
   }
@@ -574,6 +588,12 @@ const handleCreateTask = async (
     }
     if (payload.tagIds !== undefined) {
       createPayload.tagIds = payload.tagIds
+    }
+    if (payload.dueAt !== undefined) {
+      createPayload.dueAt = payload.dueAt
+    }
+    if (payload.reminderOffsetSeconds !== undefined) {
+      createPayload.reminderOffsetSeconds = payload.reminderOffsetSeconds
     }
     if (payload.recurrence) {
       createPayload.recurrence = payload.recurrence
@@ -611,6 +631,12 @@ const handleCreateTask = async (
           createdTask.priority ?? optimisticLocation.task.priority
         optimisticLocation.task.tags =
           createdTask.tags ?? optimisticLocation.task.tags
+        if (createdTask.dueAt !== undefined) {
+          optimisticLocation.task.dueAt = createdTask.dueAt
+        }
+        if (createdTask.reminderOffsetSeconds !== undefined) {
+          optimisticLocation.task.reminderOffsetSeconds = createdTask.reminderOffsetSeconds
+        }
         if (createdTask.recurringTaskId !== undefined) {
           optimisticLocation.task.recurringTaskId = createdTask.recurringTaskId
         }
@@ -650,12 +676,20 @@ const applyTaskUpdates = (
     priority?: TaskPriorityType
     tags?: TagDto[]
     timer?: TaskTimerDto | null
+    dueAt?: string | null
+    reminderOffsetSeconds?: number | null
   },
 ): void => {
   if (source.title !== undefined) target.title = source.title
   if (source.description !== undefined) target.description = source.description
   if (source.priority !== undefined) target.priority = source.priority
   if (source.tags !== undefined) target.tags = source.tags
+  if (source.dueAt !== undefined) {
+    target.dueAt = source.dueAt ?? null
+  }
+  if (source.reminderOffsetSeconds !== undefined) {
+    target.reminderOffsetSeconds = source.reminderOffsetSeconds ?? null
+  }
   if (source.timer !== undefined) {
     if (source.timer === null || source.timer.mode === 'NONE') {
       target.timer = null
@@ -736,6 +770,12 @@ const handleUpdateTask = async (
     }
     if (payload.tagIds !== undefined) {
       updatePayload.tagIds = payload.tagIds
+    }
+    if (payload.dueAt !== undefined) {
+      updatePayload.dueAt = payload.dueAt
+    }
+    if (payload.reminderOffsetSeconds !== undefined) {
+      updatePayload.reminderOffsetSeconds = payload.reminderOffsetSeconds
     }
     if ((payload as any).applyToFuture !== undefined) {
       updatePayload.applyToFuture = (payload as any).applyToFuture
@@ -841,6 +881,8 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       priority: savePayload.priority,
       tags: savePayload.tags,
       tagIds: savePayload.tagIds,
+      dueAt: savePayload.dueAt,
+      reminderOffsetSeconds: savePayload.reminderOffsetSeconds,
       recurrence: savePayload.recurrence,
       timer: savePayload.timer,
     })
@@ -854,6 +896,12 @@ const handleSaveTask = async (savePayload: TaskDialogSavePayload): Promise<void>
       columnId: savePayload.columnId,
       applyToFuture: savePayload.applyToFuture,
       timer: savePayload.timer,
+    }
+    if (savePayload.dueAt !== undefined) {
+      updateTaskPayload.dueAt = savePayload.dueAt
+    }
+    if (savePayload.reminderOffsetSeconds !== undefined) {
+      updateTaskPayload.reminderOffsetSeconds = savePayload.reminderOffsetSeconds
     }
     if (savePayload.recurrence) {
       updateTaskPayload.recurrence = savePayload.recurrence
@@ -1194,6 +1242,8 @@ defineExpose({
   localColumns,
   availableTags,
   boardChat,
+  handleBoardEvent,
+  handleBoardReconnect,
   handleMoveTask,
   isTaskDialogOpen,
   dialogMode,

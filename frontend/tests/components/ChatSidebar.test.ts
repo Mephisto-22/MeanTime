@@ -68,7 +68,9 @@ function createMockBoardChat(
     isOpen,
     loading,
     loadHistory: vi.fn().mockResolvedValue(undefined),
-    pollMessages: vi.fn().mockResolvedValue(undefined),
+    receiveMessage: vi.fn((msg: any) => {
+      messages.value.push(msg)
+    }),
     sendMessage: vi.fn().mockImplementation(async (text: string) => {
       const msg: MessageOut = {
         id: 99,
@@ -90,7 +92,6 @@ function createMockBoardChat(
     toggle: vi.fn(() => {
       isOpen.value = !isOpen.value
     }),
-    stopPolling: vi.fn(),
   }
 }
 
@@ -298,6 +299,85 @@ describe('Board-Scoped ChatSidebar & Board Integration Suite', () => {
     expect(wrapper.find('[data-testid="chat-drawer"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="active-chat-title"]').text()).toContain(
       'Team Board',
+    )
+  })
+
+  it('Board.vue forwards chat.message_created SSE events from collaborators into boardChat and renders them in ChatSidebar', async () => {
+    vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValue([...mockMessages])
+
+    const sharedBoard: KanbanBoardDto = {
+      id: 10,
+      title: 'Team Board',
+      description: 'Shared work',
+      isOwner: true,
+      collaborators: [
+        {
+          id: 2,
+          email: 'bob@example.com',
+          display_name: 'Bob Collaborator',
+          timezone: 'UTC',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+      columns: [],
+    }
+
+    const wrapper = mount(Board, {
+      props: { board: sharedBoard },
+      global: {
+        plugins: [PrimeVue, ToastService],
+        stubs: {
+          Drawer: DrawerStub,
+          ScrollPanel: ScrollPanelStub,
+          Dialog: DialogStub,
+        },
+      },
+    })
+
+    await wrapper.find('[data-testid="chat-dock-button"]').trigger('click')
+
+    ;(wrapper.vm as any).handleBoardEvent({
+      id: 'evt-chat-1',
+      type: 'chat.message_created',
+      boardId: 10,
+      actorId: 2,
+      timestamp: '2026-11-16T19:00:00Z',
+      data: {
+        message: {
+          id: 42,
+          boardId: 10,
+          senderId: 2,
+          senderName: 'Bob Collaborator',
+          content: 'Live via SSE!',
+          createdAt: '2026-11-16T19:00:00Z',
+        },
+      },
+    })
+
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="message-bubble-42"]').text()).toBe(
+      'Live via SSE!',
+    )
+
+    // Verify SSE reconnect reloads chat history when drawer is open
+    const getSpy = vi.spyOn(chatApi, 'getBoardMessages').mockResolvedValue([
+      ...mockMessages,
+      {
+        id: 43,
+        board_id: 10,
+        sender_id: 2,
+        sender_name: 'Bob Collaborator',
+        content: 'Recovered after SSE reconnect',
+        created_at: '2026-11-16T19:01:00Z',
+      },
+    ])
+
+    await (wrapper.vm as any).handleBoardReconnect()
+    await wrapper.vm.$nextTick()
+
+    expect(getSpy).toHaveBeenCalledWith(10)
+    expect(wrapper.find('[data-testid="message-bubble-43"]').text()).toBe(
+      'Recovered after SSE reconnect',
     )
   })
 })

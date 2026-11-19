@@ -3,8 +3,10 @@
 import asyncio
 import json
 import redis.asyncio as redis
-
+from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.db.models import Q
+from users.models import UserBlock
 from ..event_schemas import BoardEventType
 
 from ..sse import (
@@ -12,6 +14,19 @@ from ..sse import (
     format_sse_event,
     format_sse_retry,
 )
+
+
+def check_user_blocked(user_id: int, other_user_id: int) -> bool:
+    """Return True if a UserBlock exists in either direction between two users."""
+    if not user_id or not other_user_id or user_id == other_user_id:
+        return False
+    return UserBlock.objects.filter(
+        Q(blocker_id=user_id, blocked_id=other_user_id)
+        | Q(blocker_id=other_user_id, blocked_id=user_id)
+    ).exists()
+
+
+is_user_blocked = sync_to_async(check_user_blocked)
 
 
 async def subscribe_to_board(board_id: int, user_id: int):
@@ -63,6 +78,12 @@ async def subscribe_to_board(board_id: int, user_id: int):
             if event_type == BoardEventType.BOARD_DELETED:
                 yield format_sse_event(event)
                 break
+
+            # Suppress chat messages between users with a bidirectional block
+            if event_type == BoardEventType.CHAT_MESSAGE_CREATED:
+                sender_id = event.get("actor_id") or event_data.get("message", {}).get("sender_id")
+                if sender_id and sender_id != user_id and await is_user_blocked(user_id, sender_id):
+                    continue
 
             # in general, convert the Redis message into SSE format
             yield format_sse_event(event)

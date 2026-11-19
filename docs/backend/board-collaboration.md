@@ -91,6 +91,7 @@ Each event contains a common envelope:
 - `task.created`, `task.updated`, `task.deleted`, `task.moved`
 - `task.timer_updated`
 - `time_entry.created`, `time_entry.updated`, `time_entry.deleted`
+- `chat.message_created`
 
 ### Collaborator role notifications
 

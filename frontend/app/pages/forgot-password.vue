@@ -8,6 +8,10 @@
         <div class="flex flex-col gap-4">
           <PasswordResetRequestForm v-if="!message" :loading="loading" @submit="requestReset" />
           <Message v-if="message" severity="success" role="status">{{ message }}</Message>
+          <template v-if="message">
+            <p class="text-sm text-surface-400">Check your inbox and spam folder. Open the link to choose a new password. If no email arrives, check the address and try again.</p>
+            <Button label="Request another link" severity="secondary" @click="message = ''" />
+          </template>
           <Message v-if="error" severity="error" role="alert">{{ error }}</Message>
           <div class="pt-2 text-sm text-surface-600 dark:text-surface-400">
             <NuxtLink to="/login" class="auth-link">Back to login</NuxtLink>

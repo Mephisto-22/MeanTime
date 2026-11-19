@@ -192,6 +192,8 @@ class TaskIn(Schema):
     target_duration_seconds: int | None = None
     column_id: int | None = None
     recurrence: RecurringTaskIn | None = None
+    due_at: datetime | None = None
+    reminder_offset_seconds: int | None = Field(default=None, ge=0)
 
 class TaskOut(Schema):
     """Shape of the task returned to clients."""
@@ -202,6 +204,8 @@ class TaskOut(Schema):
     position: int | None = None
     column_id: int
     column_activity_at: datetime | None = None
+    due_at: datetime | None = None
+    reminder_offset_seconds: int | None = None
     archived_at: datetime | None = None
     recurring_task_id: int | None = None
     recurring_task: RecurringTaskOut | None = None
@@ -252,6 +256,8 @@ class TaskUpdateIn(Schema):
     recurring_task_id: int | None = None
     apply_to_future: bool = False
     recurrence: RecurringTaskPatchIn | None = None
+    due_at: datetime | None = None
+    reminder_offset_seconds: int | None = Field(default=None, ge=0)
 
 # Column Schemas
 class BoardColumnIn(Schema):

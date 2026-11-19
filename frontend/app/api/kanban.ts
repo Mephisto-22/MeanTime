@@ -86,6 +86,51 @@ export const TASK_PRIORITY_CONFIG = {
 
 export const DEFAULT_TASK_PRIORITY_BORDER_CLASS = 'border-l-4 border-l-transparent'
 
+export type DueDateStatus = 'overdue' | 'due_soon' | 'upcoming'
+
+export const TASK_DUE_DATE_STATUS_CONFIG = {
+  overdue: {
+    label: 'Overdue',
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+    dotClass: 'bg-red-500',
+    icon: 'pi pi-exclamation-circle',
+  },
+  due_soon: {
+    label: 'Due soon',
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    dotClass: 'bg-amber-500',
+    icon: 'pi pi-clock',
+  },
+  upcoming: {
+    label: 'Upcoming',
+    badgeClass: 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-300',
+    dotClass: 'bg-surface-400',
+    icon: 'pi pi-calendar',
+  },
+} as const
+
+export function getDueDateStatus(dueAt: string | Date | null | undefined, now: Date = new Date()): DueDateStatus | null {
+  if (!dueAt) return null
+  const dueDate = typeof dueAt === 'string' ? new Date(dueAt) : dueAt
+  if (isNaN(dueDate.getTime())) return null
+
+  const diffMs = dueDate.getTime() - now.getTime()
+  if (diffMs < 0) {
+    return 'overdue'
+  }
+  if (diffMs <= 24 * 60 * 60 * 1000) {
+    return 'due_soon'
+  }
+  return 'upcoming'
+}
+
+export function formatDueDateBadge(dueAt: string | Date | null | undefined): string {
+  if (!dueAt) return ''
+  const date = typeof dueAt === 'string' ? new Date(dueAt) : dueAt
+  if (isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export const TASK_CADENCE_OPTIONS: Array<{ label: string; value: RecurrenceCadence }> = [
   { label: 'Daily', value: 'DAILY' },
   { label: 'Weekly', value: 'WEEKLY' },
@@ -100,6 +145,16 @@ export const TASK_WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
   { label: 'Fri', value: 4 },
   { label: 'Sat', value: 5 },
   { label: 'Sun', value: 6 },
+]
+
+export const REMINDER_PRESET_OPTIONS: Array<{ label: string; value: number | null; shortLabel: string }> = [
+  { label: 'None (No reminder)', value: null, shortLabel: 'Off' },
+  { label: 'At due date (0m)', value: 0, shortLabel: 'At due' },
+  { label: '15 minutes before', value: 900, shortLabel: '15m' },
+  { label: '1 hour before', value: 3600, shortLabel: '1h' },
+  { label: '2 hours before', value: 7200, shortLabel: '2h' },
+  { label: '1 day before', value: 86400, shortLabel: '1d' },
+  { label: '2 days before', value: 172800, shortLabel: '2d' },
 ]
 
 export const TIMER_MODE_CONFIG = {
@@ -153,6 +208,10 @@ export interface KanbanTaskDto {
   priority?: TaskPriorityType
   tags?: TagDto[]
   tagIds?: Array<string | number>
+  dueAt?: string | null
+  reminderOffsetSeconds?: number | null
+  reminderAt?: string | null
+  reminderSentAt?: string | null
 }
 
 export interface KanbanColumnDto {
@@ -240,6 +299,8 @@ export interface TaskDialogSavePayload {
   recurrence?: RecurrenceIn | null
   recurringTaskId?: number | string | null
   applyToFuture?: boolean
+  dueAt?: string | null
+  reminderOffsetSeconds?: number | null
 }
 
 export interface KanbanContext {
