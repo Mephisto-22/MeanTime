@@ -14,6 +14,8 @@ import {
   DatePickerStub,
   InputMaskStub,
   InputNumberStub,
+  PopoverStub,
+  SelectStub,
   ToggleSwitchStub,
 } from '../fixtures'
 
@@ -24,48 +26,6 @@ const HomeDialogStub = {
   template: '<div v-if="visible" v-bind="$attrs" class="p-dialog" :data-header="header"><slot /><slot name="footer" /></div>',
 }
 
-const SelectStub = {
-  name: 'Select',
-  inheritAttrs: false,
-  props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
-  emits: ['update:modelValue', 'change'],
-  template: `
-    <select
-      v-bind="$attrs"
-      :value="modelValue ?? ''"
-      @change="onChange"
-    >
-      <option
-        v-for="o in options"
-        :key="String(getOptionValue(o))"
-        :value="getOptionValue(o) ?? ''"
-      >
-        {{ getOptionLabel(o) }}
-      </option>
-    </select>
-  `,
-  methods: {
-    getOptionValue(option: any) {
-      return this.optionValue ? option[this.optionValue] : (option.id !== undefined ? option.id : option.value)
-    },
-    getOptionLabel(option: any) {
-      return this.optionLabel ? option[this.optionLabel] : (option.title || option.label || option.display_name)
-    },
-    onChange(event: any) {
-      const raw = event.target.value
-      if (raw === '' || raw === 'null') {
-        this.$emit('update:modelValue', null)
-        this.$emit('change', { value: null })
-        return
-      }
-      const matched = (this.options || []).find((o: any) => String(this.getOptionValue(o)) === String(raw))
-      const val = matched ? this.getOptionValue(matched) : raw
-      this.$emit('update:modelValue', val)
-      this.$emit('change', { value: val })
-    },
-  },
-}
-
 let mountedWrappers: VueWrapper[] = []
 
 async function mountHomePage() {
@@ -74,6 +34,7 @@ async function mountHomePage() {
     global: {
       stubs: {
         Dialog: HomeDialogStub,
+        Popover: PopoverStub,
         Select: SelectStub,
         ToggleSwitch: ToggleSwitchStub,
         InputNumber: InputNumberStub,
@@ -196,6 +157,7 @@ describe('Home Page (/) with Task Feed', () => {
     })
 
     vi.spyOn(kanbanApi, 'listTags').mockResolvedValue([])
+    vi.spyOn(kanbanApi, 'listUserTags').mockResolvedValue([])
     vi.spyOn(kanbanApi, 'listTimeEntries').mockResolvedValue([])
     vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue(createTaskFixture({ id: 101 }))
     vi.spyOn(kanbanApi, 'moveTask').mockResolvedValue(createTaskFixture({ id: 101 }))
@@ -561,5 +523,109 @@ describe('Home Page (/) with Task Feed', () => {
     expect(feedTask.find('[data-testid="feed-task-context"]').text()).toContain('To Do')
     expect(coreBoardPanel.text()).toContain('To Do(1)')
     expect(coreBoardPanel.text()).toContain('In Progress(0)')
+  })
+
+  it('loads userTags into Filter Popover, refreshes on board changes, and surfaces newly created tags immediately', async () => {
+    const { boards, feedTasks } = buildSampleData()
+    const listUserTagsSpy = vi.spyOn(kanbanApi, 'listUserTags').mockResolvedValue([
+      createTagFixture({ id: 50, name: 'Ops' }),
+    ])
+    vi.spyOn(kanbanApi, 'listBoards').mockResolvedValue(boards)
+    vi.spyOn(kanbanApi, 'listTaskFeed').mockResolvedValue(feedTasks)
+    vi.spyOn(kanbanApi, 'createBoard').mockResolvedValue(
+      createBoardFixture({ id: 99, title: 'Fresh Board', columns: [] }),
+    )
+    vi.spyOn(kanbanApi, 'createTag').mockResolvedValue(
+      createTagFixture({ id: 51, name: 'Urgent' }),
+    )
+
+    const wrapper = await mountHomePage()
+    expect(listUserTagsSpy).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-testid="feed-filter-trigger"]').trigger('click')
+    const optionTexts = () => wrapper.find('[data-testid="feed-tag-listbox"]')
+      .findAll('[role="option"]')
+      .map(el => el.text())
+
+    expect(optionTexts()).toEqual([
+      expect.stringContaining('Ops'),
+      expect.stringContaining('Untagged'),
+    ])
+
+    // Open TaskDialog and create a new tag -> immediately appears in Filter Popover
+    await wrapper.find('[data-testid="task-feed-rail"] [data-task-id="101"]').trigger('click')
+    await flushPromises()
+    const tagInput = wrapper.find('[data-testid="task-tag-input"]')
+    await tagInput.setValue('Urgent')
+    await tagInput.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect(optionTexts()).toEqual([
+      expect.stringContaining('Ops'),
+      expect.stringContaining('Urgent'),
+      expect.stringContaining('Untagged'),
+    ])
+
+    await wrapper.find('[data-testid="task-cancel-button"]').trigger('click')
+
+    // Saving a board via refreshAll also refreshes userTags
+    await wrapper.find('[data-testid="new-board-button"]').trigger('click')
+    await wrapper.find('[data-testid="board-title-input"]').setValue('Fresh Board')
+    await wrapper.find('form#board-form').trigger('submit')
+    await flushPromises()
+
+    expect(listUserTagsSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves active Task Feed filter and sort state during in-place TaskDialog editing', async () => {
+    const { boards, feedTasks } = buildSampleData()
+    feedTasks[0]!.priority = 'HIGH'
+    feedTasks[0]!.title = 'Prepare release notes'
+    feedTasks[1]!.priority = 'LOW'
+    boards[0]!.columns[0]!.tasks[0]!.priority = 'HIGH'
+    boards[1]!.columns[0]!.tasks[0]!.priority = 'LOW'
+
+    vi.spyOn(kanbanApi, 'listBoards').mockResolvedValue(boards)
+    vi.spyOn(kanbanApi, 'listTaskFeed').mockResolvedValue(feedTasks)
+    vi.spyOn(kanbanApi, 'updateTask').mockResolvedValue(
+      createTaskFixture({
+        id: 101,
+        title: 'Prepare release checklist',
+        priority: 'HIGH',
+        columnId: 10,
+        position: 0,
+        updatedAt: '2026-11-18T15:00:00Z',
+      }),
+    )
+
+    const wrapper = await mountHomePage()
+    const rail = wrapper.find('[data-testid="task-feed-rail"]')
+
+    // Activate search + priority filter + TITLE sort
+    await rail.find('[data-testid="feed-search-input"]').setValue('prepare')
+    await rail.find('[data-testid="feed-filter-trigger"]').trigger('click')
+    await rail.find('[data-testid="feed-priority-filter-HIGH"]').trigger('click')
+    await rail.find('[data-testid="feed-sort-select"]').setValue('TITLE')
+    await flushPromises()
+
+    expect(rail.findAll('[data-testid="kanban-task"]')).toHaveLength(1)
+    expect(rail.find('[data-testid="feed-filter-count-badge"]').text()).toContain('2')
+
+    // Edit the visible task in-place and save
+    await rail.find('[data-task-id="101"]').trigger('click')
+    await flushPromises()
+    const dialog = wrapper.find('[data-testid="task-dialog"]')
+    await dialog.find('[data-testid="task-title-input"]').setValue('Prepare release checklist')
+    await dialog.find('form').trigger('submit')
+    await flushPromises()
+
+    // Filter and sort state remain intact and updated title stays visible
+    expect((rail.find('[data-testid="feed-search-input"]').element as HTMLInputElement).value).toBe('prepare')
+    expect((rail.find('[data-testid="feed-sort-select"]').element as HTMLSelectElement).value).toBe('TITLE')
+    expect(rail.find('[data-testid="feed-filter-count-badge"]').text()).toContain('2')
+    expect(rail.find('[data-testid="feed-priority-filter-HIGH"]').attributes('aria-pressed')).toBe('true')
+    const visibleTasks = rail.findAll('[data-testid="kanban-task"]')
+    expect(visibleTasks).toHaveLength(1)
+    expect(visibleTasks[0]!.text()).toContain('Prepare release checklist')
   })
 })
