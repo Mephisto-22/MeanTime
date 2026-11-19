@@ -24,7 +24,7 @@ describe('Public landing page', () => {
     const list = vi.spyOn(kanbanApi, 'listBoards')
     wrapper = await mountSuspended(LandingPage, { route: '/' })
     await flushPromises()
-    expect(wrapper.get('h1').text()).toContain('Your tasks. Your time.')
+    expect(wrapper.get('h1').text()).toContain('Your way.')
     expect(wrapper.get('[data-testid="landing-login"]').attributes('href')).toBe('/login')
     expect(wrapper.get('[data-testid="landing-register"]').attributes('href')).toBe('/register')
     expect(list).not.toHaveBeenCalled()

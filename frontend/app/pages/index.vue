@@ -1,68 +1,89 @@
 <template>
-  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
-    <section class="overflow-hidden rounded-3xl border border-surface-800 bg-surface-900" aria-labelledby="landing-title">
-      <div class="grid items-center gap-12 p-6 sm:p-10 lg:grid-cols-2 lg:p-16">
-        <div>
-          <p class="mb-5 flex items-center gap-2 text-sm font-semibold text-primary-400">
-            <i class="pi pi-clock" aria-hidden="true" /> Make time for what matters
-          </p>
-          <h1 id="landing-title" class="max-w-xl text-4xl font-bold tracking-tight text-surface-0 sm:text-5xl lg:text-6xl">
-            Your tasks. Your time.<br><span class="text-primary-400">One clear workspace.</span>
-          </h1>
-          <p class="mt-6 max-w-lg text-lg leading-relaxed text-surface-400">
-            Bring your plans into focus with MeanTime. Organize tasks on boards,
-            track your focus sessions, and keep moving forward with your team.
-          </p>
-          <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-            <NuxtLink to="/register" class="landing-action bg-primary-500 text-white hover:bg-primary-600" data-testid="landing-register">
-              Create an account <i class="pi pi-arrow-right" aria-hidden="true" />
-            </NuxtLink>
-            <NuxtLink to="/login" class="landing-action border border-surface-700 text-surface-0 hover:bg-surface-800" data-testid="landing-login">
-              Log in
-            </NuxtLink>
-          </div>
+  <div class="landing">
+    <div class="landing-inner">
+      <Toolbar class="landing-nav" aria-label="Welcome navigation">
+        <template #start>
+          <NuxtLink to="/" class="wordmark" aria-label="MeanTime home"><span aria-hidden="true">✳</span> meantime<span class="wordmark-dot">.</span></NuxtLink>
+        </template>
+        <template #end>
+          <NuxtLink v-slot="{ href, navigate }" to="/login" custom>
+            <Button as="a" :href="href" label="Log in" icon="pi pi-arrow-up-right" icon-pos="right" class="login-link" data-testid="landing-login" @click="navigate" />
+          </NuxtLink>
+        </template>
+      </Toolbar>
+
+      <section class="hero" aria-labelledby="landing-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot" /> A LITTLE SPACE FOR YOUR NEXT BIG THING</p>
+          <h1 id="landing-title">Your tasks.<br>Your time.<br><em>Your way.</em></h1>
+          <p class="hero-description">Big ideas. Side projects. Everyday things.<br>Give them a home, find your focus, and make time for what moves you.</p>
+          <NuxtLink v-slot="{ href, navigate }" to="/register" custom>
+            <Button as="a" :href="href" label="Find your MeanTime" icon="pi pi-arrow-right" icon-pos="right" class="join-button" data-testid="landing-register" @click="navigate" />
+          </NuxtLink>
+          <p class="cta-caption">Your next chapter starts with a board.</p>
         </div>
 
-        <div class="rounded-2xl border border-surface-700 bg-surface-950 p-5 sm:p-6" aria-label="Example task board">
-          <div class="mb-6 flex items-center justify-between gap-3">
-            <span class="font-semibold text-surface-0">A little progress, every day</span>
-            <i class="pi pi-th-large text-surface-500" aria-hidden="true" />
-          </div>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div v-for="column in preview" :key="column.title" class="rounded-xl border border-surface-800 bg-surface-900 p-3">
-              <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-surface-400">{{ column.title }}</p>
-              <div class="rounded-lg border border-surface-700 bg-surface-800 p-3">
-                <span class="mb-3 block h-1 w-7 rounded-full" :class="column.accent" />
-                <p class="text-sm leading-relaxed text-surface-100">{{ column.task }}</p>
+        <figure class="collage" aria-label="An illustrated example of a MeanTime workspace">
+          <span class="orbit" aria-hidden="true" />
+          <span class="collage-spark" aria-hidden="true">✳</span>
+          <Card class="workspace">
+            <template #title>
+              <div class="workspace-title"><span>the good stuff</span><i class="pi pi-ellipsis-h" aria-hidden="true" /></div>
+            </template>
+            <template #subtitle>A little progress, every day.</template>
+            <template #content>
+              <div class="sample-columns">
+                <section v-for="column in preview" :key="column.title" class="sample-column">
+                  <h2>{{ column.title }} <span>{{ column.tasks.length }}</span></h2>
+                  <Card v-for="task in column.tasks" :key="task.title" class="sample-task">
+                    <template #content>
+                      <Tag :value="task.label" :class="task.color" />
+                      <p>{{ task.title }}</p>
+                      <span class="task-detail"><i :class="task.icon" aria-hidden="true" /> {{ task.detail }}</span>
+                    </template>
+                  </Card>
+                </section>
               </div>
-            </div>
-          </div>
-          <div class="mt-5 flex items-center gap-3 rounded-xl border border-primary-900 bg-primary-950/40 px-4 py-3 text-sm text-primary-300">
-            <i class="pi pi-stopwatch" aria-hidden="true" /> Room for your next focus session
-          </div>
-          <p class="mt-4 text-xs text-surface-500">An example of your workspace. Your boards start with you.</p>
-        </div>
-      </div>
-    </section>
+            </template>
+          </Card>
+          <Card class="focus-sticker">
+            <template #content>
+              <p class="eyebrow">IN YOUR FOCUS ERA</p>
+              <p class="timer">25:00<span aria-hidden="true">↗</span></p>
+              <p>One thing at a time.</p>
+            </template>
+          </Card>
+          <Card class="note-sticker">
+            <template #content><span aria-hidden="true">↗</span><p>A little less chaos.<br>A lot more <em>you.</em></p></template>
+          </Card>
+          <figcaption>EXAMPLE WORKSPACE · YOURS STARTS HERE</figcaption>
+        </figure>
+      </section>
 
-    <section class="mt-8 grid gap-4 md:grid-cols-3" aria-label="What you can do with MeanTime">
-      <article v-for="feature in features" :key="feature.title" class="rounded-2xl border border-surface-800 bg-surface-900 p-6">
-        <i :class="feature.icon" class="mb-4 text-xl text-primary-400" aria-hidden="true" />
-        <h2 class="text-lg font-semibold text-surface-0">{{ feature.title }}</h2>
-        <p class="mt-2 text-sm leading-relaxed text-surface-400">{{ feature.description }}</p>
-      </article>
-    </section>
-    <footer class="mt-10 text-center text-sm text-surface-500">MeanTime · Make your time count.</footer>
+      <section class="possibilities" aria-labelledby="possibilities-title">
+        <div class="section-intro"><p class="eyebrow">ROOM TO DO YOUR THING</p><h2 id="possibilities-title">A plan. A little focus.<br>People in your corner.</h2></div>
+        <article v-for="(feature, index) in features" :key="feature.title">
+          <span class="feature-number">0{{ index + 1 }} /</span>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </article>
+      </section>
+      <footer><span>meantime.</span><p>Less spinning plates. More moving forward.</p><span class="footer-mark" aria-hidden="true">✳</span></footer>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Tag from 'primevue/tag'
+import Toolbar from 'primevue/toolbar'
 import { useAuthStore } from '~/stores/auth'
 
-definePageMeta({ public: true })
+definePageMeta({ public: true, layout: 'headless' })
 useSeoMeta({
-  title: 'MeanTime — Your tasks. Your time.',
-  description: 'Organize your tasks, track focused time, and collaborate with your team in MeanTime.',
+  title: 'MeanTime — Your tasks. Your time. Your way.',
+  description: 'A home for big ideas, side projects, and everyday things. Organize tasks, find your focus, and work together in MeanTime.',
 })
 
 const auth = useAuthStore()
@@ -72,19 +93,136 @@ onMounted(async () => {
 })
 
 const preview = [
-  { title: 'To do', task: 'Plan the next step', accent: 'bg-surface-500' },
-  { title: 'In progress', task: 'Make space to focus', accent: 'bg-primary-400' },
-  { title: 'Done', task: 'Celebrate progress', accent: 'bg-emerald-400' },
+  { title: 'Up next', tasks: [
+    { title: 'Bring that idea to life', label: 'THE BIG IDEA', color: 'tag-peach', icon: 'pi pi-paperclip', detail: 'A fresh start' },
+    { title: 'Make room to make', label: 'PERSONAL', color: 'tag-lilac', icon: 'pi pi-align-left', detail: 'For future you' },
+  ] },
+  { title: 'Made it happen', tasks: [
+    { title: 'Take the first step', label: 'SMALL WINS', color: 'tag-lime', icon: 'pi pi-check-circle', detail: 'Looking good' },
+  ] },
 ]
 const features = [
-  { title: 'See the bigger picture', icon: 'pi pi-th-large', description: 'Turn your plans into tasks and move them across boards as your work progresses.' },
-  { title: 'Find your focus', icon: 'pi pi-clock', description: 'Track time on your tasks and make room for focused work sessions.' },
-  { title: 'Move forward together', icon: 'pi pi-users', description: 'Connect with friends and share boards to keep your team on the same page.' },
+  { title: 'Untangle the ideas.', description: 'Give every task a place. Move it across your board as things come together.' },
+  { title: 'Get into your flow.', description: 'Track time on your tasks and give the work in front of you your attention.' },
+  { title: 'Make it a team thing.', description: 'Share a board, bring your people, and keep the next step in sight.' },
 ]
 </script>
 
 <style scoped>
-.landing-action {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold no-underline transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-400;
+.landing {
+  --ink: #222321;
+  --paper: #f6f3eb;
+  --blue: #3045dc;
+  color: var(--ink);
+  background: var(--paper);
+  width: calc(100% + 2rem);
+  margin: -3rem -1rem;
+  min-height: 100svh;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: clip;
+}
+.landing-inner { max-width: 1380px; margin: 0 auto; padding: 28px 5% 0; }
+.landing-nav { padding: 0 0 24px; border: 0; border-bottom: 1px solid #22232130; border-radius: 0; background: transparent; }
+.wordmark { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 29px; font-weight: 800; letter-spacing: -1.5px; text-decoration: none; }
+.wordmark > span:first-child { font-size: 37px; color: var(--blue); font-weight: 400; }
+.wordmark .wordmark-dot { color: var(--blue); margin-left: -8px; }
+.login-link { background: transparent; border: 0; color: var(--ink); border-radius: 0; font-weight: 600; }
+.login-link:hover { background: #2223210c; border-color: transparent; color: var(--blue); }
+.hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 3%; align-items: center; padding: 74px 0 80px; }
+.hero-copy { position: relative; z-index: 1; }
+.eyebrow { font-family: 'Courier New', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; line-height: 1.6; }
+.hero-copy > .eyebrow { display: flex; align-items: center; gap: 9px; margin-bottom: 25px; }
+.status-dot { width: 7px; height: 7px; background: var(--blue); border-radius: 50%; flex-shrink: 0; }
+h1 { font-size: clamp(58px, 6vw, 82px); line-height: .98; letter-spacing: -5px; font-weight: 800; }
+h1 em { font-family: Georgia, 'Times New Roman', serif; color: var(--blue); font-weight: 400; letter-spacing: -4px; }
+.hero-description { max-width: 370px; font-size: 16px; line-height: 1.7; margin: 25px 0; color: #57584f; }
+.join-button { background: var(--blue); color: white; border: 1px solid var(--blue); padding: 15px 22px; border-radius: 100px; font-size: 14px; gap: 24px; }
+.join-button:hover { background: #2335b4; border-color: #2335b4; color: white; transform: translateY(-2px); }
+.cta-caption { color: #68695f; font-size: 11px; margin-top: 12px; }
+.collage { position: relative; min-width: 0; height: 510px; margin: 0; isolation: isolate; }
+.orbit { position: absolute; width: 390px; height: 390px; max-width: 90%; background: #eea382; border-radius: 50%; right: -4%; top: 18%; z-index: -1; }
+.collage-spark { position: absolute; font-size: 106px; right: 4%; top: -27px; color: #e85b3d; line-height: 1; transform: rotate(12deg); }
+.workspace { position: absolute; width: 92%; left: 0; top: 80px; background: var(--blue); color: white; border-radius: 14px; border: 1px solid #222321; transform: rotate(-5deg); box-shadow: 8px 10px 0 #222321; }
+.workspace :deep(.p-card-body) { padding: 22px; gap: 5px; }
+.workspace :deep(.p-card-subtitle) { color: #e0e4ff; font-size: 11px; }
+.workspace-title { display: flex; align-items: center; justify-content: space-between; font-size: 22px; font-weight: 700; letter-spacing: -.7px; }
+.sample-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+.sample-column { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.sample-column h2 { display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 500; color: #f0f1ff; }
+.sample-column h2 span { opacity: .75; }
+.sample-task { background: #fffdf7; color: var(--ink); border-radius: 6px; box-shadow: none; }
+.sample-task :deep(.p-card-body) { padding: 13px; }
+.sample-task p { font-size: 14px; line-height: 1.3; font-weight: 600; margin: 10px 0 16px; }
+.sample-task :deep(.p-tag) { padding: 3px 6px; border-radius: 3px; font-size: 7px; letter-spacing: .6px; color: #30302d; }
+.tag-peach { background: #ffd5ba; }
+.tag-lilac { background: #ded5fc; }
+.tag-lime { background: #e1efba; }
+.task-detail { display: flex; align-items: center; gap: 5px; font-size: 9px; color: #737367; }
+.task-detail i { font-size: 10px; }
+.focus-sticker { position: absolute; top: 4px; left: 7%; width: 190px; background: #e1f29b; color: var(--ink); transform: rotate(7deg); border: 1px solid var(--ink); border-radius: 6px; box-shadow: 3px 4px 0 var(--ink); z-index: 2; }
+.focus-sticker :deep(.p-card-body) { padding: 15px 18px; }
+.focus-sticker .eyebrow { font-size: 8px; letter-spacing: 1px; }
+.timer { display: flex; justify-content: space-between; align-items: center; font-size: 36px; font-weight: 600; letter-spacing: -2px; line-height: 1.3; }
+.timer span { font-size: 26px; }
+.focus-sticker p:last-child { font-size: 10px; }
+.note-sticker { position: absolute; bottom: 27px; right: -2%; background: #f38369; color: var(--ink); width: 215px; transform: rotate(8deg); border: 1px solid var(--ink); border-radius: 2px; box-shadow: 4px 5px 0 var(--ink); z-index: 2; }
+.note-sticker :deep(.p-card-body) { padding: 17px 20px; }
+.note-sticker span { font-size: 30px; line-height: 1; }
+.note-sticker p { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; line-height: 1.15; margin-top: 8px; }
+.collage figcaption { position: absolute; bottom: -9px; left: 5%; font-family: 'Courier New', monospace; font-size: 8px; letter-spacing: 1px; }
+.possibilities { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 30px; padding: 34px 0 38px; border-top: 1px solid #22232140; }
+.section-intro .eyebrow { font-size: 8px; margin-bottom: 8px; }
+.section-intro h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; letter-spacing: -.6px; line-height: 1.15; }
+.feature-number { font-family: 'Courier New', monospace; color: var(--blue); font-size: 11px; }
+.possibilities h3 { font-size: 14px; font-weight: 700; margin: 12px 0 8px; }
+.possibilities article p { color: #626358; font-size: 12px; line-height: 1.7; max-width: 210px; }
+footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 0; border-top: 1px solid #22232125; }
+footer > span:first-child { font-size: 16px; font-weight: 800; letter-spacing: -.7px; }
+footer p { font-size: 10px; color: #626358; }
+.footer-mark { color: var(--blue); font-size: 26px; }
+.landing a:focus-visible { outline: 3px solid #b53a21; outline-offset: 5px; }
+@media (min-width: 640px) { .landing { width: calc(100% + 3rem); margin: -3rem -1.5rem; } }
+@media (min-width: 1400px) { .hero { gap: 6%; } }
+@media (max-width: 1050px) {
+  .hero { padding: 55px 0 60px; }
+  h1 { font-size: 72px; }
+  .collage { height: 470px; }
+  .workspace :deep(.p-card-body) { padding: 16px; }
+  .sample-task :deep(.p-card-body) { padding: 10px; }
+  .focus-sticker { width: 160px; }
+  .note-sticker { width: 180px; bottom: 0; }
+  .note-sticker p { font-size: 21px; }
+  .collage figcaption { bottom: -24px; }
+  .possibilities { grid-template-columns: 1fr 1fr; gap: 26px; }
+}
+@media (max-width: 760px) {
+  .landing-inner { padding: 20px 6% 0; }
+  .hero { grid-template-columns: 1fr; gap: 38px; padding: 40px 0 60px; }
+  h1 { font-size: clamp(60px, 12vw, 86px); letter-spacing: -3.5px; }
+  .hero-copy > .eyebrow { font-size: 8px; margin-bottom: 18px; }
+  .hero-description { font-size: 15px; max-width: 400px; margin: 20px 0; }
+  .collage { width: 100%; max-width: 490px; justify-self: center; height: 480px; }
+  .workspace { width: 94%; left: 1%; }
+  .note-sticker { bottom: 2px; right: 0; }
+  .collage figcaption { bottom: -25px; left: 0; }
+  .orbit { width: 330px; height: 330px; right: 0; }
+  .wordmark { font-size: 25px; }
+  .wordmark > span:first-child { font-size: 30px; }
+}
+@media (max-width: 390px) {
+  .collage { height: 460px; }
+  .workspace-title { font-size: 19px; }
+  .sample-task p { font-size: 12px; }
+  .sample-columns { gap: 8px; }
+  .note-sticker { width: 165px; }
+  .possibilities { gap: 24px 18px; }
+  .section-intro h2 { font-size: 21px; }
+  footer p { max-width: 150px; text-align: center; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy, .collage { animation: arrive .65s ease-out both; }
+  .collage { animation-delay: .12s; }
+  .join-button { transition: transform .2s, background .2s; }
+  @keyframes arrive { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
 }
 </style>

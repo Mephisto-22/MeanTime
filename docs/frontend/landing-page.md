@@ -1,9 +1,15 @@
 # Public landing page
 
 `/` is a public, server-rendered introduction to MeanTime with links to `/login`
-and `/register`. It uses the shared dark surface palette, blue accents, rounded
-panels, and responsive spacing. The example board is static, labeled sample
-content; visiting as a guest does not request protected board data.
+and `/register`. It uses the `headless` layout, with a compact PrimeVue Toolbar
+for the brand and login link rather than the authenticated application navbar.
+PrimeVue Card, Tag, and Button components form a paper-and-cobalt composition,
+with oversized type, serif accents, and overlapping task, timer, and note cards.
+Scoped styles keep this public-page treatment separate from the application
+theme. The page fills the headless layout with responsive spacing; its entrance
+animation respects reduced-motion preferences. The board and timer are static,
+labeled illustrations, not interactive controls or live data. Visiting as a
+guest does not request protected board data.
 
 After browser session restoration, authenticated visitors are redirected to
 `/boards`. The existing boards dashboard now lives there and remains protected
