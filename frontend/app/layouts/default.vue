@@ -1,13 +1,17 @@
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="border-b border-surface-200 bg-surface-0 px-6 py-2 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+    <header class="border-b border-surface bg-[var(--p-content-background)] px-6 py-3.5 shadow-sm">
       <div class="mx-auto max-w-7xl">
-        <Menubar :model="menuItems" class="border-none bg-transparent p-0">
+        <Menubar :model="menuItems" class="border-none bg-transparent p-0 gap-6">
           <template #start>
-            <div class="mr-6 flex items-center gap-3">
-              <i class="pi pi-clock text-2xl text-primary" />
-              <span class="text-xl font-bold tracking-tight text-surface-900 dark:text-surface-0">MeanTime</span>
-            </div>
+            <NuxtLink
+              to="/"
+              data-testid="brand-link"
+              class="inline-flex items-center text-2xl font-black tracking-tight uppercase text-surface-0 no-underline focus-visible:rounded"
+              aria-label="MeanTime Home"
+            >
+              MEAN<span class="text-primary-400">TIME</span>
+            </NuxtLink>
           </template>
 
           <template #item="{ item }">
@@ -15,11 +19,11 @@
               :to="item.route"
               :data-testid="item.testId"
               :aria-current="item.active ? 'page' : undefined"
-              class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+              class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
               :class="[
                 item.active
-                  ? 'bg-surface-100 text-primary dark:bg-surface-800 dark:text-primary-400 font-semibold'
-                  : 'text-surface-700 hover:bg-surface-100 hover:text-primary dark:text-surface-200 dark:hover:bg-surface-800'
+                  ? 'bg-surface-100 text-primary dark:bg-surface-800 font-semibold'
+                  : 'text-surface-700 dark:text-surface-300'
               ]"
             >
               <i :class="item.icon" />
@@ -42,7 +46,6 @@
                 icon="pi pi-user"
                 text
                 severity="secondary"
-                size="small"
                 @click="goToProfile"
               />
 
@@ -84,6 +87,7 @@ const isBoardsActive = computed(
 const isFriendsActive = computed(
   () => route.path === '/friends' || route.path.startsWith('/friends/')
 )
+const isAnalyticsActive = computed(() => route.path === '/analytics')
 
 const menuItems = computed(() => {
   if (!authStore.isAuthenticated) return []
@@ -91,7 +95,7 @@ const menuItems = computed(() => {
     {
       label: 'Boards',
       icon: 'pi pi-th-large',
-      route: '/',
+      route: '/boards',
       active: isBoardsActive.value,
       testId: 'boards-nav-link',
     },
@@ -103,6 +107,13 @@ const menuItems = computed(() => {
       testId: 'friends-nav-link',
       badge: pendingIncomingCount.value > 0 ? pendingIncomingCount.value : undefined,
       badgeTestId: 'friends-pending-badge',
+    },
+    {
+      label: 'Analytics',
+      icon: 'pi pi-chart-bar',
+      route: '/analytics',
+      active: isAnalyticsActive.value,
+      testId: 'analytics-nav-link',
     },
   ]
 })

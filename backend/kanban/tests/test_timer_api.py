@@ -264,25 +264,43 @@ class TaskTimerApiTests(TestCase):
         # Must still be exactly 1 entry
         self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
 
-    def test_rapid_reconcile_and_patch_within_safety_window(self):
-        """Even if started_at timestamps slightly differ, duplicate creations within 15 seconds are blocked."""
-        # Pre-existing entry created 2 seconds ago
+    def run_session(self, seconds, mode=TimerMode.COUNT_UP):
+        """Start a timer `seconds` ago and stop it, as the client does."""
+        started_at = timezone.now() - timedelta(seconds=seconds)
+        TaskTimer.objects.update_or_create(task_id=self.task_id, defaults={
+            "mode": mode,
+            "target_duration_seconds": seconds if mode == TimerMode.COUNT_DOWN else None,
+            "state": TimerState.RUNNING,
+            "started_at": started_at,
+            "last_resumed_at": started_at,
+            "elapsed_seconds": 0,
+        })
+        res = self.client.patch(
+            f"/api/kanban/tasks/{self.task_id}/timer",
+            data=json.dumps({"state": "IDLE", "elapsed_seconds": seconds}),
+            content_type="application/json",
+            **self.auth,
+        )
+        self.assertEqual(res.status_code, 200)
+        return started_at
+
+    def test_stop_does_not_resave_an_already_recorded_session(self):
+        """A stop for a session that already has an entry (same started_at) adds no second entry."""
+        started_at = timezone.now() - timedelta(seconds=10)
         TaskTimeEntry.objects.create(
             task_id=self.task_id,
             user=self.user,
-            started_at=timezone.now() - timedelta(seconds=12),
-            ended_at=timezone.now() - timedelta(seconds=2),
+            started_at=started_at,
+            ended_at=timezone.now(),
             duration_seconds=10,
             note="Completed countdown session",
         )
-        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
-
         TaskTimer.objects.create(
             task_id=self.task_id,
             mode=TimerMode.COUNT_DOWN,
             target_duration_seconds=10,
             state=TimerState.RUNNING,
-            started_at=timezone.now() - timedelta(seconds=10),
+            started_at=started_at,
             elapsed_seconds=0,
         )
 
@@ -292,10 +310,26 @@ class TaskTimerApiTests(TestCase):
             content_type="application/json",
             **self.auth,
         )
-        self.assertEqual(res.status_code, 200)
 
-        # Still exactly 1 entry, duplicate prevented by 15-second safety window
+        self.assertEqual(res.status_code, 200)
         self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 1)
+
+    def test_back_to_back_short_sessions_are_all_recorded(self):
+        """Separate sessions of a few seconds, stopped moments apart, each get an entry."""
+        self.run_session(3)
+        self.run_session(3)
+        self.run_session(2)
+
+        durations = TaskTimeEntry.objects.filter(task_id=self.task_id).values_list(
+            "duration_seconds", flat=True)
+        self.assertEqual(sorted(durations), [2, 3, 3])
+
+    def test_countdown_stopped_soon_after_another_session_is_recorded(self):
+        """A new countdown session isn't mistaken for a duplicate of one saved seconds earlier."""
+        self.run_session(10, mode=TimerMode.COUNT_DOWN)
+        self.run_session(10, mode=TimerMode.COUNT_DOWN)
+
+        self.assertEqual(TaskTimeEntry.objects.filter(task_id=self.task_id).count(), 2)
 
     def test_pause_and_resume_preserves_started_at_and_records_correct_entry(self):
         """Timer paused and resumed preserves started_at, records true stop as ended_at and active duration."""

@@ -95,29 +95,33 @@ describe('Default Layout Header Suite', () => {
       expect(wrapper.find('nav').exists()).toBe(false)
     })
 
-    it('renders static, non-clickable MeanTime brand in header', async () => {
+    it('renders clickable MeanTime brand in header navigating to main homepage /', async () => {
+      const router = useRouter()
+      await router.push('/friends')
       const wrapper = mountLayout()
       await flushPromises()
 
-      const clockIcon = wrapper.find('.pi-clock')
-      expect(clockIcon.exists()).toBe(true)
-      expect(wrapper.text()).toContain('MeanTime')
+      const brandWrapper = wrapper.find('[data-testid="brand-link"]')
+      expect(brandWrapper.exists()).toBe(true)
+      expect(brandWrapper.text()).toBe('MEANTIME')
+      expect(wrapper.find('.pi-clock').exists()).toBe(false)
+      expect(brandWrapper.attributes('href') || brandWrapper.attributes('to')).toBe('/')
 
-      expect(clockIcon.element.closest('a')).toBeNull()
-      expect(clockIcon.element.closest('button')).toBeNull()
+      await brandWrapper.trigger('click')
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
     })
 
-    it('renders boards navigation button when authenticated pointing to /', async () => {
+    it('renders boards navigation button pointing to /boards', async () => {
       const wrapper = mountLayout()
       await flushPromises()
 
       const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
       expect(boardsLink.exists()).toBe(true)
-      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/boards')
       expect(boardsLink.text()).toContain('Boards')
     })
 
-    it('navigates to / when boards navigation button is clicked', async () => {
+    it('navigates to /boards when boards navigation button is clicked', async () => {
       const router = useRouter()
       await router.push('/friends')
       const wrapper = mountLayout()
@@ -125,10 +129,10 @@ describe('Default Layout Header Suite', () => {
 
       const boardsLink = wrapper.find('[data-testid="boards-nav-link"]')
       expect(boardsLink.exists()).toBe(true)
-      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/')
+      expect(boardsLink.attributes('href') || boardsLink.attributes('to')).toBe('/boards')
 
       await boardsLink.trigger('click')
-      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/boards'))
     })
 
     it('displays active visual highlight on boards navigation button when route is / or /boards/*', async () => {
@@ -220,13 +224,47 @@ describe('Default Layout Header Suite', () => {
       expect(inactiveFriendsLink.classes()).toContain('text-surface-700')
     })
 
-    it('renders profile button with user display name', async () => {
+    it('renders navigation link pointing to /analytics with chart icon and label', async () => {
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const link = wrapper.find('[data-testid="analytics-nav-link"]')
+      expect(link.exists()).toBe(true)
+      expect(link.attributes('href') || link.attributes('to')).toBe('/analytics')
+      expect(link.text()).toContain('Analytics')
+      expect(link.find('.pi-chart-bar').exists()).toBe(true)
+    })
+
+    it('highlights the analytics link only on /analytics, not on a board analytics page', async () => {
+      const router = useRouter()
+      await router.push('/analytics')
+      const wrapper = mountLayout()
+      await flushPromises()
+
+      const activeLink = wrapper.find('[data-testid="analytics-nav-link"]')
+      expect(activeLink.classes()).toContain('bg-surface-100')
+      expect(activeLink.classes()).toContain('text-primary')
+      expect(activeLink.attributes('aria-current')).toBe('page')
+
+      await router.push('/boards/123/analytics')
+      const wrapperBoardAnalytics = mountLayout()
+      await flushPromises()
+
+      const boardAnalyticsLink = wrapperBoardAnalytics.find('[data-testid="analytics-nav-link"]')
+      expect(boardAnalyticsLink.classes()).not.toContain('bg-surface-100')
+      expect(boardAnalyticsLink.classes()).toContain('text-surface-700')
+      expect(wrapperBoardAnalytics.find('[data-testid="boards-nav-link"]').classes())
+        .toContain('bg-surface-100')
+    })
+
+    it('renders profile button with user display name matching standard button size', async () => {
       const wrapper = mountLayout()
       await flushPromises()
 
       const button = wrapper.find('[data-testid="user-profile-button"]')
       expect(button.exists()).toBe(true)
       expect(button.text()).toContain('Alex Engineer')
+      expect(button.classes()).not.toContain('p-button-sm')
     })
 
     it('renders display name button in top right when authenticated', async () => {
@@ -247,13 +285,13 @@ describe('Default Layout Header Suite', () => {
       await flushPromises()
 
       const header = wrapper.find('header')
-      const brandIcon = header.find('.pi-clock').element
+      const brandLink = header.find('[data-testid="brand-link"]').element
       const boardsLink = header.find('[data-testid="boards-nav-link"]').element
       const friendsLink = header.find('[data-testid="friends-nav-link"]').element
       const profileBtn = header.find('[data-testid="user-profile-button"]').element
       const logoutBtn = header.find('[data-testid="logout-button"]').element
 
-      expect(brandIcon.compareDocumentPosition(boardsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(brandLink.compareDocumentPosition(boardsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(boardsLink.compareDocumentPosition(friendsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(friendsLink.compareDocumentPosition(profileBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(profileBtn.compareDocumentPosition(logoutBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

@@ -89,7 +89,7 @@
 
             <!-- Digital Readout Display Slab (Double-Click to Edit Custom Target) -->
             <Card
-              class="group text-center transition-all border border-surface-200/80 dark:border-surface-700/60 bg-surface-50 dark:bg-surface-800/60 shadow-none"
+              class="group text-center border border-surface-200/80 dark:border-surface-700/60 bg-surface-50 dark:bg-surface-800/60 shadow-none"
               :class="{ 'ring-2 ring-primary-500/50 bg-primary-50/20 dark:bg-primary-950/20': isEditingTarget }"
               :pt="{ body: 'p-4 flex flex-col items-center justify-center gap-1', content: 'p-0 w-full flex flex-col items-center gap-1' }"
             >
@@ -109,7 +109,7 @@
                 <div
                   v-if="!isEditingTarget"
                   data-testid="timer-digital-readout"
-                  class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none transition-transform"
+                  class="font-mono text-3xl font-bold tracking-normal tabular-nums text-surface-900 dark:text-surface-100 select-none"
                   :class="{
                     'cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 hover:scale-[1.02]': !isRunning && !isPaused && localTimer.mode === 'COUNT_DOWN'
                   }"
@@ -126,7 +126,7 @@
                     v-model="targetInputText"
                     type="text"
                     maxlength="8"
-                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 !focus:outline-none !w-36 !py-0 !shadow-none"
+                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 text-surface-900 dark:text-surface-100 focus:!outline-none !w-36 !py-0 !shadow-none"
                     data-testid="timer-inline-target-input"
                     placeholder="25:00"
                     @keydown.enter="commitTargetInput"
@@ -168,7 +168,7 @@
                 type="button"
                 severity="primary"
                 :disabled="isRunning"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 :title="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
                 :aria-label="isPaused ? 'Resume Focus Session' : 'Start Focus Session'"
@@ -183,7 +183,7 @@
                 type="button"
                 severity="warn"
                 :disabled="!isRunning"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 title="Pause Focus Session"
                 aria-label="Pause Focus Session"
@@ -199,7 +199,7 @@
                 severity="danger"
                 outlined
                 :disabled="isIdle"
-                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-30 transition-all"
+                class="!w-full !h-10 rounded-lg flex items-center justify-center cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-30"
                 style="width: 100% !important;"
                 title="Stop & Save Session"
                 aria-label="Stop & Save Session"
@@ -257,7 +257,7 @@
               <div class="flex items-center gap-3">
                 <!-- Date (takes natural expanded space) -->
                 <div class="flex-1 min-w-0 flex flex-col gap-1">
-                  <Label for="manual-date" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Date</Label>
+                  <Label for="manual-date" class="text-[10px] font-semibold text-surface-500">Date</Label>
                   <InputText
                     id="manual-date"
                     v-model="manualDate"
@@ -270,7 +270,7 @@
 
                 <!-- Duration (compact dedicated stepper) -->
                 <div class="w-28 shrink-0 flex flex-col gap-1">
-                  <Label for="manual-duration-mins" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Duration</Label>
+                  <Label for="manual-duration-mins" class="text-[10px] font-semibold text-surface-500">Duration</Label>
                   <InputNumber
                     id="manual-duration-mins"
                     v-model="manualDurationMinutes"
@@ -289,7 +289,7 @@
               <div class="grid grid-cols-2 gap-3">
                 <!-- Start Time -->
                 <div class="flex flex-col gap-1">
-                  <Label for="manual-start-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Start Time</Label>
+                  <Label for="manual-start-time" class="text-[10px] font-semibold text-surface-500">Start Time</Label>
                   <InputText
                     id="manual-start-time"
                     v-model="manualStartTime"
@@ -303,7 +303,7 @@
 
                 <!-- End Time -->
                 <div class="flex flex-col gap-1">
-                  <Label for="manual-end-time" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">End Time</Label>
+                  <Label for="manual-end-time" class="text-[10px] font-semibold text-surface-500">End Time</Label>
                   <InputText
                     id="manual-end-time"
                     v-model="manualEndTime"
@@ -316,9 +316,47 @@
                 </div>
               </div>
 
+              <!-- Row: Recorded by Dropdown (When on Shared Board) -->
+              <div v-if="isShared" class="flex flex-col gap-1">
+                <Label for="manual-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                <Select
+                  id="manual-recorded-by"
+                  v-model="manualUserId"
+                  :options="members"
+                  option-label="display_name"
+                  option-value="id"
+                  placeholder="Select contributor"
+                  fluid
+                  class="!text-xs"
+                  data-testid="manual-select-recorded-by"
+                >
+                  <template #value="slotProps">
+                    <div v-if="slotProps.value" class="flex items-center gap-2">
+                      <UserAvatar
+                        :user="getMemberById(slotProps.value)"
+                        size="small"
+                        class="font-bold"
+                      />
+                      <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                    </div>
+                    <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                  </template>
+                  <template #option="slotProps">
+                    <div class="flex items-center gap-2 py-0.5">
+                      <UserAvatar
+                        :user="slotProps.option"
+                        size="small"
+                        class="font-bold"
+                      />
+                      <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
+
               <!-- Row 3: Note Field (Dedicated Full-Width Space) -->
               <div class="flex flex-col gap-1">
-                <Label for="manual-session-note" class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Session Note</Label>
+                <Label for="manual-session-note" class="text-[10px] font-semibold text-surface-500">Session Note</Label>
                 <InputText
                   id="manual-session-note"
                   v-model="manualNote"
@@ -358,7 +396,7 @@
               v-for="entry in entries"
               :key="entry.id"
               :data-testid="`session-entry-${entry.id}`"
-              class="group relative border border-surface-200/90 bg-surface-50/50 transition-all hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80 shadow-none"
+              class="group relative border border-surface-200/90 bg-surface-50/50 hover:bg-surface-50 dark:border-surface-800 dark:bg-surface-800/40 dark:hover:bg-surface-800/80 shadow-none"
               :pt="{ body: 'p-3 flex flex-col gap-2 text-xs', content: 'p-0 flex flex-col gap-2' }"
             >
               <template #content>
@@ -411,14 +449,22 @@
                     </div>
                   </div>
 
-                  <!-- Note Display -->
-                  <p
-                    class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors"
-                    title="Click to edit session"
-                    @click="startEditingSession(entry)"
-                  >
-                    {{ entry.note || '(No session note recorded)' }}
-                  </p>
+                  <!-- Bottom Row: Session Note & Contributor Avatar on Shared Boards -->
+                  <div class="flex items-end justify-between gap-2">
+                    <p
+                      class="text-surface-700 dark:text-surface-200 text-xs leading-relaxed cursor-pointer hover:text-primary-600 transition-colors flex-1"
+                      title="Click to edit session"
+                      @click="startEditingSession(entry)"
+                    >
+                      {{ entry.note || '(No session note recorded)' }}
+                    </p>
+                    <UserAvatar
+                      v-if="isShared"
+                      :user="entry.user"
+                      class="text-[10px] font-bold"
+                      :data-testid="`time-entry-avatar-${entry.id}`"
+                    />
+                  </div>
                 </template>
 
                 <!-- Inline Session Editor (When Editing this Entry) -->
@@ -437,7 +483,7 @@
                     <!-- Row 1: Date + Duration Stepper -->
                     <div class="flex items-center gap-2.5">
                       <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Date</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Date</Label>
                         <InputText
                           v-model="editDate"
                           type="date"
@@ -446,7 +492,7 @@
                         />
                       </div>
                       <div class="w-28 shrink-0 flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Duration</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Duration</Label>
                         <InputNumber
                           v-model="editDurationMinutes"
                           suffix=" min"
@@ -463,7 +509,7 @@
                     <!-- Row 2: Start Time & End Time -->
                     <div class="grid grid-cols-2 gap-2.5">
                       <div class="flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">Start Time</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">Start Time</Label>
                         <InputText
                           v-model="editStartTime"
                           type="time"
@@ -474,7 +520,7 @@
                         />
                       </div>
                       <div class="flex flex-col gap-0.5">
-                        <Label class="text-[10px] uppercase font-semibold text-surface-400">End Time</Label>
+                        <Label class="text-[10px] font-semibold text-surface-500">End Time</Label>
                         <InputText
                           v-model="editEndTime"
                           type="time"
@@ -486,9 +532,47 @@
                       </div>
                     </div>
 
+                    <!-- Editable Recorded by Dropdown (When on Shared Board) -->
+                    <div v-if="isShared" class="flex flex-col gap-0.5">
+                      <Label for="edit-session-recorded-by" class="text-[10px] font-semibold text-surface-500">Recorded by</Label>
+                      <Select
+                        id="edit-session-recorded-by"
+                        v-model="editUserId"
+                        :options="members"
+                        option-label="display_name"
+                        option-value="id"
+                        placeholder="Select contributor"
+                        fluid
+                        class="!text-xs"
+                        data-testid="edit-session-recorded-by"
+                      >
+                        <template #value="slotProps">
+                          <div v-if="slotProps.value" class="flex items-center gap-2">
+                            <UserAvatar
+                              :user="getMemberById(slotProps.value)"
+                              size="small"
+                              class="font-bold"
+                            />
+                            <span class="text-xs">{{ getMemberName(slotProps.value) }}</span>
+                          </div>
+                          <span v-else class="text-surface-400 text-xs">Select contributor</span>
+                        </template>
+                        <template #option="slotProps">
+                          <div class="flex items-center gap-2 py-0.5">
+                            <UserAvatar
+                              :user="slotProps.option"
+                              size="small"
+                              class="font-bold"
+                            />
+                            <span class="text-xs">{{ getUserDisplayName(slotProps.option) }}</span>
+                          </div>
+                        </template>
+                      </Select>
+                    </div>
+
                     <!-- Editable Note -->
                     <div class="flex flex-col gap-0.5">
-                      <Label class="text-[10px] uppercase font-semibold text-surface-400">Note</Label>
+                      <Label class="text-[10px] font-semibold text-surface-500">Note</Label>
                       <InputText
                         v-model="editNoteText"
                         placeholder="Session notes..."
@@ -536,6 +620,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, inject, onMounted } from 'vue'
+import UserAvatar from '~/components/UserAvatar.vue'
 import type { TaskTimerDto, TaskTimeEntryDto, TimerMode } from '~/api/kanban'
 import {
   TIMER_MODE_CONFIG,
@@ -545,6 +630,8 @@ import {
 } from '~/api/kanban'
 import { toCamelCase } from '~/utils/case'
 import { useNotifications } from '~/composables/useNotifications'
+import { useAuthStore } from '~/stores/auth'
+import type { UserOut } from '~/api/friends'
 import {
   useTaskTimer,
   formatDigital,
@@ -555,13 +642,23 @@ import {
   toLocalTimeString,
   toLocalDateString,
   combineDateAndTime,
+  sumEntryDurations,
 } from '~/composables/useTaskTimer'
 
-const props = defineProps<{
+interface Props {
   timer?: TaskTimerDto | null
   timeEntries?: TaskTimeEntryDto[]
   taskId: string | number
-}>()
+  isShared?: boolean
+  boardMembers?: UserOut[]
+  currentUserId?: number | string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isShared: undefined,
+  boardMembers: undefined,
+  currentUserId: undefined,
+})
 
 const emit = defineEmits<{
   (e: 'update:timer', timer: TaskTimerDto): void
@@ -571,6 +668,67 @@ const emit = defineEmits<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 const notify = useNotifications()
+
+let authStore: any
+try {
+  authStore = useAuthStore()
+} catch {
+  // Pinia not active
+}
+
+const isShared = computed<boolean>(() => {
+  if (props.isShared !== undefined) {
+    return props.isShared
+  }
+  return kanbanContext?.isShared?.value ?? false
+})
+
+const members = computed<UserOut[]>(() => {
+  if (props.boardMembers !== undefined) {
+    return props.boardMembers
+  }
+  return kanbanContext?.boardMembers?.value ?? []
+})
+
+const effectiveCurrentUserId = computed<number | string | null>(() => {
+  if (props.currentUserId !== undefined) {
+    return props.currentUserId
+  }
+  return authStore?.user?.id ?? null
+})
+
+const manualUserId = ref<number | string | null>(null)
+
+watch(
+  [effectiveCurrentUserId, members],
+  ([userId, mems]) => {
+    if (manualUserId.value == null) {
+      if (userId != null && mems.some(m => String(m.id) === String(userId))) {
+        manualUserId.value = userId
+      } else if (userId != null) {
+        manualUserId.value = userId
+      } else if (mems.length > 0 && mems[0]) {
+        manualUserId.value = mems[0].id
+      }
+    }
+  },
+  { immediate: true },
+)
+
+function getMemberById(id: number | string | null | undefined): UserOut | undefined {
+  if (id == null) return undefined
+  return members.value.find(m => String(m.id) === String(id))
+}
+
+function getMemberName(id: number | string | null | undefined): string {
+  const member = getMemberById(id)
+  return member ? getUserDisplayName(member) : ''
+}
+
+function getUserDisplayName(user?: any): string {
+  if (!user) return ''
+  return user.displayName || user.display_name || ''
+}
 
 const modeOptions = [
   { label: TIMER_MODE_CONFIG.NONE.label, value: 'NONE' },
@@ -665,7 +823,13 @@ watch(
 )
 
 const syncTimerOut = () => emit('update:timer', { ...localTimer.value })
-const syncEntriesOut = () => emit('update:timeEntries', [...entries.value])
+const syncEntriesOut = () => {
+  emit('update:timeEntries', [...entries.value])
+  // Keep the task card's total in step with the entries shown here.
+  if (isPersistedTaskId.value) {
+    kanbanContext?.setTaskTotal?.(props.taskId, sumEntryDurations(entries.value))
+  }
+}
 
 // Target duration & inline editing
 const targetMinutes = computed(() => {
@@ -764,12 +928,7 @@ const setMode = (m: TimerMode) => {
   onModeChange()
 }
 
-const totalDurationSeconds = computed(() => {
-  return entries.value.reduce((acc, cur) => {
-    const dur = Number(cur.durationSeconds ?? 0)
-    return acc + (isNaN(dur) ? 0 : dur)
-  }, 0)
-})
+const totalDurationSeconds = computed(() => sumEntryDurations(entries.value))
 
 const {
   isRunning,
@@ -879,11 +1038,12 @@ const toggleManualLog = () => {
   if (isManualLogOpen.value) {
     const now = new Date()
     const twentyFiveMinsAgo = new Date(now.getTime() - 25 * 60 * 1000)
-    manualDate.value = toLocalDateString(now.toISOString())
+    manualDate.value = toLocalDateString(twentyFiveMinsAgo.toISOString())
     manualStartTime.value = toLocalTimeString(twentyFiveMinsAgo.toISOString())
     manualEndTime.value = toLocalTimeString(now.toISOString())
     manualDurationMinutes.value = 25
     manualNote.value = ''
+    manualUserId.value = effectiveCurrentUserId.value ?? (members.value[0]?.id ?? null)
   }
 }
 
@@ -936,7 +1096,12 @@ const submitManualEntry = async () => {
   }
 
   const started = combineDateAndTime(manualDate.value, manualStartTime.value)
-  const ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  let ended = combineDateAndTime(manualDate.value, manualEndTime.value)
+  if (endTotalMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
@@ -945,10 +1110,15 @@ const submitManualEntry = async () => {
   const durationSec = durationMins * 60
   const note = manualNote.value.trim() || 'Manual session'
 
+  const selectedUserId = isShared.value ? (manualUserId.value != null ? Number(manualUserId.value) : undefined) : undefined
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   const tempId = `manual-${Date.now()}`
   const newEntry: TaskTimeEntryDto = {
     id: tempId,
     taskId: props.taskId,
+    userId: selectedUserId,
+    user: selectedMember,
     startedAt: started,
     endedAt: ended,
     durationSeconds: durationSec,
@@ -964,6 +1134,7 @@ const submitManualEntry = async () => {
   if (isPersistedTaskId.value) {
     try {
       const persisted = await kanbanApi.createTimeEntry(props.taskId, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,
@@ -991,6 +1162,7 @@ const editStartTime = ref('')
 const editEndTime = ref('')
 const editDurationMinutes = ref<number | null>(0)
 const editNoteText = ref('')
+const editUserId = ref<number | string | null>(null)
 
 const startEditingSession = (entry: TaskTimeEntryDto) => {
   editingEntryId.value = entry.id
@@ -999,6 +1171,7 @@ const startEditingSession = (entry: TaskTimeEntryDto) => {
   editEndTime.value = toLocalTimeString(entry.endedAt)
   editDurationMinutes.value = Math.max(1, Math.round(entry.durationSeconds / 60))
   editNoteText.value = entry.note
+  editUserId.value = entry.userId ?? entry.user?.id ?? effectiveCurrentUserId.value ?? null
 }
 
 const onEditTimeChanged = () => {
@@ -1027,7 +1200,12 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   }
 
   const started = combineDateAndTime(editDate.value, editStartTime.value)
-  const ended = combineDateAndTime(editDate.value, editEndTime.value)
+  let ended = combineDateAndTime(editDate.value, editEndTime.value)
+  if (endMins >= 24 * 60 || new Date(ended) < new Date(started)) {
+    const endedDate = new Date(ended)
+    endedDate.setDate(endedDate.getDate() + 1)
+    ended = endedDate.toISOString()
+  }
   if (new Date(ended) < new Date(started)) {
     notify.error(null, 'End time cannot precede start time')
     return
@@ -1036,16 +1214,24 @@ const saveSessionEdits = async (entry: TaskTimeEntryDto) => {
   const durationSec = durationMins * 60
   const note = editNoteText.value
 
+  const selectedUserId = isShared.value ? (editUserId.value != null ? Number(editUserId.value) : undefined) : entry.userId
+  const selectedMember = selectedUserId != null ? (getMemberById(selectedUserId) ?? null) : null
+
   entry.startedAt = started
   entry.endedAt = ended
   entry.durationSeconds = durationSec
   entry.note = note
+  if (isShared.value) {
+    entry.userId = selectedUserId
+    entry.user = selectedMember ?? entry.user
+  }
   editingEntryId.value = null
   syncEntriesOut()
 
   if (isPersistedTaskId.value && !String(entry.id).startsWith('manual') && !String(entry.id).startsWith('entry')) {
     try {
       const updated = await kanbanApi.updateTimeEntry(entry.id, {
+        userId: selectedUserId,
         startedAt: started,
         endedAt: ended,
         durationSeconds: durationSec,
@@ -1074,3 +1260,4 @@ const deleteEntry = async (id: string | number) => {
   }
 }
 </script>
+

@@ -40,6 +40,8 @@ describe('Live registration requirements and confirmation', () => {
     expect(wrapper.findAll('[data-met="true"]')).toHaveLength(0)
     expect(wrapper.get('label[for="register-password-confirm"]').text()).toBe('Confirm password')
     expect(wrapper.get('input[name="password_confirm"]').attributes('type')).toBe('password')
+    expect(wrapper.get('input[name="password_confirm"]').attributes('aria-invalid')).toBe('false')
+    expect(wrapper.get('#register-password-match').classes()).not.toContain('field-error-text')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
@@ -55,18 +57,28 @@ describe('Live registration requirements and confirmation', () => {
     expect(wrapper.text()).toContain('Passwords match.')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
-    expect(wrapper.emitted('submit')).toEqual([[{ display_name: 'Name', email: 'user@example.com', password: 'StrongPass!746xyz' }]])
+    expect(wrapper.emitted('submit')).toEqual([[{
+      display_name: 'Name',
+      email: 'user@example.com',
+      password: 'StrongPass!746xyz',
+      timezone: expect.any(String),
+    }]])
   })
 
   it('blocks mismatches and recomputes confirmation when the original password changes', async () => {
     const wrapper = form()
     await fill(wrapper)
     await settle()
-    await wrapper.get('input[name="password_confirm"]').setValue('DifferentPassword982!')
-    expect(wrapper.get('input[name="password_confirm"]').attributes('aria-invalid')).toBe('true')
+    const confirmInput = wrapper.get('input[name="password_confirm"]')
+    expect(confirmInput.attributes('aria-invalid')).toBe('false')
+    await confirmInput.setValue('DifferentPassword982!')
+    expect(confirmInput.attributes('aria-invalid')).toBe('false')
+    await confirmInput.trigger('blur')
+    expect(confirmInput.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.text()).toContain('Passwords do not match.')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')).toBeUndefined()
-    await wrapper.get('input[name="password_confirm"]').setValue('StrongPass!746xyz')
+    await confirmInput.setValue('StrongPass!746xyz')
     await wrapper.get('input[name="password"]').setValue('ChangedPassword982!')
     expect(wrapper.text()).toContain('Passwords do not match.')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()

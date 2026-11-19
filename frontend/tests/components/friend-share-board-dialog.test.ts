@@ -117,7 +117,7 @@ describe('FriendShareBoardDialog Component Suite', () => {
     await wrapper.get('[data-testid="confirm-share-button"]').trigger('click')
     await flushPromises()
 
-    expect(shareSpy).toHaveBeenCalledWith(1, 10)
+    expect(shareSpy).toHaveBeenCalledWith(1, 10, 'EDITOR')
     expect(wrapper.emitted('shared')).toBeTruthy()
     expect(wrapper.emitted('update:visible')).toEqual([[false]])
   })

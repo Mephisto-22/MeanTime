@@ -2,7 +2,7 @@
   <div
     v-if="hasTimer"
     data-testid="task-timer-dock"
-    class="-mx-2.5 -mb-2.5 mt-2.5 flex flex-col justify-between border-t border-surface-200/80 bg-surface-50/90 px-2.5 py-1.5 dark:border-surface-700/60 dark:bg-surface-800/60 rounded-b-[inherit] select-none transition-colors"
+    class="kanban-timer-dock -mx-2.5 -mb-2.5 mt-2.5 flex flex-col gap-1.5 border-t border-surface-200 bg-surface-50 px-2.5 py-1.5 dark:border-surface-700 dark:bg-surface-800 rounded-b-xl select-none"
     @click.stop
     @pointerdown.stop
     @mousedown.stop
@@ -55,7 +55,10 @@
       </div>
 
       <!-- Right: Micro-Controls Cluster (Strictly Isolated Events) -->
-      <div class="flex items-center gap-0.5 shrink-0" data-testid="card-timer-controls">
+      <div 
+        v-if="!readOnly"
+        class="flex items-center gap-0.5 shrink-0" 
+        data-testid="card-timer-controls">
         <!-- Start / Resume Micro Button -->
         <Button
           v-if="!isRunning"
@@ -65,7 +68,7 @@
           size="small"
           text
           rounded
-          class="!h-5 !w-5 !p-0 text-emerald-600 hover:bg-emerald-100/60 dark:text-emerald-400 dark:hover:bg-emerald-950/50 cursor-pointer"
+          class="timer-btn timer-btn-start"
           :title="isPaused ? 'Resume timer' : 'Start timer'"
           :aria-label="isPaused ? 'Resume timer' : 'Start timer'"
           data-testid="card-timer-btn-start"
@@ -83,7 +86,7 @@
           size="small"
           text
           rounded
-          class="!h-5 !w-5 !p-0 text-amber-600 hover:bg-amber-100/60 dark:text-amber-400 dark:hover:bg-amber-950/50 cursor-pointer"
+          class="timer-btn timer-btn-pause"
           title="Pause timer"
           aria-label="Pause timer"
           data-testid="card-timer-btn-pause"
@@ -101,7 +104,7 @@
           size="small"
           text
           rounded
-          class="!h-5 !w-5 !p-0 text-red-500 hover:bg-red-100/60 dark:text-red-400 dark:hover:bg-red-950/50 cursor-pointer"
+          class="timer-btn timer-btn-stop"
           title="Stop & record session"
           aria-label="Stop and record session"
           data-testid="card-timer-btn-stop"
@@ -113,10 +116,10 @@
     </div>
 
     <!-- Countdown Progress Line flush with bottom edge (Persistent for Countdown tasks to prevent layout shift) -->
-    <div v-if="isCountDownTask" class="w-full mt-1.5">
-      <div class="h-1 w-full bg-surface-200/80 dark:bg-surface-700/80 rounded-full overflow-hidden">
+    <div v-if="isCountDownTask">
+      <div class="timer-progress-track h-1 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
         <div
-          class="h-full transition-all duration-300"
+          class="h-full"
           :class="progressBarColorClass"
           :style="{ width: `${progressPercent}%` }"
           data-testid="card-timer-progress"
@@ -136,9 +139,11 @@ const props = withDefaults(
   defineProps<{
     timer?: TaskTimerDto | null
     taskId: string | number
+    readOnly?: boolean
   }>(),
   {
     timer: null,
+    readOnly: false,
   },
 )
 
@@ -163,6 +168,7 @@ const {
   () => props.timer,
   {
     onExpired: (entry) => {
+      if (props.readOnly) return
       emit('stop', props.taskId, entry)
     },
   },
@@ -179,9 +185,12 @@ const isCountDownTask = computed(() => {
 
 const progressBarColorClass = computed(() => {
   if (isPaused.value) {
-    return 'bg-amber-500 dark:bg-amber-400'
+    return TIMER_STATE_CONFIG.PAUSED.progressClass
   }
-  return 'bg-emerald-500 dark:bg-emerald-400'
+  if (isRunning.value) {
+    return TIMER_STATE_CONFIG.RUNNING.progressClass
+  }
+  return TIMER_STATE_CONFIG.IDLE.progressClass
 })
 
 // Inherited idle mode and label
@@ -198,6 +207,7 @@ const idleDisplayLabel = computed(() => {
 })
 
 const handleStartOrResume = () => {
+  if (props.readOnly) return
   const defaultTimer: Partial<TaskTimerDto> = {
     taskId: props.taskId,
     mode: props.timer?.mode && props.timer.mode !== 'NONE' ? props.timer.mode : 'COUNT_DOWN',
@@ -210,10 +220,13 @@ const handleStartOrResume = () => {
 }
 
 const handlePause = () => {
+  if (props.readOnly) return
   emit('pause', props.taskId)
 }
 
 const handleStop = () => {
+  if (props.readOnly) return
   emit('stop', props.taskId)
 }
 </script>
+

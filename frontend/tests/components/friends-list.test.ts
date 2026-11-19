@@ -1,8 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import FriendsList from '~/components/friends/FriendsList.vue'
 import type { UserOut } from '~/api/friends'
+
+enableAutoUnmount(afterEach)
 
 const DialogStub = {
   name: 'Dialog',
@@ -90,12 +92,26 @@ describe('FriendsList Component Suite', () => {
       expect(secondCard.find('[data-testid="friend-avatar"]').text()).toBe('B')
     })
 
-    it('renders unfriend and block action buttons for each friend', () => {
+    it('renders standardized unfriend, block, and share board action buttons for each friend', () => {
       const wrapper = mountFriendsList({ loading: false, friends: mockFriends })
 
-      expect(wrapper.find('[data-testid="unfriend-button-1"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="block-button-1"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="share-board-button-1"]').exists()).toBe(true)
+      const unfriendBtn = wrapper.find('[data-testid="unfriend-button-1"]')
+      const blockBtn = wrapper.find('[data-testid="block-button-1"]')
+      const shareBtn = wrapper.find('[data-testid="share-board-button-1"]')
+
+      expect(unfriendBtn.exists()).toBe(true)
+      expect(blockBtn.exists()).toBe(true)
+      expect(shareBtn.exists()).toBe(true)
+
+      // Standardized sizing and variant consistency
+      expect(unfriendBtn.classes()).toContain('w-28')
+      expect(blockBtn.classes()).toContain('w-28')
+      expect(shareBtn.classes()).toContain('w-28')
+
+      expect(unfriendBtn.classes()).toContain('p-button-outlined')
+      expect(blockBtn.classes()).toContain('p-button-outlined')
+      expect(shareBtn.classes()).toContain('p-button-outlined')
+
       expect(wrapper.find('[data-testid="unfriend-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="block-button-2"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="share-board-button-2"]').exists()).toBe(true)

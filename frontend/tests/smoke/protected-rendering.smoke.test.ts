@@ -91,13 +91,25 @@ describe('Production SSR Smoke Check', () => {
   })
 
   it('verifies protected route withholds protected content and renders unhydrated SPA shell', async () => {
-    const res = await request('/')
+    const res = await request('/boards')
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain('data-ssr="false"')
     expect(html).not.toContain('Your boards')
     expect(html).not.toContain('Welcome to MeanTime')
     expect(html).not.toContain('data-testid="backend-status-badge"')
+  })
+
+  it('renders the public landing page and account links without protected content', async () => {
+    const res = await request('/')
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('YOUR TIME.')
+    expect(html).toContain('href="/login"')
+    expect(html).toContain('href="/register"')
+    expect(html).not.toContain('data-testid="boards-empty"')
+    expect(html).not.toContain('data-testid="new-board-button"')
+    expect(html).not.toContain('data-ssr="false"')
   })
 
   it('verifies public forms render correctly on login and register routes', async () => {
@@ -113,5 +125,14 @@ describe('Production SSR Smoke Check', () => {
     const page = await request('/reset-password')
     expect(page.status).toBe(200)
     expect(await page.text()).toContain('Checking your reset link')
+  })
+
+  it('renders public confirmation cards without a session', async () => {
+    const inbox = await request('/check-email')
+    expect(inbox.status).toBe(200)
+    expect(await inbox.text()).toContain('Check your email')
+    const confirmation = await request('/confirm-email')
+    expect(confirmation.status).toBe(200)
+    expect(await confirmation.text()).toContain('Confirming your email')
   })
 })

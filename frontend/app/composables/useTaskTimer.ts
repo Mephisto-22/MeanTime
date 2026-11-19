@@ -38,6 +38,15 @@ export function formatDurationBadge(totalSeconds?: number | null): string {
   return `${seconds}s`
 }
 
+/** Sum the durations of time entries, ignoring missing or invalid values. */
+export function sumEntryDurations(entries?: Array<{ durationSeconds?: number | null }> | null): number {
+  if (!entries) return 0
+  return entries.reduce((total, entry) => {
+    const seconds = Number(entry.durationSeconds ?? 0)
+    return total + (isNaN(seconds) ? 0 : seconds)
+  }, 0)
+}
+
 export function formatTimeRange(startedAt?: string | null, endedAt?: string | null): string {
   try {
     if (!startedAt) return 'Session'

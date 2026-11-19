@@ -1,5 +1,10 @@
 # Frontend Developer Guide
 
+See [Registration email confirmation](../email-verification.md) for verification
+cards, login requirements, and email setup.
+See [Public landing page](landing-page.md) for the guest entry point and the
+protected dashboard at `/boards`.
+
 See [Clean logout](../clean-logout.md) for navbar logout, session cleanup, and
 revocation-failure behavior.
 See [Notifications and required fields](notifications.md) for toast usage,

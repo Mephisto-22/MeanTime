@@ -3,6 +3,7 @@ import {
   createBoardFixture,
   createColumnFixture,
   createTagFixture,
+  createTaskFeedItemFixture,
   createTaskFixture,
 } from './kanban'
 
@@ -54,6 +55,40 @@ describe('Domain Fixture Factories', () => {
       expect(task.columnId).toBe('custom-col-1')
       expect(task.priority).toBe('HIGH')
       expect(task.tags).toEqual([tag])
+    })
+  })
+
+  describe('createTaskFeedItemFixture', () => {
+    it('creates a Task Feed task with board and column metadata defaults', () => {
+      const feedTask = createTaskFeedItemFixture()
+      expect(feedTask.id).toBeDefined()
+      expect(feedTask.title).toBeTruthy()
+      expect(feedTask.columnId).toBeDefined()
+      expect(feedTask.boardId).toBeDefined()
+      expect(feedTask.boardTitle).toBeTruthy()
+      expect(feedTask.columnTitle).toBeTruthy()
+      expect(feedTask.updatedAt).toBeTruthy()
+    })
+
+    it('allows overriding Task Feed metadata alongside task fields', () => {
+      const feedTask = createTaskFeedItemFixture({
+        id: 42,
+        title: 'Cross-board task',
+        boardId: 7,
+        boardTitle: 'Roadmap',
+        columnId: 19,
+        columnTitle: 'Review',
+        totalSeconds: 900,
+        updatedAt: '2026-11-18T12:00:00Z',
+      })
+      expect(feedTask.id).toBe(42)
+      expect(feedTask.title).toBe('Cross-board task')
+      expect(feedTask.boardId).toBe(7)
+      expect(feedTask.boardTitle).toBe('Roadmap')
+      expect(feedTask.columnId).toBe(19)
+      expect(feedTask.columnTitle).toBe('Review')
+      expect(feedTask.totalSeconds).toBe(900)
+      expect(feedTask.updatedAt).toBe('2026-11-18T12:00:00Z')
     })
   })
 

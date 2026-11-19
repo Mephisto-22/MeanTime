@@ -2,12 +2,12 @@
   <div
     data-testid="kanban-column"
     :data-column-id="column.id"
-    class="flex h-[50vh] flex-1 min-w-64 flex-col rounded-lg bg-surface-100 p-3 transition-colors duration-200 dark:bg-surface-800"
+    class="kanban-column flex flex-1 min-w-72 h-full min-h-0 flex-col gap-2.5 rounded-xl bg-surface-100 p-3 dark:bg-surface-950/70 border border-surface-200 dark:border-surface-800/80"
   >
     <!-- Column Header -->
-    <div class="mb-3 flex shrink-0 items-center justify-between">
+    <div class="flex shrink-0 items-center justify-between">
       <div class="flex min-w-0 items-center gap-2">
-        <h3 class="truncate text-sm font-semibold">
+        <h3 class="truncate text-sm font-semibold text-surface-900 dark:text-surface-0">
           {{ column.title }}
         </h3>
 
@@ -19,17 +19,23 @@
         />
       </div>
 
-      <Button
-        data-testid="edit-column-button"
-        icon="pi pi-pencil"
-        severity="secondary"
-        text
-        rounded
-        size="small"
-        aria-label="Edit column"
-        @click="handleEditColumn"
-      />
+      <div class="flex items-center gap-1.5 shrink-0">
+        <slot name="header-actions" />
+        <Button
+          v-if="showEditButton && canEdit"
+          data-testid="edit-column-button"
+          icon="pi pi-pencil"
+          severity="secondary"
+          text
+          rounded
+          size="small"
+          aria-label="Edit column"
+          @click="handleEditColumn"
+        />
+      </div>
     </div>
+
+    <slot name="subheader" />
 
     <!-- Draggable Tasks Container -->
     <div class="relative flex flex-1 min-h-[120px] flex-col overflow-y-auto">
@@ -37,9 +43,9 @@
       <div
         v-if="tasks.length === 0"
         data-testid="column-empty-placeholder"
-        class="absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 text-sm text-surface-500 select-none pointer-events-none dark:border-surface-600"
+        class="kanban-column-empty absolute inset-0 flex items-center justify-center rounded border-2 border-dashed border-surface-300 px-4 text-center text-sm text-surface-500 select-none pointer-events-none dark:border-surface-700"
       >
-        No tasks
+        {{ emptyText }}
       </div>
 
       <VueDraggable
@@ -48,6 +54,7 @@
         :data-column-id="column.id"
         group="kanban-tasks"
         :animation="150"
+        :disabled="!isDraggable"
         draggable="[data-testid='kanban-task']"
         ghost-class="kanban-task-ghost"
         drag-class="kanban-task-drag"
@@ -59,26 +66,33 @@
         @update="onUpdate"
         @add="onAdd"
       >
-        <KanbanTask
-          v-for="task in tasks"
-          :key="task.id"
-          :task="task"
-        />
+        <template v-if="$slots.task">
+          <template v-for="task in tasks" :key="task.id">
+            <slot name="task" :task="task" />
+          </template>
+        </template>
+        <template v-else>
+          <KanbanTask
+            v-for="task in tasks"
+            :key="task.id"
+            :task="task"
+            :draggable="isDraggable"
+          />
+        </template>
       </VueDraggable>
     </div>
 
     <!-- Add Task Button -->
-    <div class="mt-2 shrink-0 pt-1">
-      <Button
-        data-testid="add-task-button"
-        label="Add Task"
-        severity="secondary"
-        icon="pi pi-plus"
-        size="small"
-        class="w-full justify-center bg-surface-200 hover:bg-surface-300 dark:bg-surface-700 dark:hover:bg-surface-600"
-        @click="handleAddTask"
-      />
-    </div>
+    <Button
+      v-if="showAddTask && canEdit"
+      data-testid="add-task-button"
+      label="Add Task"
+      severity="secondary"
+      icon="pi pi-plus"
+      size="small"
+      class="kanban-add-task-btn shrink-0 w-full bg-surface-200 hover:bg-surface-300 dark:bg-surface-800 dark:hover:bg-surface-700"
+      @click="handleAddTask"
+    />
   </div>
 </template>
 
@@ -88,33 +102,55 @@ import { VueDraggable } from 'vue-draggable-plus'
 import type { KanbanColumnDto, KanbanColumnSummary, KanbanTaskDto } from '~/api/kanban'
 import { kanbanContextKey } from '~/api/kanban'
 
-const props = defineProps<{
-  column: KanbanColumnDto
-  columns?: KanbanColumnSummary[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    column: KanbanColumnDto
+    columns?: KanbanColumnSummary[]
+    draggable?: boolean
+    showEditButton?: boolean
+    showAddTask?: boolean
+    emptyText?: string
+  }>(),
+  {
+    draggable: true,
+    showEditButton: true,
+    showAddTask: true,
+    emptyText: 'No tasks',
+  },
+)
 
 const emit = defineEmits<{
   edit: [column: KanbanColumnDto]
 }>()
 
 defineSlots<{
+  'header-actions'?: () => any
+  subheader?: () => any
   task?: (props: { task: KanbanTaskDto }) => any
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
 
+const canEdit = computed(() =>
+  kanbanContext?.canEdit?.value ?? false,
+)
+
+const isDraggable = computed(() => props.draggable && canEdit.value)
+
 const tasks = computed({
   get: () => props.column.tasks,
   set: (newTasks: KanbanTaskDto[]) => {
+    if (!isDraggable.value) return
     props.column.tasks.splice(0, props.column.tasks.length, ...newTasks)
   },
 })
 
 const onUpdate = (event: any) => {
+  if (!isDraggable.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const targetPosition = event.newDraggableIndex ?? event.newIndex
-  if (taskId !== undefined && targetPosition !== undefined && kanbanContext) {
-    kanbanContext.moveTask({
+  if (taskId !== undefined && targetPosition !== undefined) {
+    kanbanContext?.moveTask?.({
       taskId,
       fromColumnId: props.column.id,
       toColumnId: props.column.id,
@@ -124,14 +160,15 @@ const onUpdate = (event: any) => {
 }
 
 const onAdd = (event: any) => {
+  if (!isDraggable.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const fromColumnId =
     event.from?.getAttribute('data-column-id') ||
     event.from?.closest('[data-column-id]')?.getAttribute('data-column-id')
   const targetPosition = event.newDraggableIndex ?? event.newIndex
 
-  if (taskId !== undefined && fromColumnId !== undefined && targetPosition !== undefined && kanbanContext) {
-    kanbanContext.moveTask({
+  if (taskId !== undefined && fromColumnId !== undefined && targetPosition !== undefined) {
+    kanbanContext?.moveTask?.({
       taskId,
       fromColumnId,
       toColumnId: props.column.id,
@@ -141,12 +178,14 @@ const onAdd = (event: any) => {
 }
 
 const handleAddTask = () => {
+  if (!canEdit.value) return
   if (kanbanContext?.openCreateTaskDialog) {
     kanbanContext.openCreateTaskDialog(props.column.id)
   }
 }
 
 const handleEditColumn = () => {
+  if (!canEdit.value) return
   emit('edit', props.column)
 }
 
@@ -158,3 +197,4 @@ defineExpose({
   handleEditColumn,
 })
 </script>
+

@@ -1,15 +1,12 @@
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-          Friends & Social
-        </h1>
-        <p class="mt-1 text-surface-600 dark:text-surface-400">
-          Manage your friends list, accept pending requests, find new connections, and view blocked users.
-        </p>
-      </div>
+  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 flex flex-col gap-6">
+    <div class="flex flex-col gap-1">
+      <h1 class="text-3xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+        Friends & Social
+      </h1>
+      <p class="text-surface-600 dark:text-surface-400">
+        Manage your friends list, accept pending requests, find new connections, and view blocked users.
+      </p>
     </div>
 
     <Tabs
@@ -17,7 +14,7 @@
       data-testid="friends-tabs"
       class="w-full"
     >
-      <TabList class="border-b border-surface-200 dark:border-surface-700">
+      <TabList class="border-b border-surface-200 dark:border-surface-800">
         <Tab
           value="friends"
           data-testid="tab-friends"
@@ -120,8 +117,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useToast } from 'primevue/usetoast'
-import Button from 'primevue/button'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -138,7 +133,7 @@ import {
   type UserOut,
 } from '~/api/friends'
 
-const toast = useToast()
+const notify = useNotifications()
 const userSearchRef = ref<InstanceType<typeof UserSearch> | null>(null)
 
 const loading = ref(true)
@@ -160,13 +155,7 @@ async function loadData() {
     outgoingRequests.value = requestsData.outgoing
     blockedUsers.value = blockedData
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to load friends data'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   } finally {
     loading.value = false
   }
@@ -177,20 +166,9 @@ async function handleUnfriend(userId: number) {
     await friendsApi.unfriend(userId)
     userSearchRef.value?.updateStatus(userId, 'none')
     friends.value = friends.value.filter((f) => f.id !== userId)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Friend removed successfully',
-      life: 3000,
-    })
+    notify.success('Friend removed successfully')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to unfriend user'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -219,20 +197,9 @@ async function handleBlock(userId: number) {
       }
     }
 
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'User blocked successfully',
-      life: 3000,
-    })
+    notify.success('User blocked successfully')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to block user'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -256,20 +223,9 @@ async function handleAccept(userId: number) {
       }
     }
 
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Friend request accepted',
-      life: 3000,
-    })
+    notify.success('Friend request accepted')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to accept friend request'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -278,20 +234,9 @@ async function handleDecline(userId: number) {
     await friendsApi.declineRequest(userId)
     userSearchRef.value?.updateStatus(userId, 'none')
     incomingRequests.value = incomingRequests.value.filter((r) => r.user.id !== userId)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Friend request declined',
-      life: 3000,
-    })
+    notify.success('Friend request declined')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to decline friend request'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -300,20 +245,9 @@ async function handleCancel(userId: number) {
     await friendsApi.cancelRequest(userId)
     userSearchRef.value?.updateStatus(userId, 'none')
     outgoingRequests.value = outgoingRequests.value.filter((r) => r.user.id !== userId)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Friend request cancelled',
-      life: 3000,
-    })
+    notify.success('Friend request cancelled')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to cancel friend request'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -321,20 +255,9 @@ async function handleUnblock(userId: number) {
   try {
     await friendsApi.unblockUser(userId)
     blockedUsers.value = blockedUsers.value.filter((u) => u.id !== userId)
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'User unblocked successfully',
-      life: 3000,
-    })
+    notify.success('User unblocked successfully')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to unblock user'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 
@@ -345,20 +268,9 @@ async function handleSendRequest(userId: number) {
     if (newReq && !outgoingRequests.value.some((r) => r.id === newReq.id)) {
       outgoingRequests.value.push(newReq)
     }
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: 'Friend request sent',
-      life: 3000,
-    })
+    notify.success('Friend request sent')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to send friend request'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 3000,
-    })
+    notify.error(err, 'Error')
   }
 }
 

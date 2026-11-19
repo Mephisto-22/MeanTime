@@ -5,7 +5,7 @@
     modal
     :draggable="false"
     :header="dialogTitle"
-    class="w-[min(34rem,calc(100vw-2rem))]"
+    class="dialog-md"
   >
     <div class="flex flex-col gap-5 py-2">
       <!-- Owner Invite Section -->
@@ -22,8 +22,19 @@
             option-value="id"
             option-label="label"
             :placeholder="availableFriends.length > 0 ? 'Select a friend...' : 'No new friends to invite'"
-            :disabled="availableFriends.length === 0"
-            class="w-full"
+            :disabled="availableFriends.length === 0 || isUpdatingCollaborators"
+            fluid
+            size="small"
+          />
+          <Select
+            v-model="selectedRole"
+            data-testid="invite-role-select"
+            :options="BOARD_ROLE_OPTIONS"
+            option-value="value"
+            option-label="label"
+            aria-label="Collaborator role"
+            :disabled="isUpdatingCollaborators"
+            class="w-32 shrink-0"
             size="small"
           />
           <Button
@@ -31,11 +42,14 @@
             icon="pi pi-user-plus"
             size="small"
             data-testid="invite-friend-button"
-            :disabled="!selectedFriendId || isInviting"
+            :disabled="!selectedFriendId || isUpdatingCollaborators"
             :loading="isInviting"
             @click="handleInviteFriend"
           />
         </div>
+        <p class="text-xs text-surface-500">
+          Editors can change board content. Viewers can view the board and analytics.
+        </p>
       </div>
 
       <!-- Non-owner Notice -->
@@ -64,10 +78,9 @@
               class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800"
             >
               <div class="flex items-center gap-3">
-                <Avatar
-                  :label="getInitials(board.owner.display_name, board.owner.email)"
-                  shape="circle"
-                  class="bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300 text-xs font-bold"
+                <UserAvatar
+                  :user="board.owner"
+                  class="text-xs font-bold"
                 />
                 <div class="flex flex-col">
                   <span class="text-sm font-medium">
@@ -91,10 +104,10 @@
                 class="flex items-center justify-between p-3 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
               >
                 <div class="flex items-center gap-3">
-                  <Avatar
-                    :label="getInitials(collaborator.display_name, collaborator.email)"
-                    shape="circle"
-                    class="bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300 text-xs font-bold"
+                  <UserAvatar
+                    :user="collaborator"
+                    variant="secondary"
+                    class="text-xs font-bold"
                   />
                   <div class="flex flex-col">
                     <span class="text-sm font-medium">
@@ -107,7 +120,24 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
-                  <Tag value="Editor" severity="secondary" />
+                  <Select
+                    v-if="isOwner"
+                    :model-value="collaborator.role"
+                    :options="BOARD_ROLE_OPTIONS"
+                    option-value="value"
+                    option-label="label"
+                    :data-testid="'collaborator-role-' + collaborator.id"
+                    :aria-label="`Role for ${collaborator.display_name || collaborator.email}`"
+                    :disabled="isUpdatingCollaborators"
+                    class="w-32"
+                    size="small"
+                    @update:model-value="handleChangeRole(collaborator, $event)"
+                  />
+                  <Tag
+                    v-else
+                    :value="BOARD_ROLE_CONFIG[collaborator.role]?.label ?? 'Collaborator'"
+                    severity="secondary"
+                  />
                   <Button
                     v-if="isOwner"
                     :data-testid="'remove-collaborator-' + collaborator.id"
@@ -117,7 +147,7 @@
                     severity="danger"
                     size="small"
                     aria-label="Remove collaborator"
-                    :disabled="isRemovingId === collaborator.id"
+                    :disabled="isUpdatingCollaborators"
                     :loading="isRemovingId === collaborator.id"
                     @click="handleRemoveCollaborator(collaborator)"
                   />
@@ -196,7 +226,15 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
+import UserAvatar from '~/components/UserAvatar.vue'
+import { 
+  BOARD_ROLE_CONFIG,
+  BOARD_ROLE_OPTIONS, 
+  kanbanApi, 
+  type BoardCollaboratorDto, 
+  type BoardRole, 
+  type KanbanBoardDto, 
+} from '~/api/kanban'
 import { friendsApi, type UserOut } from '~/api/friends'
 import { useAuthStore } from '~/stores/auth'
 
@@ -218,6 +256,12 @@ const notify = useNotifications()
 
 const friends = ref<UserOut[]>([])
 const selectedFriendId = ref<number | null>(null)
+const selectedRole = ref<BoardRole>('EDITOR')
+const isChangingRoleId = ref<number | null>(null)
+const isUpdatingCollaborators = computed(() =>
+  isInviting.value || isRemovingId.value !== null ||
+  isChangingRoleId.value !== null,
+)
 const isInviting = ref(false)
 const isRemovingId = ref<number | null>(null)
 const isLeaving = ref(false)
@@ -258,6 +302,7 @@ watch(visible, (isOpen) => {
   if (isOpen) {
     isConfirmingLeave.value = false
     selectedFriendId.value = null
+    selectedRole.value = 'EDITOR'
     loadFriends()
   }
 })
@@ -268,33 +313,14 @@ onMounted(() => {
   }
 })
 
-function getInitials(name?: string, email?: string): string {
-  const trimmed = name?.trim()
-  if (trimmed) {
-    const parts = trimmed.split(/\s+/)
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-    if (parts.length >= 2 && first && last && first[0] && last[0]) {
-      return (first[0] + last[0]).toUpperCase()
-    }
-    if (first) {
-      return first.slice(0, 1).toUpperCase()
-    }
-  }
-  const emailTrimmed = email?.trim()
-  if (emailTrimmed) {
-    return emailTrimmed.slice(0, 1).toUpperCase()
-  }
-  return '?'
-}
-
 async function handleInviteFriend() {
-  if (!selectedFriendId.value) return
+  if (!isOwner.value || !selectedFriendId.value || isUpdatingCollaborators.value) return
   isInviting.value = true
   try {
-    await kanbanApi.shareBoard(props.board.id, Number(selectedFriendId.value))
+    await kanbanApi.shareBoard(props.board.id, Number(selectedFriendId.value), selectedRole.value)
     notify.success('Friend invited to collaborate on board.')
     selectedFriendId.value = null
+    selectedRole.value = 'EDITOR'
     emit('collaborators-updated')
   } catch (err) {
     notify.error(err, 'Failed to invite friend.')
@@ -303,7 +329,33 @@ async function handleInviteFriend() {
   }
 }
 
+async function handleChangeRole(collaborator: BoardCollaboratorDto, role: BoardRole) {
+  if (!isOwner.value || isUpdatingCollaborators.value) return
+  if (!(role in BOARD_ROLE_CONFIG)) return
+  if (role === collaborator.role) return
+
+  isChangingRoleId.value = collaborator.id
+
+  try {
+    await kanbanApi.shareBoard(
+      props.board.id,
+      collaborator.id,
+      role,
+    )
+
+    notify.success(
+      `${collaborator.display_name || collaborator.email} is now ${BOARD_ROLE_CONFIG[role].indefiniteLabel}.`,
+    )
+    emit('collaborators-updated')
+  } catch (err) {
+    notify.error(err, 'Failed to change collaborator role.')
+  } finally {
+    isChangingRoleId.value = null
+  }
+}
+
 async function handleRemoveCollaborator(collaborator: UserOut) {
+  if (!isOwner.value || isUpdatingCollaborators.value) return
   isRemovingId.value = collaborator.id
   try {
     await kanbanApi.removeCollaborator(props.board.id, collaborator.id)

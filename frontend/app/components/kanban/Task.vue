@@ -2,85 +2,118 @@
   <Card
     data-testid="kanban-task"
     :data-task-id="task.id"
-    :pt="{ body: 'p-2.5', content: 'p-0' }"
-    class="cursor-grab active:cursor-grabbing select-none transition-shadow duration-150"
-    :class="priorityBorderClass"
+    :pt="{
+      body: 'p-2.5 flex flex-col justify-between h-full flex-1',
+      content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
+    }"
+    class="kanban-task-card select-none rounded-xl overflow-hidden shadow-sm shrink-0"
+    :class="[
+      priorityBorderClass,
+      isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+      draggable ? 'h-32' : 'min-h-32',
+    ]"
     @click="handleClick"
-    @pointerdown="handlePointerDown"
-    @pointermove="handlePointerMove"
-    @mousedown="handlePointerDown"
-    @mousemove="handlePointerMove"
-    @dragstart="handleDragStart"
-    @dragend="handleDragEnd"
+    v-on="dragListeners"
   >
     <template #content>
-      <div class="flex items-start justify-between gap-3">
-        <!-- Left Column: Title and Description -->
-        <div class="flex-1 min-w-0">
-          <h4 class="text-sm font-semibold text-surface-900 leading-snug break-words dark:text-surface-100">
+      <!-- Top Section: Header (Title + Priority micro-pip) & Description -->
+      <div class="flex flex-col min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <h4 class="text-sm font-semibold text-surface-900 break-words dark:text-surface-100 line-clamp-2 flex-1 min-w-0">
             {{ task.title }}
           </h4>
-          <p
-            v-if="hasDescription"
-            data-testid="task-description"
-            class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
-          >
-            {{ task.description }}
-          </p>
-        </div>
 
-        <!-- Right Column: Priority Micro-Pip and Tags -->
-        <div
-          v-if="task.priority || (task.tags && task.tags.length > 0)"
-          data-testid="task-card-indicators"
-          class="shrink-0 flex flex-col items-end gap-1.5 pt-0.5"
-        >
-          <!-- Priority micro-pip (omitted completely if null) -->
-          <span
-            v-if="task.priority"
-            data-testid="task-priority-indicator"
-            class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
-            :class="priorityBadgeClass"
-          >
+          <div class="flex items-center gap-1.5 shrink-0">
+            <!-- Due Date Badge -->
             <span
-              data-testid="task-priority-dot"
-              class="h-1.5 w-1.5 rounded-full"
-              :class="priorityDotClass"
-            />
-            {{ priorityLabel }}
-          </span>
-
-          <!-- Tags row: compact dot-prefixed pills capped at 3 with overflow badge -->
-          <div
-            v-if="task.tags && task.tags.length > 0"
-            data-testid="task-tags-row"
-            class="flex flex-wrap items-center justify-end gap-1"
-          >
-            <span
-              v-for="tag in visibleTags"
-              :key="tag.id"
-              data-testid="task-tag-chip"
-              class="inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+              v-if="hasDueDate"
+              data-testid="task-due-date-badge"
+              :data-status="dueDateStatus"
+              class="kanban-due-date-badge inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide"
+              :class="dueDateBadgeClass"
+              :title="`Due: ${fullDueDateString}`"
             >
-              <span class="text-surface-400">&bull;</span>
-              {{ tag.name }}
+              <i :class="dueDateIcon" class="text-[10px]" aria-hidden="true" />
+              <span>{{ dueDateLabel }}</span>
             </span>
+
+            <!-- Recurring Icon Badge -->
             <span
-              v-if="overflowTagCount > 0"
-              data-testid="task-tag-overflow-badge"
-              class="inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+              v-if="isRecurring"
+              data-testid="task-recurring-badge"
+              class="inline-flex items-center text-surface-400 dark:text-surface-500"
+              title="Recurring task"
             >
-              +{{ overflowTagCount }}
+              <i class="pi pi-sync text-[11px]" aria-hidden="true" />
+            </span>
+
+            <!-- Priority micro-pip (omitted completely if null) -->
+            <span
+              v-if="task.priority"
+              data-testid="task-priority-indicator"
+              class="kanban-priority-pip shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+              :class="priorityBadgeClass"
+            >
+              <span
+                data-testid="task-priority-dot"
+                class="h-1.5 w-1.5 rounded-full"
+                :class="priorityDotClass"
+              />
+              {{ priorityLabel }}
             </span>
           </div>
         </div>
+
+        <p
+          v-if="hasDescription"
+          data-testid="task-description"
+          class="line-clamp-1 text-xs text-surface-500 mt-0.5 dark:text-surface-400"
+        >
+          {{ task.description }}
+        </p>
       </div>
+
+      <!-- Lower Section: Total tracked time (left) and tags row (right) stabilized at bottom content area -->
+      <div
+        v-if="hasTotal || (task.tags && task.tags.length > 0)"
+        data-testid="task-tags-row"
+        class="flex flex-wrap items-center justify-end gap-1 mt-auto pt-1"
+      >
+        <span
+          v-if="hasTotal"
+          data-testid="task-total-time"
+          class="mr-auto inline-flex items-center gap-1 text-[10px] font-medium text-surface-500 dark:text-surface-400"
+          :title="`${formattedTotal} tracked`"
+        >
+          <i class="pi pi-clock text-[10px]" aria-hidden="true" />
+          {{ formattedTotal }}
+        </span>
+        <span
+          v-for="tag in visibleTags"
+          :key="tag.id"
+          data-testid="task-tag-chip"
+          class="kanban-tag-chip inline-flex items-center gap-1 rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-800 dark:text-surface-300"
+        >
+          <span class="text-surface-400">&bull;</span>
+          {{ tag.name }}
+        </span>
+        <span
+          v-if="overflowTagCount > 0"
+          data-testid="task-tag-overflow-badge"
+          class="kanban-tag-overflow inline-flex items-center rounded bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+        >
+          +{{ overflowTagCount }}
+        </span>
+      </div>
+
+      <slot name="before-timer" />
 
       <!-- Task Timer Bottom Row: Unified flush dock with inherited 1-click start and micro-controls -->
       <TaskTimerDock
         v-if="hasActiveTimer"
         :task-id="task.id"
         :timer="task.timer"
+        :read-only="!canEdit"
         @start="handleTimerStart"
         @pause="handleTimerPause"
         @stop="handleTimerStop"
@@ -91,36 +124,67 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto } from '~/api/kanban'
-import { kanbanContextKey } from '~/api/kanban'
+import type { KanbanTaskDto, TaskTimerDto, TaskTimeEntryDto, DueDateStatus } from '~/api/kanban'
+import {
+  kanbanContextKey,
+  TASK_PRIORITY_CONFIG,
+  DEFAULT_TASK_PRIORITY_BORDER_CLASS,
+  TASK_DUE_DATE_STATUS_CONFIG,
+  getDueDateStatus,
+  formatDueDateBadge,
+} from '~/api/kanban'
 import { useTaskInteraction } from '~/composables/useTaskInteraction'
+import { formatDurationBadge } from '~/composables/useTaskTimer'
+import { useNow } from '~/composables/useNow'
 import TaskTimerDock from '~/components/kanban/TaskTimerDock.vue'
 
-const props = defineProps<{
-  task: KanbanTaskDto
-  onOpenEdit?: (task: KanbanTaskDto) => void
-  onTimerStart?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
-  onTimerPause?: (taskId: string | number) => void
-  onTimerStop?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+const props = withDefaults(
+  defineProps<{
+    task: KanbanTaskDto
+    draggable?: boolean
+    onOpenEdit?: (task: KanbanTaskDto) => void
+    onTimerStart?: (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => void
+    onTimerPause?: (taskId: string | number) => void
+    onTimerStop?: (taskId: string | number, entry?: TaskTimeEntryDto) => void
+  }>(),
+  {
+    draggable: true,
+  },
+)
+
+defineSlots<{
+  'before-timer'?: () => any
 }>()
 
 const kanbanContext = inject(kanbanContextKey, null)
+
+const canEdit = computed(() => {
+  if (kanbanContext?.canEditTask) {
+    return kanbanContext.canEditTask(props.task)
+  }
+  return kanbanContext?.canEdit?.value ?? false
+})
+
+const isDraggable = computed(() => props.draggable && canEdit.value)
 
 const hasActiveTimer = computed(() => {
   return props.task.timer != null && props.task.timer.mode !== 'NONE'
 })
 
 const handleTimerStart = (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => {
+  if (!canEdit.value) return
   if (props.onTimerStart) props.onTimerStart(taskId, defaultTimer)
   else if (kanbanContext?.startTimer) kanbanContext.startTimer(taskId, defaultTimer)
 }
 
 const handleTimerPause = (taskId: string | number) => {
+  if (!canEdit.value) return
   if (props.onTimerPause) props.onTimerPause(taskId)
   else if (kanbanContext?.pauseTimer) kanbanContext.pauseTimer(taskId)
 }
 
 const handleTimerStop = (taskId: string | number, entry?: TaskTimeEntryDto) => {
+  if (!canEdit.value) return
   if (props.onTimerStop) props.onTimerStop(taskId, entry)
   else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId, entry)
 }
@@ -134,65 +198,81 @@ const {
   handleClick,
 } = useTaskInteraction(() => props.task, props.onOpenEdit)
 
+const dragListeners = computed(() => {
+  if (!isDraggable.value) return {}
+  return {
+    pointerdown: handlePointerDown,
+    pointermove: handlePointerMove,
+    mousedown: handlePointerDown,
+    mousemove: handlePointerMove,
+    dragstart: handleDragStart,
+    dragend: handleDragEnd,
+  }
+})
+
 const hasDescription = computed(() => {
   return Boolean(props.task.description && props.task.description.trim().length > 0)
 })
 
+const isRecurring = computed(() => {
+  return Boolean(props.task.recurringTaskId || props.task.recurringTask)
+})
+
+const rawDueAt = computed(() => props.task.dueAt)
+
+const hasDueDate = computed(() => Boolean(rawDueAt.value))
+
+const now = useNow()
+
+const dueDateStatus = computed<DueDateStatus | null>(() => {
+  if (!rawDueAt.value) return null
+  return getDueDateStatus(rawDueAt.value, now.value)
+})
+
+const dueDateConfig = computed(() => {
+  if (!dueDateStatus.value) return null
+  return TASK_DUE_DATE_STATUS_CONFIG[dueDateStatus.value]
+})
+
+const dueDateBadgeClass = computed(() => dueDateConfig.value?.badgeClass ?? '')
+const dueDateIcon = computed(() => dueDateConfig.value?.icon ?? 'pi pi-calendar')
+
+const dueDateLabel = computed(() => {
+  if (!rawDueAt.value) return ''
+  return formatDueDateBadge(rawDueAt.value)
+})
+
+const fullDueDateString = computed(() => {
+  if (!rawDueAt.value) return ''
+  const d = new Date(rawDueAt.value)
+  return isNaN(d.getTime()) ? '' : d.toLocaleString()
+})
+
+const priorityConfig = computed(() => {
+  const p = props.task.priority
+  return (p && p in TASK_PRIORITY_CONFIG) ? TASK_PRIORITY_CONFIG[p] : null
+})
+
 const priorityBorderClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'border-l-4 border-l-red-500 dark:border-l-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'border-l-4 border-l-amber-500 dark:border-l-amber-500'
-    case 'LOW':
-      return 'border-l-4 border-l-sky-500 dark:border-l-sky-500'
-    default:
-      return 'border-l-4 border-l-transparent'
-  }
+  return priorityConfig.value?.borderClass ?? DEFAULT_TASK_PRIORITY_BORDER_CLASS
 })
 
 const priorityLabel = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'HIGH'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'MED'
-    case 'LOW':
-      return 'LOW'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.shortLabel ?? ''
 })
 
 const priorityBadgeClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-    case 'LOW':
-      return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.badgeClass ?? ''
 })
 
 const priorityDotClass = computed(() => {
-  switch (props.task.priority) {
-    case 'HIGH':
-      return 'bg-red-500'
-    case 'MEDIUM':
-    case 'MED' as any:
-      return 'bg-amber-500'
-    case 'LOW':
-      return 'bg-sky-500'
-    default:
-      return ''
-  }
+  return priorityConfig.value?.dotClass ?? ''
 })
+
+// Total tracked time is hidden until the task has any recorded time.
+const hasTotal = computed(() => (props.task.totalSeconds ?? 0) > 0)
+
+const formattedTotal = computed(() => formatDurationBadge(props.task.totalSeconds))
 
 const MAX_VISIBLE_TAGS = 3
 
@@ -217,7 +297,15 @@ defineExpose({
   priorityLabel,
   priorityBadgeClass,
   priorityDotClass,
+  hasDueDate,
+  dueDateStatus,
+  dueDateBadgeClass,
+  dueDateIcon,
+  dueDateLabel,
+  fullDueDateString,
   hasDescription,
+  hasTotal,
+  formattedTotal,
   visibleTags,
   overflowTagCount,
   handleTimerStart,

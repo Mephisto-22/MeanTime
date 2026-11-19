@@ -5,7 +5,7 @@
     modal
     :header="isEditing ? 'Edit board' : 'New board'"
     :draggable="false"
-    class="w-[min(28rem,calc(100vw-2rem))]"
+    class="dialog-sm"
   >
     <form
       id="board-form"
@@ -13,7 +13,7 @@
       novalidate
       @submit.prevent="save"
     >
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="board-title-input">Name</Label>
         <InputText
           id="board-title-input"
@@ -23,9 +23,12 @@
           fluid
           :maxlength="TITLE_MAX_LENGTH"
           required
+          :disabled="!canSave"
           :invalid="showTitleError"
           :aria-invalid="showTitleError"
           :aria-describedby="showTitleError ? 'board-title-error' : undefined"
+          @input="markDirty('title')"
+          @blur="markBlurred('title')"
         />
         <Message
           v-if="showTitleError"
@@ -39,13 +42,14 @@
         </Message>
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="board-description-input">Description (optional)</Label>
         <Textarea
           id="board-description-input"
           v-model="description"
           data-testid="board-description-input"
           rows="3"
+          :disabled="!canSave"
           fluid
         />
       </div>
@@ -109,7 +113,7 @@
           data-testid="board-save-button"
           :label="isEditing ? 'Save' : 'Create'"
           :loading="isSaving"
-          :disabled="isBusy || showTitleError"
+          :disabled="!canSave || isBusy || isTitleInvalid"
         />
       </template>
     </template>
@@ -118,7 +122,8 @@
 
 <script setup lang="ts">
 import {kanbanApi, type KanbanBoardDto} from '~/api/kanban';
-import {useAuthStore} from '~/stores/auth';
+import { useBoardPermissions } from '~/composables/useBoardPermissions'
+import { useFormValidation } from '~/composables/useFormValidation'
 
 interface Props {
   /** The board to edit, or null to create a new one. */
@@ -148,20 +153,19 @@ const isDeleting = ref(false);
 // Deleting asks for confirmation first, in place of the editor's buttons.
 const isConfirmingDelete = ref(false);
 const notify = useNotifications();
-const authStore = useAuthStore();
 
 const isEditing = computed(() => props.board !== null);
-const isOwner = computed(() => {
-  if (!props.board) return true;
-  if (typeof props.board.isOwner === 'boolean') {
-    return props.board.isOwner;
-  }
-  return Boolean(props.board.owner?.id && authStore.user?.id && props.board.owner.id === authStore.user.id);
-});
+const { isOwner } = useBoardPermissions(() => props.board)
+
+const canSave = computed(() =>
+  props.board === null || isOwner.value,
+)
 const isBusy = computed(() => isSaving.value || isDeleting.value);
 const trimmedTitle = computed(() => title.value.trim());
+const isTitleInvalid = computed(() => trimmedTitle.value === '');
+const { markDirty, markBlurred, markSubmitted, shouldShowError, reset: resetValidation } = useFormValidation();
 const showTitleError = computed(
-  () => trimmedTitle.value === '',
+  () => shouldShowError('title', isTitleInvalid.value),
 );
 
 // Start from a clean form every time the dialog opens, so values and errors
@@ -170,12 +174,15 @@ watch(visible, isOpen => {
   if (!isOpen) {
     return;
   }
+  resetValidation();
   title.value = props.board?.title ?? '';
   description.value = props.board?.description ?? '';
   isConfirmingDelete.value = false;
 }, {immediate: true});
 
 async function save(): Promise<void> {
+  markSubmitted();
+  if (!canSave.value) return
   // Enter in a field still submits the form while the confirmation shows.
   if (trimmedTitle.value === '' || isBusy.value || isConfirmingDelete.value) {
     return;
@@ -204,6 +211,7 @@ async function save(): Promise<void> {
 }
 
 async function deleteBoard(): Promise<void> {
+  if (!isOwner.value) return
   if (props.board === null || isBusy.value) {
     return;
   }

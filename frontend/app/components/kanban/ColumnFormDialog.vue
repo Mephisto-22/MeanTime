@@ -3,12 +3,12 @@
     v-model:visible="visible"
     :header="column ? 'Edit Column' : 'Create Column'"
     modal
-    :style="{ width: '25rem' }"
+    class="dialog-sm"
     :closable="!busy"
     :draggable="false"
   >
     <form @submit.prevent="handleSave" class="flex flex-col gap-4">
-      <div class="flex flex-col gap-2">
+      <div class="field-group">
         <Label for="column-title" class="font-medium">
           Column Title
         </Label>
@@ -19,13 +19,69 @@
           autofocus
           maxlength="100"
           placeholder="Enter column title"
-          :invalid="!!errorMessage && !title.trim()"
+          :invalid="showTitleError || (!!errorMessage && !title.trim())"
+          :aria-invalid="showTitleError || (!!errorMessage && !title.trim())"
+          :aria-describedby="showTitleError ? 'column-title-error' : undefined"
           :disabled="busy"
+          @input="markDirty('title')"
+          @blur="markBlurred('title')"
         />
 
-        <small v-if="!title.trim() && attemptedSave" class="text-red-500">
+        <small v-if="showTitleError" id="column-title-error" class="field-error-text">
           A column title is required.
         </small>
+      </div>
+
+      <div class="flex items-center justify-between gap-4 pt-1">
+        <div class="flex flex-col">
+          <Label for="column-auto-clear-toggle" class="font-medium text-sm">
+            Auto-clear tasks
+          </Label>
+          <span class="text-xs text-surface-500">
+            Automatically archive inactive tasks in this column.
+          </span>
+        </div>
+
+        <ToggleSwitch
+          id="column-auto-clear-toggle"
+          v-model="autoClearEnabled"
+          :disabled="busy"
+          data-testid="column-auto-clear-toggle"
+        />
+      </div>
+
+      <div v-if="autoClearEnabled" class="field-group">
+        <Label for="auto-clear-preset-select" class="text-sm font-medium">
+          Retention Duration
+        </Label>
+
+        <div class="flex items-center gap-2 w-full">
+          <Select
+            id="auto-clear-preset-select"
+            v-model="selectedPreset"
+            :options="AUTO_CLEAR_PRESET_OPTIONS"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select retention duration"
+            :disabled="busy"
+            :class="selectedPreset === 'custom' ? 'w-3/5 min-w-0' : 'w-full'"
+            data-testid="auto-clear-preset-select"
+          />
+
+          <InputNumber
+            v-if="selectedPreset === 'custom'"
+            id="custom-auto-clear-days"
+            v-model="customDays"
+            :min="1"
+            :max="365"
+            placeholder="Days"
+            suffix=" days"
+            :disabled="busy"
+            fluid
+            class="flex-1 min-w-0"
+            data-testid="custom-auto-clear-days"
+          />
+        </div>
       </div>
 
       <p v-if="errorMessage" class="text-sm text-red-500">
@@ -65,7 +121,7 @@
 
       <div
         v-if="confirmingDelete"
-        class="rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950"
+        class="danger-callout-box"
       >
         <p class="mb-3 text-sm">
           Are you sure you want to delete this column? Tasks in this column
@@ -99,9 +155,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { kanbanApi } from '~/api/kanban'
 import type { KanbanColumnDto } from '~/api/kanban'
+import { useFormValidation } from '~/composables/useFormValidation'
 
 const props = defineProps<{
   boardId: string | number
@@ -116,26 +173,61 @@ const emit = defineEmits<{
 
 const visible = defineModel<boolean>('visible', { default: false })
 
+interface PresetOption {
+  label: string
+  value: number | string
+}
+
+const AUTO_CLEAR_PRESET_OPTIONS: PresetOption[] = [
+  { label: '3 days', value: 259200 },
+  { label: '1 week', value: 604800 },
+  { label: '2 weeks', value: 1209600 },
+  { label: '1 month', value: 2592000 },
+  { label: 'Custom...', value: 'custom' },
+]
+
 const title = ref('')
+const autoClearEnabled = ref(false)
+const selectedPreset = ref<number | string>(259200)
+const customDays = ref<number | null>(3)
 const busy = ref(false)
-const attemptedSave = ref(false)
 const confirmingDelete = ref(false)
 const errorMessage = ref('')
+const { markDirty, markBlurred, markSubmitted, shouldShowError, reset: resetValidation } = useFormValidation()
+const showTitleError = computed(() => shouldShowError('title', !title.value.trim()))
 
 watch(
   () => [visible.value, props.column] as const,
   ([isVisible, column]) => {
     if (isVisible) {
+      resetValidation()
       title.value = column?.title ?? ''
-      attemptedSave.value = false
       confirmingDelete.value = false
       errorMessage.value = ''
+
+      const duration = column?.autoClearDurationSeconds ?? (column as any)?.auto_clear_duration_seconds
+      if (duration && duration > 0) {
+        autoClearEnabled.value = true
+        const isStandardPreset = [259200, 604800, 1209600, 2592000].includes(duration)
+        if (isStandardPreset) {
+          selectedPreset.value = duration
+          customDays.value = Math.round(duration / 86400)
+        } else {
+          selectedPreset.value = 'custom'
+          customDays.value = Math.max(1, Math.round(duration / 86400))
+        }
+      } else {
+        autoClearEnabled.value = false
+        selectedPreset.value = 259200
+        customDays.value = 3
+      }
     }
   },
+  { immediate: true },
 )
 
 const handleSave = async () => {
-  attemptedSave.value = true
+  markSubmitted()
   errorMessage.value = ''
 
   const trimmedTitle = title.value.trim()
@@ -144,20 +236,36 @@ const handleSave = async () => {
     return
   }
 
+  let autoClearDurationSeconds: number | null = null
+  if (autoClearEnabled.value) {
+    if (selectedPreset.value === 'custom') {
+      const days = customDays.value && customDays.value > 0 ? customDays.value : 1
+      autoClearDurationSeconds = days * 86400
+    } else {
+      autoClearDurationSeconds = Number(selectedPreset.value)
+    }
+  }
+
   busy.value = true
 
   try {
     if (props.column) {
       const updatedColumn = await kanbanApi.updateColumn(
         props.column.id,
-        { title: trimmedTitle },
+        {
+          title: trimmedTitle,
+          autoClearDurationSeconds,
+        },
       )
 
       emit('updated', updatedColumn)
     } else {
       const createdColumn = await kanbanApi.createColumn(
         props.boardId,
-        { title: trimmedTitle },
+        {
+          title: trimmedTitle,
+          autoClearDurationSeconds,
+        },
       )
 
       emit('created', createdColumn)
