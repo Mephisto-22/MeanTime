@@ -49,3 +49,31 @@ resource "aws_acm_certificate_validation" "prod" {
   certificate_arn         = aws_acm_certificate.prod.arn
   validation_record_fqdns = [for r in aws_route53_record.certificate_validation : r.fqdn]
 }
+
+# Confirmation and password reset emails are sent through SES from this domain
+# (noreply@...). The identity lives here, not in the app layer, so it isn't
+# verified again every time the app layer is brought up. SES finds the DKIM
+# records below on its own and marks the domain verified, usually within minutes.
+resource "aws_sesv2_email_identity" "prod" {
+  email_identity = var.domain_name
+}
+
+resource "aws_route53_record" "ses_dkim" {
+  count = 3
+
+  zone_id = aws_route53_zone.prod.zone_id
+  name    = "${aws_sesv2_email_identity.prod.dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = 1800
+  records = ["${aws_sesv2_email_identity.prod.dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"]
+}
+
+# Publishing a DMARC policy, even one that only reports (p=none), makes mail
+# providers less likely to treat the domain's email as spam.
+resource "aws_route53_record" "dmarc" {
+  zone_id = aws_route53_zone.prod.zone_id
+  name    = "_dmarc.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 1800
+  records = ["v=DMARC1; p=none;"]
+}

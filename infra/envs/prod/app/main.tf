@@ -56,8 +56,8 @@ module "network" {
 }
 
 module "app" {
-  ses_sender_identity_arn = var.ses_sender_identity_arn
-  email_from_address      = var.email_from_address
+  ses_sender_identity_arn = local.ses_sender_identity_arn
+  email_from_address      = local.email_from_address
   source                  = "../../../modules/app"
 
   environment = "prod"
