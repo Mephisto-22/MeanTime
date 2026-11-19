@@ -126,7 +126,7 @@
                     v-model="targetInputText"
                     type="text"
                     maxlength="8"
-                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 !text-surface-900 dark:!text-surface-100 focus:!outline-none !w-36 !py-0 !shadow-none"
+                    class="font-mono !text-3xl !font-bold !tracking-normal !tabular-nums !text-center !bg-transparent !border-0 !border-b-2 !border-primary-500 text-surface-900 dark:text-surface-100 focus:!outline-none !w-36 !py-0 !shadow-none"
                     data-testid="timer-inline-target-input"
                     placeholder="25:00"
                     @keydown.enter="commitTargetInput"

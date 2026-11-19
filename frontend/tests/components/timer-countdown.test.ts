@@ -195,9 +195,13 @@ describe('Countdown Timer Mode, Inline Typing & Persistent Track (#107)', () => 
       expect(readoutContainer.exists()).toBe(true)
       await readoutContainer.trigger('dblclick')
 
-      // Input appears
+      // Input appears and matches readout text color utilities without !important layer inversion
       const input = wrapper.find('[data-testid="timer-inline-target-input"]')
       expect(input.exists()).toBe(true)
+      expect(input.classes()).toContain('text-surface-900')
+      expect(input.classes()).toContain('dark:text-surface-100')
+      expect(input.classes()).not.toContain('!text-surface-900')
+      expect(input.classes()).not.toContain('dark:!text-surface-100')
 
       // Test "30" -> 30 minutes (1800s)
       await input.setValue('30')
