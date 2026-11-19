@@ -12,6 +12,10 @@ variable "email_from_address" {
   default     = ""
 }
 
+# While the account is in the SES sandbox, SES also checks permission on the
+# recipient's verified identity, not just the sender's. So the policy covers
+# every identity in the account, and the From address condition still limits
+# sending to the one sender.
 resource "aws_iam_role_policy" "ses_send" {
   count = var.ses_sender_identity_arn == null ? 0 : 1
   name  = "send-transactional-email"
@@ -21,7 +25,7 @@ resource "aws_iam_role_policy" "ses_send" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["ses:SendEmail"]
-      Resource = var.ses_sender_identity_arn
+      Resource = replace(var.ses_sender_identity_arn, "/identity/.*$/", "identity/*")
       Condition = {
         StringEquals = { "ses:FromAddress" = var.email_from_address }
       }

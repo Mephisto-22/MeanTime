@@ -58,30 +58,35 @@ registration email is held only in Nuxt memory to prefill the form; refreshing
 the page requires entering it again. Requests and toasts follow existing UI
 patterns. Confirmation routes are public and server-rendered.
 
-## AWS setup still required
+## AWS setup
 
-The code is ready for SES, but no AWS identities or sending permissions have
-been provisioned or applied by this change. AWS deployments use the SES backend
-and fail registration with 503 until sender configuration and permissions work;
-they do not silently discard mail. Local console delivery is independently
-configurable. Dummy delivery is rejected for transactional mail.
+AWS deployments use the SES backend and fail registration with 503 until sender
+configuration and permissions work; they do not silently discard mail. Local
+console delivery is independently configurable. Dummy delivery is rejected for
+transactional mail.
 
-1. Verify a sender address/domain in the app's AWS region (currently configured
-   as `us-east-2`). Configure DNS verification/DKIM for a domain identity.
-2. For ordinary user recipients, request SES production access. In the sandbox,
-   recipients must also be verified, except SES simulator addresses.
-3. Supply `ses_sender_identity_arn` and `email_from_address` as Terraform inputs
-   to the `infra/envs/dev/app` or `infra/envs/prod/app` layer. Example values:
-   `arn:aws:ses:us-east-2:123456789012:identity/example.com` and
-   `noreply@example.com`. Both must identify the same authorized sender.
-4. Review the Terraform plan and deploy through the team's normal process. The
-   app module passes `EMAIL_BACKEND`, `AWS_SES_REGION`, and `DEFAULT_FROM_EMAIL`
-   to the backend and grants the task role `ses:SendEmail` only for that identity
-   and From address. This feature does not create DNS or SES identities.
-5. Verify `FRONTEND_URL` is the address recipients can actually reach. Dev's
-   localhost/tunnel links are not reachable from another person's machine.
-6. Send a controlled test email and check inbox/spam delivery. Set up bounce and
-   complaint handling before enabling unrestricted registration at scale.
+**Prod** sends from `noreply@meantime.click`:
+
+- `infra/envs/prod/base/domain.tf` creates the SES domain identity for
+  `meantime.click`, its three DKIM records and a DMARC record. The base layer
+  is applied by hand (`terraform apply` in `infra/envs/prod/base`), not by CI.
+  SES marks the domain verified on its own once it sees the DKIM records.
+- `infra/envs/prod/app/email.tf` sets the sender address and builds the
+  identity's ARN from the signed-in account, so CI's `up` needs no inputs. The
+  app module passes `EMAIL_BACKEND`, `AWS_SES_REGION`, and `DEFAULT_FROM_EMAIL`
+  to the backend and grants the task role `ses:SendEmail` for the account's
+  identities, limited to that From address.
+- While the account is in the SES sandbox, mail only reaches recipients whose
+  address is verified in SES. Request SES production access (a one-time form
+  reviewed by AWS) to let anyone register.
+
+**Dev** has no sender configured. To set one up, verify an identity in
+`us-east-2` and supply `ses_sender_identity_arn` and `email_from_address` to
+`infra/envs/dev/app`. Dev's localhost/tunnel links in the emails are not
+reachable from another person's machine.
+
+Send a controlled test email and check inbox/spam delivery. Set up bounce and
+complaint handling before enabling unrestricted registration at scale.
 
 Official setup references:
 - https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html
