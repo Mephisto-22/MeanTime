@@ -26,9 +26,26 @@
           option-label="title"
           :placeholder="eligibleBoards.length > 0 ? 'Select a board to share...' : 'No available boards to share'"
           :disabled="eligibleBoards.length === 0 || isLoading"
-          class="w-full"
+          fluid
           size="small"
         />
+        <label for="friend-board-role-select" class="text-sm font-medium">
+          Role
+        </label>
+        <Select
+          id="friend-board-role-select"
+          v-model="selectedRole"
+          data-testid="friend-board-role-select"
+          :options="BOARD_ROLE_OPTIONS"
+          option-value="value"
+          option-label="label"
+          :disabled="isSharing"
+          fluid
+          size="small"
+        />
+        <p class="text-xs text-surface-500">
+          Editors can change board content. Viewers can view the board and analytics.
+        </p>
         <Message
           v-if="eligibleBoards.length === 0 && !isLoading"
           severity="info"
@@ -67,7 +84,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { kanbanApi, type KanbanBoardDto } from '~/api/kanban'
+import { 
+  BOARD_ROLE_OPTIONS,
+  kanbanApi, 
+  type BoardRole,
+  type KanbanBoardDto 
+} from '~/api/kanban'
 import type { UserOut } from '~/api/friends'
 import { useAuthStore } from '~/stores/auth'
 
@@ -88,6 +110,7 @@ const notify = useNotifications()
 
 const boards = ref<KanbanBoardDto[]>([])
 const selectedBoardId = ref<number | null>(null)
+const selectedRole = ref<BoardRole>('EDITOR')
 const isLoading = ref(false)
 const isSharing = ref(false)
 
@@ -121,6 +144,7 @@ async function loadBoards() {
 watch(visible, (isOpen) => {
   if (isOpen) {
     selectedBoardId.value = null
+    selectedRole.value = 'EDITOR'
     loadBoards()
   }
 })
@@ -135,7 +159,7 @@ async function handleShare() {
   if (!props.friend || !selectedBoardId.value) return
   isSharing.value = true
   try {
-    await kanbanApi.shareBoard(selectedBoardId.value, props.friend.id)
+    await kanbanApi.shareBoard(selectedBoardId.value, props.friend.id, selectedRole.value)
     notify.success(`Board shared with ${props.friend.display_name}.`)
     visible.value = false
     emit('shared')

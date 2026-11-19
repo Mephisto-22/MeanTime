@@ -14,6 +14,7 @@ from ninja import Router
 from users.models import UserBlock
 from .models import (
     Board,
+    BoardMembership,
     BoardColumn,
     Task,
     TaskTimer,
@@ -85,7 +86,7 @@ def get_accessible_boards(user):
     )
 
     return Board.objects.filter(
-        Q(owner=user) | Q(collaborators=user)
+        Q(owner=user) | Q(memberships__user=user)
     ).annotate(owner_blocked_user=Exists(owner_blocked_user),
                user_blocked_owner=Exists(user_blocked_owner),
                is_owner=Case(
@@ -97,6 +98,24 @@ def get_accessible_boards(user):
         owner_blocked_user=False,
         user_blocked_owner=False,
     ).distinct()
+
+def get_editable_boards(user):
+    """
+    Return boards the user can modify:
+    boards they own or boards where they have the EDITOR role.
+    """
+
+    return (
+        get_accessible_boards(user)
+        .filter(
+            Q(owner=user)
+            | Q(
+                memberships__user=user,
+                memberships__role=BoardMembership.Role.EDITOR,
+            )
+        )
+        .distinct()
+    )
 
 def session_already_recorded(task, started_at) -> bool:
     """Return whether a time entry already exists for this timer session.
@@ -189,7 +208,7 @@ def get_board_queryset(user):
     return (
         get_accessible_boards(user)
         .select_related("owner")
-        .prefetch_related("collaborators", Prefetch("columns", queryset=col_qs))
+        .prefetch_related("memberships__user", Prefetch("columns", queryset=col_qs))
     )
 
 def get_owned_board(user, board_id: int) -> Board:
@@ -232,6 +251,37 @@ def get_accessible_recurring_task(user, recurring_task_id: int) -> RecurringTask
         ),
         id=recurring_task_id,
     )
+
+def require_board_edit_access(user, board_id: int) -> None:
+    """Raise 403 when the user cannot edit an already accessible board."""
+    if not get_editable_boards(user).filter(id=board_id).exists():
+        raise HttpError(403, "You do not have permission to edit this board.")
+
+def get_editable_board(user, board_id: int) -> Board:
+    """Retrieve an accessible board and require edit permission."""
+    board = get_object_or_404(
+        get_accessible_boards(user),
+        id=board_id,
+    )
+    require_board_edit_access(user, board.id)
+    return board
+
+def get_editable_column(user, column_id: int) -> BoardColumn:
+    """Retrieve a column on a board the user can modify."""
+    column = get_accessible_column(user, column_id)
+    require_board_edit_access(user, column.board_id)
+    return column
+
+def get_editable_task(user, task_id: int) -> Task:
+    task = get_accessible_task(user, task_id)
+    require_board_edit_access(user, task.column.board_id)
+    return task
+
+def get_editable_recurring_task(user, recurring_task_id: int) -> RecurringTask:
+    """Retrieve a recurring task on a board the user can modify."""
+    recurring_task = get_accessible_recurring_task(user, recurring_task_id)
+    require_board_edit_access(user, recurring_task.board_id)
+    return recurring_task
 
 def create_recurring_task_blueprint(
     user,
@@ -355,7 +405,9 @@ def get_available_board_tags(user, board, tag_ids: list[int]) -> list[Tag]:
         raise HttpError(400, "Duplicate tag IDs are not allowed.")
 
     member_ids = [board.owner_id]
-    member_ids.extend(board.collaborators.values_list("id", flat=True))
+    member_ids.extend(
+        board.memberships.values_list("user_id", flat=True)
+    )
 
     tags = list(Tag.objects.filter(user_id__in=member_ids, id__in=tag_ids))
 
@@ -461,8 +513,8 @@ def board_events(request, board_id: int):
 
 @router.patch("/boards/{board_id}", response=BoardOut)
 def update_board(request, board_id: int, payload: BoardIn):
-    """Update a board's title and description."""
-    board = get_accessible_board(request.auth, board_id)
+    """Update a board's title and description as its owner."""
+    board = get_owned_board(request.auth, board_id)
     board.title = payload.title
     board.description = payload.description
     board.save()
@@ -504,7 +556,7 @@ def delete_board(request, board_id: int):
 
 @router.post("/boards/{board_id}/collaborators")
 def share_board(request, board_id: int, payload: BoardShareIn):
-    """Share a board with an accepted friend."""
+    """Share a board with an accepted friend, or update their role if they are already a collaborator."""
 
     # only the board owner can manage collaborators
     board = get_owned_board(request.auth, board_id)
@@ -512,12 +564,32 @@ def share_board(request, board_id: int, payload: BoardShareIn):
     # retrieve the user who will receive access
     friend = get_object_or_404(User, id=payload.friend_id)
 
-    # verify the user is an accepted friend
-    if not request.auth.is_friends_with(friend):
-        raise HttpError(403, "You can only share boards with accepted friends.")
+    # Lock existing memberships so concurrent role changes are applied in order.
+    with transaction.atomic():
+        memberships = BoardMembership.objects.select_for_update()
+        membership = memberships.filter(board=board, user=friend).first()
+        created = False
+        if membership is None:
+            # Friendship is required for new invitations, not existing role changes.
+            if not request.auth.is_friends_with(friend):
+                raise HttpError(403, "You can only share boards with accepted friends.")
+            membership, created = memberships.get_or_create(
+                board=board,
+                user=friend,
+                defaults={"role": payload.role},
+            )
+        role_changed = membership.role != payload.role
+        if role_changed:
+            membership.role = payload.role
+            membership.save(update_fields=["role"])
 
-    # grant the friend access
-    board.collaborators.add(friend)
+        if created or role_changed:
+            publish_event_on_commit(
+                board_id=board.id,
+                actor_id=request.auth.id,
+                event_type=BoardEventType.BOARD_COLLABORATOR_UPDATED,
+                data={"user_id": friend.id, "role": membership.role},
+            )
 
     return {"success": True, "message": "Board shared successfully."}
 
@@ -532,7 +604,12 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     collaborator = get_object_or_404(User, id=collaborator_id)
 
     # Verify that the user currently has access.
-    if not board.collaborators.filter(id=collaborator.id).exists():
+    membership_exists = BoardMembership.objects.filter(
+        board=board,
+        user=collaborator,
+    ).exists()
+
+    if not membership_exists:
         raise HttpError(404, "User is not a collaborator on this board.")
 
     # only the owner can remove other collaborators
@@ -540,8 +617,11 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
     if request.auth != board.owner and request.auth.id != collaborator_id:
         raise HttpError(403, "You can only remove yourself from a shared board.")
 
-    # remove the relationship from the many-to-many table
-    board.collaborators.remove(collaborator)
+    # remove the relationship
+    BoardMembership.objects.filter(
+        board=board,
+        user=collaborator,
+    ).delete()
 
     # publish collaborator removal event. This goes to everyone subscribed to the board,
     # but only the connection belonging to the removed user will be terminated. This is
@@ -565,7 +645,7 @@ def remove_collaborators(request, board_id: int, collaborator_id: int):
 @router.post("/boards/{board_id}/columns", response=BoardColumnOut)
 def create_column(request, board_id: int, payload: BoardColumnIn):
     """Create a column on a board owned by the authenticated user."""
-    board = get_accessible_board(request.auth, board_id)
+    board = get_editable_board(request.auth, board_id)
     last = board.columns.aggregate(m=Max("position"))["m"]
     column = BoardColumn.objects.create(
         board=board,
@@ -594,7 +674,7 @@ def create_column(request, board_id: int, payload: BoardColumnIn):
 @router.patch("/columns/{column_id}", response=BoardColumnOut)
 def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
     """Update the supplied fields of a column."""
-    column = get_accessible_column(request.auth, column_id)
+    column = get_editable_column(request.auth, column_id)
     updates = payload.dict(exclude_unset=True)
 
     if not updates:
@@ -634,7 +714,7 @@ def update_column(request, column_id: int, payload: BoardColumnUpdateIn):
 @router.delete("/columns/{column_id}")
 def delete_column(request, column_id: int):
     """Delete a column and its tasks."""
-    column = get_accessible_column(request.auth, column_id)
+    column = get_editable_column(request.auth, column_id)
     board = column.board
     board_id = column.board_id
     column_id = column.id
@@ -682,7 +762,7 @@ def list_task_feed(request):
 @router.post("/columns/{column_id}/tasks", response=TaskOut)
 def create_task(request, column_id: int, payload: TaskIn):
     """Create a task in a column."""
-    column = get_accessible_column(request.auth, column_id)
+    column = get_editable_column(request.auth, column_id)
     with transaction.atomic():
         task = create_task_in_column(request.auth, column, payload)
 
@@ -701,7 +781,7 @@ def create_task(request, column_id: int, payload: TaskIn):
 @router.patch("/tasks/{task_id}", response=TaskOut)
 def update_task(request, task_id: int, payload: TaskUpdateIn):
     """Update the supplied fields of a task."""
-    task = get_accessible_task(request.auth, task_id)
+    task = get_editable_task(request.auth, task_id)
     updates = payload.dict(exclude_unset=True) # get fields included in request
 
     tag_ids = updates.pop("tag_ids", None)
@@ -832,7 +912,7 @@ def update_task(request, task_id: int, payload: TaskUpdateIn):
 @router.delete("/tasks/{task_id}")
 def delete_task(request, task_id: int, cancel_recurrence: bool = False):
     """Delete a task. If cancel_recurrence=True and task is recurring, deactivates the recurrence schedule."""
-    task = get_accessible_task(request.auth, task_id)
+    task = get_editable_task(request.auth, task_id)
     column = task.column
     board_id = task.column.board_id
     column_id = task.column_id
@@ -859,7 +939,7 @@ def delete_task(request, task_id: int, cancel_recurrence: bool = False):
 @router.patch("/recurring-tasks/{recurring_task_id}", response=RecurringTaskOut)
 def update_recurring_task(request, recurring_task_id: int, payload: RecurringTaskPatchIn):
     """Update fields or toggle is_active for a recurring task blueprint."""
-    rec = get_accessible_recurring_task(request.auth, recurring_task_id)
+    rec = get_editable_recurring_task(request.auth, recurring_task_id)
     updates = payload.dict(exclude_unset=True)
 
     tag_ids = updates.pop("tag_ids", None)
@@ -879,7 +959,7 @@ def update_recurring_task(request, recurring_task_id: int, payload: RecurringTas
 @router.delete("/recurring-tasks/{recurring_task_id}")
 def delete_recurring_task(request, recurring_task_id: int):
     """Delete a recurring task blueprint, leaving past spawned task occurrences intact."""
-    rec = get_accessible_recurring_task(request.auth, recurring_task_id)
+    rec = get_editable_recurring_task(request.auth, recurring_task_id)
     with transaction.atomic():
         rec.delete()
     return {"success": True}
@@ -887,9 +967,9 @@ def delete_recurring_task(request, recurring_task_id: int):
 @router.post("/tasks/{task_id}/move", response=TaskOut)
 def move_task(request, task_id: int, payload: TaskMoveIn):
     """Move a task to another column and position."""
-    task = get_accessible_task(request.auth, task_id)
+    task = get_editable_task(request.auth, task_id)
     src = task.column
-    dest = get_accessible_column(request.auth, payload.to_column_id)
+    dest = get_editable_column(request.auth, payload.to_column_id)
     if dest.board_id != src.board.id:
         raise HttpError(400, "Column on different board")
 
@@ -927,7 +1007,7 @@ def move_task(request, task_id: int, payload: TaskMoveIn):
 @router.patch("/tasks/{task_id}/timer", response=TaskTimerOut)
 def patch_task_timer(request, task_id: int, payload: TaskTimerPatchIn):
     """Configure or transition the execution state of a task's timer."""
-    task = get_accessible_task(request.auth, task_id)
+    task = get_editable_task(request.auth, task_id)
     with transaction.atomic():
         timer, _ = TaskTimer.objects.select_for_update().get_or_create(task=task)
         data = payload.dict(exclude_unset=True)
@@ -1057,7 +1137,7 @@ def list_time_entries(request, task_id: int):
 @router.post("/tasks/{task_id}/time-entries", response={201: TaskTimeEntryOut})
 def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
     """Manually log a past work session for a task."""
-    task = get_accessible_task(request.auth, task_id)
+    task = get_editable_task(request.auth, task_id)
     data = payload.dict()
     start = data["started_at"]
     end = data.get("ended_at")
@@ -1079,7 +1159,7 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
 
     if target_user_id is not None:
         is_owner = (board.owner_id == target_user_id)
-        is_collab = board.collaborators.filter(id=target_user_id).exists()
+        is_collab = board.memberships.filter(user_id=target_user_id).exists()
         if not (is_owner or is_collab):
             raise HttpError(400, "Selected user is not a member of this board")
         if target_user_id == request.auth.id:
@@ -1115,6 +1195,10 @@ def create_time_entry(request, task_id: int, payload: TaskTimeEntryIn):
 def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
     """Partially update a recorded time entry, enforcing duration_seconds <= ended_at - started_at."""
     entry = get_owned_time_entry(request.auth, entry_id)
+
+    # Require Editor or Owner access to the board containing this entry.
+    get_editable_task(request.auth, entry.task_id)
+
     updates = payload.dict(exclude_unset=True)
 
     with transaction.atomic():
@@ -1133,7 +1217,7 @@ def update_time_entry(request, entry_id: int, payload: TaskTimeEntryUpdateIn):
             if new_user_id is not None:
                 board = entry.task.column.board
                 is_owner = (board.owner_id == new_user_id)
-                is_collab = board.collaborators.filter(id=new_user_id).exists()
+                is_collab = board.memberships.filter(user_id=new_user_id).exists()
                 if not (is_owner or is_collab):
                     raise HttpError(400, "Selected user is not a member of this board")
                 if new_user_id == request.auth.id:
@@ -1166,6 +1250,9 @@ def delete_time_entry(request, entry_id: int):
     """Delete a recorded work session."""
     entry = get_owned_time_entry(request.auth, entry_id)
 
+    # Require Editor or Owner access to the board containing this entry.
+    get_editable_task(request.auth, entry.task_id)
+
     task_id = entry.task_id
     board_id = entry.task.column.board_id
 
@@ -1191,16 +1278,15 @@ def delete_time_entry(request, entry_id: int):
 @router.get("/tags", response=list[TagOut])
 def list_tags(request, board_id: int = None):
     """List tags belonging to participants of an accessible board."""
-    
+
     if board_id is None:
         return Tag.objects.filter(user=request.auth)
-    
+
     board = get_accessible_board(request.auth, board_id)
 
     return Tag.objects.filter(
         Q(user=board.owner) |
-        Q(user__in=board.collaborators.all()) |
-        Q(user=request.auth)
+        Q(user__in=board.memberships.values_list("user_id", flat=True))
     ).distinct()
 
 @router.post("/tags", response={201: TagOut})

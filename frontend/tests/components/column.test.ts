@@ -12,6 +12,7 @@ function mountColumn(props: any = {}, contextOverrides: any = {}, slots: Record<
     openEditTaskDialog: vi.fn(),
     moveTask: vi.fn(),
     columns: { value: [] },
+    canEdit: { value: true },
     ...contextOverrides,
   }
 
@@ -109,6 +110,33 @@ describe('Column Component DOM Suite', () => {
       toColumnId: 'col-target',
       targetPosition: 0,
     })
+  })
+
+  it('prevents viewers from adding, editing, or moving tasks', () => {
+    const { wrapper, kanbanContext } = mountColumn(
+      {},
+      { canEdit: { value: false } },
+    )
+
+    expect(wrapper.find('[data-testid="edit-column-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="add-task-button"]').exists()).toBe(false)
+
+    const vm = wrapper.vm as any
+
+    vm.handleAddTask()
+    vm.handleEditColumn()
+    vm.onUpdate({ data: { id: 'task-1' }, newIndex: 0 })
+    vm.onAdd({
+      data: { id: 'task-1' },
+      from: { getAttribute: () => 'other-column' },
+      newIndex: 0,
+    })
+
+    expect(kanbanContext.openCreateTaskDialog).not.toHaveBeenCalled()
+    expect(kanbanContext.moveTask).not.toHaveBeenCalled()
+    expect(wrapper.emitted('edit')).toBeUndefined()
+
+    wrapper.unmount()
   })
 
   it('supports hiding edit/add buttons, customizing emptyText, and rendering #header-actions and #subheader slots', () => {

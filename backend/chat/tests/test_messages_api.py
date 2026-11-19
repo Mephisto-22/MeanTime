@@ -6,7 +6,7 @@ from ninja_jwt.tokens import RefreshToken
 
 from chat.models import Message
 from kanban.event_schemas import BoardEventType
-from kanban.models import Board
+from kanban.models import Board, BoardMembership
 from users.models import UserBlock
 
 User = get_user_model()
@@ -37,7 +37,10 @@ class BoardMessagesAPITests(TestCase):
         )
 
         self.board = Board.objects.create(owner=self.owner, title="Shared Board")
-        self.board.collaborators.add(self.collab_a, self.collab_b)
+        for collaborator in (self.collab_a, self.collab_b):
+            BoardMembership.objects.create(
+                board=self.board, user=collaborator, role=BoardMembership.Role.EDITOR
+            )
 
         self.owner_auth = self._auth_headers(self.owner)
         self.collab_a_auth = self._auth_headers(self.collab_a)

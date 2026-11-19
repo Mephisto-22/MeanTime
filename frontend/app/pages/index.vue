@@ -121,6 +121,7 @@
     />
 
     <KanbanTaskDialog
+      v-if="!activeTask || canEditFeedTask(activeTask)"
       v-model:visible="isTaskDialogOpen"
       mode="edit"
       :task="activeTask"
@@ -132,6 +133,11 @@
       @save="saveTask"
       @delete="deleteTask"
       @timer-expired="handleDialogTimerExpired"
+    />
+    <ViewerTaskDialog
+      v-else
+      v-model:visible="isTaskDialogOpen"
+      :task="activeTask"
     />
   </div>
 </template>
@@ -149,6 +155,8 @@ import {
 } from '~/api/kanban'
 import KanbanTaskDialog from '~/components/kanban/TaskDialog.vue'
 import KanbanTaskFeed from '~/components/kanban/TaskFeed.vue'
+import ViewerTaskDialog from '~/components/kanban/ViewerTaskDialog.vue'
+import { canEditBoard } from '~/composables/useBoardPermissions'
 import {
   getBoardMembers,
   isBoardShared,
@@ -156,8 +164,10 @@ import {
   useKanbanTaskActions,
 } from '~/composables/useKanbanTaskActions'
 import { useTaskFeedSync } from '~/composables/useTaskFeedSync'
+import { useAuthStore } from '~/stores/auth'
 
 const notify = useNotifications()
+const auth = useAuthStore()
 
 // The backend is the source of truth: after every board create, edit, or delete
 // both boards and the Task Feed are fetched again in parallel.
@@ -236,6 +246,13 @@ const activeBoardColumns = computed<KanbanColumnSummary[]>(() => {
 const activeBoardIsShared = computed(() => isBoardShared(activeBoard.value))
 const activeBoardMembers = computed(() => getBoardMembers(activeBoard.value))
 
+const canEditFeedTask = (task: KanbanTaskDto): boolean => {
+  const feedTask = task as TaskFeedItemDto
+  const board = boards.value.find(b => sameId(b.id, feedTask.boardId))
+  if (!board) return false
+  return canEditBoard(board, auth.user?.id)
+}
+
 const taskFeedSync = useTaskFeedSync({
   boards,
   feedTasks,
@@ -254,6 +271,11 @@ const {
   setTaskTotal,
   handleTimerExpired,
 } = useKanbanTaskActions({
+  canEdit: (taskId) => {
+    if (taskId == null) return activeTask.value ? canEditFeedTask(activeTask.value) : true
+    const feedTask = taskFeedSync.findFeedTask(taskId)
+    return feedTask ? canEditFeedTask(feedTask) : false
+  },
   findTask: taskFeedSync.findFeedTask,
   availableTags: activeBoardTags,
   createSnapshot: taskFeedSync.createSnapshot,
@@ -291,6 +313,8 @@ const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
 }
 
 provide(kanbanContextKey, {
+  canEdit: computed(() => activeTask.value ? canEditFeedTask(activeTask.value) : true),
+  canEditTask: canEditFeedTask,
   columns: activeBoardColumns,
   availableTags: computed(() => activeBoardTags.value),
   isShared: activeBoardIsShared,

@@ -7,7 +7,11 @@
       content: 'p-0 flex flex-col justify-between flex-1 min-h-0',
     }"
     class="kanban-task-card select-none rounded-xl overflow-hidden shadow-sm shrink-0"
-    :class="[priorityBorderClass, draggable ? 'cursor-grab active:cursor-grabbing h-32' : 'cursor-pointer min-h-32']"
+    :class="[
+      priorityBorderClass,
+      isDraggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+      draggable ? 'h-32' : 'min-h-32',
+    ]"
     @click="handleClick"
     v-on="dragListeners"
   >
@@ -109,6 +113,7 @@
         v-if="hasActiveTimer"
         :task-id="task.id"
         :timer="task.timer"
+        :read-only="!canEdit"
         @start="handleTimerStart"
         @pause="handleTimerPause"
         @stop="handleTimerStop"
@@ -153,21 +158,33 @@ defineSlots<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 
+const canEdit = computed(() => {
+  if (kanbanContext?.canEditTask) {
+    return kanbanContext.canEditTask(props.task)
+  }
+  return kanbanContext?.canEdit?.value ?? false
+})
+
+const isDraggable = computed(() => props.draggable && canEdit.value)
+
 const hasActiveTimer = computed(() => {
   return props.task.timer != null && props.task.timer.mode !== 'NONE'
 })
 
 const handleTimerStart = (taskId: string | number, defaultTimer?: Partial<TaskTimerDto>) => {
+  if (!canEdit.value) return
   if (props.onTimerStart) props.onTimerStart(taskId, defaultTimer)
   else if (kanbanContext?.startTimer) kanbanContext.startTimer(taskId, defaultTimer)
 }
 
 const handleTimerPause = (taskId: string | number) => {
+  if (!canEdit.value) return
   if (props.onTimerPause) props.onTimerPause(taskId)
   else if (kanbanContext?.pauseTimer) kanbanContext.pauseTimer(taskId)
 }
 
 const handleTimerStop = (taskId: string | number, entry?: TaskTimeEntryDto) => {
+  if (!canEdit.value) return
   if (props.onTimerStop) props.onTimerStop(taskId, entry)
   else if (kanbanContext?.stopTimer) kanbanContext.stopTimer(taskId, entry)
 }
@@ -182,7 +199,7 @@ const {
 } = useTaskInteraction(() => props.task, props.onOpenEdit)
 
 const dragListeners = computed(() => {
-  if (!props.draggable) return {}
+  if (!isDraggable.value) return {}
   return {
     pointerdown: handlePointerDown,
     pointermove: handlePointerMove,

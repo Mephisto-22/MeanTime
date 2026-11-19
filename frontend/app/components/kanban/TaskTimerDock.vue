@@ -55,7 +55,10 @@
       </div>
 
       <!-- Right: Micro-Controls Cluster (Strictly Isolated Events) -->
-      <div class="flex items-center gap-0.5 shrink-0" data-testid="card-timer-controls">
+      <div 
+        v-if="!readOnly"
+        class="flex items-center gap-0.5 shrink-0" 
+        data-testid="card-timer-controls">
         <!-- Start / Resume Micro Button -->
         <Button
           v-if="!isRunning"
@@ -136,9 +139,11 @@ const props = withDefaults(
   defineProps<{
     timer?: TaskTimerDto | null
     taskId: string | number
+    readOnly?: boolean
   }>(),
   {
     timer: null,
+    readOnly: false,
   },
 )
 
@@ -163,6 +168,7 @@ const {
   () => props.timer,
   {
     onExpired: (entry) => {
+      if (props.readOnly) return
       emit('stop', props.taskId, entry)
     },
   },
@@ -201,6 +207,7 @@ const idleDisplayLabel = computed(() => {
 })
 
 const handleStartOrResume = () => {
+  if (props.readOnly) return
   const defaultTimer: Partial<TaskTimerDto> = {
     taskId: props.taskId,
     mode: props.timer?.mode && props.timer.mode !== 'NONE' ? props.timer.mode : 'COUNT_DOWN',
@@ -213,10 +220,12 @@ const handleStartOrResume = () => {
 }
 
 const handlePause = () => {
+  if (props.readOnly) return
   emit('pause', props.taskId)
 }
 
 const handleStop = () => {
+  if (props.readOnly) return
   emit('stop', props.taskId)
 }
 </script>

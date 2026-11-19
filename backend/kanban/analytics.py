@@ -91,7 +91,10 @@ def collaborator_totals(board: Board, tasks: QuerySet[Task]) -> list[Collaborato
     )
 
     people = {board.owner.id: board.owner}
-    people.update((user.id, user) for user in board.collaborators.all())
+    people.update(
+        (membership.user.id, membership.user)
+        for membership in board.memberships.select_related("user")
+    )
     former_ids = [
         user_id for user_id in seconds_by_user if user_id is not None and user_id not in people
     ]
@@ -169,7 +172,7 @@ def get_board_analytics(
     return {
         "board_id": board.id,
         "title": board.title,
-        "is_shared": board.collaborators.exists(),
+        "is_shared": board.memberships.exists(),
         "total_seconds": sum(column_totals.values()),
         "columns": [
             {

@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from kanban.models import Board
+from kanban.models import Board, BoardMembership
 from chat.models import Message
 
 User = get_user_model()
@@ -19,7 +19,9 @@ class ChatModelTests(TestCase):
             password="password123",
         )
         self.board = Board.objects.create(owner=self.owner, title="Sprint Board")
-        self.board.collaborators.add(self.collaborator)
+        BoardMembership.objects.create(
+            board=self.board, user=self.collaborator, role=BoardMembership.Role.EDITOR
+        )
 
     def test_create_board_message_and_ordering(self):
         m1 = Message.objects.create(

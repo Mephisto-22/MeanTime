@@ -46,11 +46,6 @@ class Board(models.Model):
         on_delete=models.CASCADE, # delete a deleted user's boards
         related_name="boards", # allows us to call user.boards in other code
     )
-    collaborators = models.ManyToManyField(
-        to=settings.AUTH_USER_MODEL,
-        related_name="shared_boards", # allows us to call user.shared_boards
-        blank=True, # a board doesn't have to have collaborators
-    )
 
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True, default="")
@@ -62,6 +57,39 @@ class Board(models.Model):
 
     def __str__(self):
         return self.title
+
+class BoardMembership(models.Model):
+    class Role(models.TextChoices):
+        EDITOR = "EDITOR", "Editor"
+        VIEWER = "VIEWER", "Viewer"
+
+    board = models.ForeignKey(
+        to=Board,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="board_memberships"
+    )
+    role = models.CharField(
+        max_length=10,
+        choices=Role.choices,
+        default=Role.EDITOR,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["board", "user"],
+                name="unique_board_membership",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.board} ({self.role})"
 
 class BoardColumn(models.Model):
     board = models.ForeignKey(

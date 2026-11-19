@@ -2,7 +2,7 @@
   <Card
     data-testid="kanban-board"
     class="flex flex-col flex-1 min-h-0 border border-surface-200 dark:border-surface-800 shadow-sm"
-    :pt="{ body: 'flex flex-col flex-1 min-h-0 p-4 gap-3', content: 'flex flex-col flex-1 min-h-0' }"
+    :pt="{ body: 'flex flex-col flex-1 min-h-0 p-4 gap-3', content: 'flex flex-col flex-1 min-h-0 gap-3' }"
   >
     <template #title>
       <Toolbar class="border-none bg-transparent p-0">
@@ -22,6 +22,7 @@
           <div class="flex items-center gap-3">
             <slot name="actions" />
             <Button
+              v-if="canEdit"
               data-testid="add-column-button"
               label="Add Column"
               icon="pi pi-plus"
@@ -35,6 +36,14 @@
       </Toolbar>
     </template>
     <template #content>
+      <Message
+        v-if="!canEdit"
+        severity="info"
+        :closable="false"
+        data-testid="viewer-notice"
+      >
+        You have viewer access. You can browse this board and its time history.
+      </Message>
       <!-- Horizontal Column Track -->
       <div
         data-testid="kanban-columns-track"
@@ -53,6 +62,7 @@
 
       <!-- Column Dialog -->
       <ColumnFormDialog
+        v-if="canEdit"
         v-model:visible="columnDialogVisible"
         :board-id="props.board.id"
         :column="selectedColumn"
@@ -63,6 +73,7 @@
 
       <!-- Centralized Task Dialog -->
       <KanbanTaskDialog
+        v-if="canEdit"
         v-model:visible="isTaskDialogOpen"
         :mode="dialogMode"
         :task="activeTask"
@@ -70,6 +81,12 @@
         @save="handleSaveTask"
         @delete="handleDeleteTask"
         @timer-expired="handleDialogTimerExpired"
+      />
+      <!-- Viewer Task Dialog -->
+      <ViewerTaskDialog
+        v-else
+        v-model:visible="isTaskDialogOpen"
+        :task="activeTask"
       />
 
       <!-- Board-Scoped Live Chat Sidebar (only on shared boards) -->
@@ -98,6 +115,8 @@ import ColumnFormDialog from '~/components/kanban/ColumnFormDialog.vue'
 import ChatSidebar from '~/components/chat/ChatSidebar.vue'
 import { useBoardChat } from '~/composables/useBoardChat'
 import { useBoardEvents, type BoardEvent } from '~/composables/useBoardEvents'
+import { useBoardPermissions } from '~/composables/useBoardPermissions'
+import ViewerTaskDialog from '~/components/kanban/ViewerTaskDialog.vue'
 import {
   getBoardMembers,
   isBoardShared,
@@ -111,6 +130,11 @@ const notify = useNotifications()
 
 const props = defineProps<{
   board: KanbanBoardDto
+}>()
+
+const { canEdit } = useBoardPermissions(() => props.board)
+const emit = defineEmits<{
+  (e: 'membership-updated'): void
 }>()
 
 const boardTitle = ref(props.board.title)
@@ -254,6 +278,11 @@ const applyTaskMove = (
 
 const handleBoardEvent = (event: BoardEvent): void => {
   const auth = useAuthStore()
+
+  if (event.type === 'board.collaborator_updated') {
+    emit('membership-updated')
+    return
+  }
 
   // ignore events published by the currently authenticated user as their UI is already
   // updated through local state
@@ -420,6 +449,8 @@ const insertTaskAtPosition = (
 const handleMoveTask = async (req: TaskMoveContext): Promise<void> => {
   await nextTick()
 
+  if (!canEdit.value) return
+
   const fromCol = localColumns.value.find(col => sameId(col.id, req.fromColumnId))
   const toCol = localColumns.value.find(col => sameId(col.id, req.toColumnId))
 
@@ -485,7 +516,15 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const activeTask = ref<KanbanTaskDto | null>(null)
 const activeColumnId = ref<string | number | null>(null)
 
+watch(canEdit, (allowed, previous) => {
+  if (allowed === previous) return
+
+  columnDialogVisible.value = false
+  isTaskDialogOpen.value = false
+})
+
 const openCreateTaskDialog = (columnId: string | number): void => {
+  if (!canEdit.value) return
   dialogMode.value = 'create'
   activeTask.value = null
   activeColumnId.value = columnId
@@ -515,6 +554,7 @@ const handleCreateTask = async (
   columnId: string | number,
   payload: Partial<KanbanTaskDto> & { tag_ids?: Array<string | number> },
 ): Promise<void> => {
+  if (!canEdit.value) return
   const targetCol = localColumns.value.find(col => sameId(col.id, columnId))
   if (!targetCol) return
 
@@ -622,6 +662,7 @@ const {
   refreshTaskTotal,
   handleTimerExpired,
 } = useKanbanTaskActions({
+  canEdit,
   findTask: findTaskById,
   availableTags,
   onCreateTask: handleCreateTask,
@@ -662,6 +703,7 @@ const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
 }
 
 const openCreateColumnDialog = () => {
+  if (!canEdit.value) return
   console.log('Add Column clicked')
 
   selectedColumn.value = null
@@ -671,6 +713,7 @@ const openCreateColumnDialog = () => {
 }
 
 const openEditColumnDialog = (column: KanbanColumnDto) => {
+  if (!canEdit.value) return
   selectedColumn.value = column
   columnDialogVisible.value = true
 }
@@ -727,6 +770,7 @@ watch(isShared, (shared) => {
 const boardMembers = computed<UserOut[]>(() => getBoardMembers(props.board))
 
 provide(kanbanContextKey, {
+  canEdit,
   columns: columnRegistry,
   availableTags: computed(() => availableTags.value),
   isShared,

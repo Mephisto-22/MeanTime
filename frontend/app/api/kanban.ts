@@ -232,13 +232,44 @@ export interface KanbanColumnDto {
   tasks: KanbanTaskDto[]
 }
 
+export type BoardRole = 'EDITOR' | 'VIEWER'
+
+export interface BoardCollaboratorDto extends UserOut {
+  role: BoardRole
+}
+
+export const BOARD_ROLE_CONFIG = {
+  EDITOR: {
+    label: 'Editor',
+    indefiniteLabel: 'an editor',
+    description: 'Can change board content',
+  },
+  VIEWER: {
+    label: 'Viewer',
+    indefiniteLabel: 'a viewer',
+    description: 'Can view the board and analytics',
+  },
+} as const satisfies Record<BoardRole, {
+  label: string
+  indefiniteLabel: string
+  description: string
+}>
+
+export const BOARD_ROLE_OPTIONS: Array<{
+  label: string
+  value: BoardRole
+}> = [
+  { label: BOARD_ROLE_CONFIG.EDITOR.label, value: 'EDITOR' },
+  { label: BOARD_ROLE_CONFIG.VIEWER.label, value: 'VIEWER' },
+]
+
 export interface KanbanBoardDto {
   id: string | number
   title: string
   description: string
   isOwner?: boolean
   owner?: UserOut
-  collaborators?: UserOut[]
+  collaborators?: BoardCollaboratorDto[]
   columns: KanbanColumnDto[]
 }
 
@@ -282,6 +313,8 @@ export interface TaskDialogSavePayload {
 }
 
 export interface KanbanContext {
+  canEdit: ComputedRef<boolean>
+  canEditTask?: (task: KanbanTaskDto) => boolean
   columns: ComputedRef<KanbanColumnSummary[]>
   availableTags?: ComputedRef<TagDto[]>
   isShared?: ComputedRef<boolean>
@@ -330,8 +363,8 @@ export class KanbanApi {
     return apiService.delete<SuccessResponse>(`${this.endpoint}/boards/${boardId}`)
   }
 
-  shareBoard(boardId: string | number, friendId: number): Promise<{ success: boolean; message: string }> {
-    return apiService.post<{ success: boolean; message: string }>(`${this.endpoint}/boards/${boardId}/collaborators`, { friend_id: friendId })
+  shareBoard(boardId: string | number, friendId: number, role: BoardRole = 'EDITOR'): Promise<{ success: boolean; message: string }> {
+    return apiService.post<{ success: boolean; message: string }>(`${this.endpoint}/boards/${boardId}/collaborators`, { friend_id: friendId, role })
   }
 
   removeCollaborator(boardId: string | number, collaboratorId: number): Promise<{ success: boolean; message: string }> {

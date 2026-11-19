@@ -11,6 +11,7 @@ class BoardEventType(StrEnum):
     BOARD_UPDATED = "board.updated"
     BOARD_DELETED = "board.deleted"
     BOARD_ACCESS_REVOKED = "board.access_revoked"
+    BOARD_COLLABORATOR_UPDATED = "board.collaborator_updated"
 
     COLUMN_CREATED = "column.created"
     COLUMN_UPDATED = "column.updated"

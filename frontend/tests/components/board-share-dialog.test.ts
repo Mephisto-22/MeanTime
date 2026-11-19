@@ -139,7 +139,7 @@ describe('BoardShareDialog Component Suite', () => {
     await wrapper.get('[data-testid="invite-friend-button"]').trigger('click')
     await flushPromises()
 
-    expect(shareSpy).toHaveBeenCalledWith(42, mockFriend.id)
+    expect(shareSpy).toHaveBeenCalledWith(42, mockFriend.id, 'EDITOR')
     expect(wrapper.emitted('collaborators-updated')).toBeTruthy()
   })
 

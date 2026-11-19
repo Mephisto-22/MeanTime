@@ -5,7 +5,7 @@ from django.db.models.functions import Coalesce
 from ninja import Schema
 from pydantic import Field, field_validator
 from users.schemas import UserOut
-from .models import TaskPriority, TimerMode, TimerState, RecurrenceCadence
+from .models import BoardMembership, TaskPriority, TimerMode, TimerState, RecurrenceCadence
 
 # Timer schemas
 class TaskTimerOut(Schema):
@@ -341,17 +341,31 @@ class BoardIn(Schema):
     title: str
     description: str = ""
 
+class BoardCollaboratorOut(UserOut):
+    """A board member's public profile and board-specific role."""
+    role: BoardMembership.Role
+
 class BoardOut(Schema):
     """Shape of a board returned to clients."""
     id: int
     title: str
     description: str
     owner: UserOut
-    collaborators: list[UserOut] = []
-    is_owner: bool = True
+    collaborators: list[BoardCollaboratorOut] = Field(default_factory=list)
+    is_owner: bool = False
     columns: list[BoardColumnOut]
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def resolve_collaborators(obj):
+        return [
+            BoardCollaboratorOut(
+                **UserOut.model_validate(membership.user).model_dump(),
+                role=membership.role,
+            )
+            for membership in obj.memberships.all()
+        ]
 
 class TaskMoveIn(Schema):
     """Payload expected when moving a task to another column."""
@@ -361,6 +375,7 @@ class TaskMoveIn(Schema):
 class BoardShareIn(Schema):
     """Payload expected when sharing a board with a friend."""
     friend_id: int
+    role: BoardMembership.Role = BoardMembership.Role.EDITOR
 
 
 # Tag Schemas

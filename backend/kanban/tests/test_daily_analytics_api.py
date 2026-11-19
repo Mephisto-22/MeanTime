@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 
-from kanban.models import Board, BoardColumn, Task, TaskTimeEntry
+from kanban.models import Board, BoardColumn, BoardMembership, Task, TaskTimeEntry
 from users.models import UserBlock
 
 User = get_user_model()
@@ -165,7 +165,9 @@ class DailyTimeAccessTests(DailyTimeTestCase):
         self.teammate = User.objects.create_user(
             email="teammate@example.com", password=PASSWORD, display_name="Teammate")
         self.shared = Board.objects.create(owner=self.teammate, title="Team Board")
-        self.shared.collaborators.add(self.user)
+        BoardMembership.objects.create(
+            board=self.shared, user=self.user, role=BoardMembership.Role.EDITOR
+        )
         shared_column = BoardColumn.objects.create(board=self.shared, title="Doing", position=0)
         self.shared_task = Task.objects.create(column=shared_column, title="Pair up", position=0)
 
@@ -187,7 +189,7 @@ class DailyTimeAccessTests(DailyTimeTestCase):
 
     def test_entries_on_a_board_the_user_left_are_not_counted(self):
         self.add_entry(utc(9, 10), 600, task=self.shared_task)
-        self.shared.collaborators.remove(self.user)
+        self.shared.memberships.filter(user=self.user).delete()
 
         res = self.get_daily(start="2026-11-09", end="2026-11-09")
 

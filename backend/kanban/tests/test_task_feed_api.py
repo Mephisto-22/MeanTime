@@ -10,6 +10,7 @@ from django.utils import timezone
 from kanban.models import (
     Board,
     BoardColumn,
+    BoardMembership,
     RecurrenceCadence,
     RecurringTask,
     Tag,
@@ -170,7 +171,8 @@ class TaskFeedApiTests(TestCase):
 
     def test_shared_board_tasks_require_collaborator_time_entry(self):
         shared_board = Board.objects.create(owner=self.owner, title="Shared Board")
-        shared_board.collaborators.add(self.collaborator, self.other_collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.other_collaborator)
         col = BoardColumn.objects.create(board=shared_board, title="In Progress", position=0)
 
         task_with_collab_entry = Task.objects.create(
@@ -215,7 +217,8 @@ class TaskFeedApiTests(TestCase):
 
     def test_shared_board_task_sums_all_collaborators_time_entries(self):
         shared_board = Board.objects.create(owner=self.owner, title="Multi-Collaborator Board")
-        shared_board.collaborators.add(self.collaborator, self.other_collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.other_collaborator)
         col = BoardColumn.objects.create(board=shared_board, title="Doing", position=0)
         shared_task = Task.objects.create(column=col, title="Joint Task", position=0)
 
@@ -254,7 +257,7 @@ class TaskFeedApiTests(TestCase):
 
     def test_revoked_collaborator_excluded_despite_historical_time_entries(self):
         shared_board = Board.objects.create(owner=self.owner, title="Revoked Board")
-        shared_board.collaborators.add(self.collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.collaborator)
         col = BoardColumn.objects.create(board=shared_board, title="To Do", position=0)
         task = Task.objects.create(column=col, title="Historical Work", position=0)
         TaskTimeEntry.objects.create(
@@ -273,7 +276,7 @@ class TaskFeedApiTests(TestCase):
         self.assertEqual([t["id"] for t in initial.json()], [task.id])
 
         # Revoke collaborator access
-        shared_board.collaborators.remove(self.collaborator)
+        BoardMembership.objects.filter(board=shared_board, user=self.collaborator).delete()
 
         after_revoke = self.client.get(
             "/api/kanban/tasks",
@@ -284,7 +287,7 @@ class TaskFeedApiTests(TestCase):
 
     def test_bidirectional_user_block_excludes_shared_tasks_despite_time_entries(self):
         shared_board = Board.objects.create(owner=self.owner, title="Blocked Board")
-        shared_board.collaborators.add(self.collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.collaborator)
         col = BoardColumn.objects.create(board=shared_board, title="To Do", position=0)
         task = Task.objects.create(column=col, title="Blocked Work", position=0)
         TaskTimeEntry.objects.create(
@@ -314,7 +317,7 @@ class TaskFeedApiTests(TestCase):
         owned_col = BoardColumn.objects.create(board=owned_board, title="Done", position=0)
 
         shared_board = Board.objects.create(owner=self.collaborator, title="Collab Owned Board")
-        shared_board.collaborators.add(self.owner)
+        BoardMembership.objects.create(board=shared_board, user=self.owner)
         shared_col = BoardColumn.objects.create(board=shared_board, title="Done", position=0)
 
         owned_active = Task.objects.create(column=owned_col, title="Owned Active", position=0)
@@ -361,7 +364,7 @@ class TaskFeedApiTests(TestCase):
         )
 
         shared_board = Board.objects.create(owner=self.owner, title="Shared Countdown Board")
-        shared_board.collaborators.add(self.collaborator)
+        BoardMembership.objects.create(board=shared_board, user=self.collaborator)
         shared_col = BoardColumn.objects.create(board=shared_board, title="Doing", position=0)
         shared_task = Task.objects.create(column=shared_col, title="Shared Countdown", position=0)
         TaskTimer.objects.create(

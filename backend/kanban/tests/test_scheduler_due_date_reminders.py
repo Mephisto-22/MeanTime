@@ -9,7 +9,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from kanban.models import Board, BoardColumn, Task
+from kanban.models import Board, BoardColumn, BoardMembership, Task
 from kanban.scheduler import (
     DUE_DATE_REMINDERS_ADVISORY_LOCK_ID,
     dispatch_due_date_reminders,
@@ -43,7 +43,8 @@ class DueDateReminderSchedulerTests(TestCase):
             is_active=False,
         )
         self.board = Board.objects.create(owner=self.owner, title="Project Phoenix")
-        self.board.collaborators.add(self.collab_active, self.collab_inactive)
+        BoardMembership.objects.create(board=self.board, user=self.collab_active)
+        BoardMembership.objects.create(board=self.board, user=self.collab_inactive)
         self.column = BoardColumn.objects.create(board=self.board, title="Doing", position=0)
 
     def tearDown(self):

@@ -11,6 +11,7 @@ function mountTask(props: any = {}, contextOverrides: any = {}, slots: Record<st
     openCreateTaskDialog: vi.fn(),
     moveTask: vi.fn(),
     columns: { value: [] },
+    canEdit: { value: true },
     ...contextOverrides,
   }
 

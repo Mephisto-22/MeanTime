@@ -22,7 +22,7 @@
       <div class="flex items-center gap-1.5 shrink-0">
         <slot name="header-actions" />
         <Button
-          v-if="showEditButton"
+          v-if="showEditButton && canEdit"
           data-testid="edit-column-button"
           icon="pi pi-pencil"
           severity="secondary"
@@ -54,7 +54,7 @@
         :data-column-id="column.id"
         group="kanban-tasks"
         :animation="150"
-        :disabled="!draggable"
+        :disabled="!isDraggable"
         draggable="[data-testid='kanban-task']"
         ghost-class="kanban-task-ghost"
         drag-class="kanban-task-drag"
@@ -76,7 +76,7 @@
             v-for="task in tasks"
             :key="task.id"
             :task="task"
-            :draggable="draggable"
+            :draggable="isDraggable"
           />
         </template>
       </VueDraggable>
@@ -84,7 +84,7 @@
 
     <!-- Add Task Button -->
     <Button
-      v-if="showAddTask"
+      v-if="showAddTask && canEdit"
       data-testid="add-task-button"
       label="Add Task"
       severity="secondary"
@@ -131,16 +131,22 @@ defineSlots<{
 
 const kanbanContext = inject(kanbanContextKey, null)
 
+const canEdit = computed(() =>
+  kanbanContext?.canEdit?.value ?? false,
+)
+
+const isDraggable = computed(() => props.draggable && canEdit.value)
+
 const tasks = computed({
   get: () => props.column.tasks,
   set: (newTasks: KanbanTaskDto[]) => {
-    if (!props.draggable) return
+    if (!isDraggable.value) return
     props.column.tasks.splice(0, props.column.tasks.length, ...newTasks)
   },
 })
 
 const onUpdate = (event: any) => {
-  if (!props.draggable) return
+  if (!isDraggable.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const targetPosition = event.newDraggableIndex ?? event.newIndex
   if (taskId !== undefined && targetPosition !== undefined) {
@@ -154,7 +160,7 @@ const onUpdate = (event: any) => {
 }
 
 const onAdd = (event: any) => {
-  if (!props.draggable) return
+  if (!isDraggable.value) return
   const taskId = event.item?.getAttribute('data-task-id') || event.data?.id
   const fromColumnId =
     event.from?.getAttribute('data-column-id') ||
@@ -172,12 +178,14 @@ const onAdd = (event: any) => {
 }
 
 const handleAddTask = () => {
+  if (!canEdit.value) return
   if (kanbanContext?.openCreateTaskDialog) {
     kanbanContext.openCreateTaskDialog(props.column.id)
   }
 }
 
 const handleEditColumn = () => {
+  if (!canEdit.value) return
   emit('edit', props.column)
 }
 

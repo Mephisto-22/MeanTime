@@ -2,7 +2,7 @@
 
 from django.contrib.auth import get_user_model
 
-from kanban.models import Tag, TaskPriority, TaskTimer, TimerMode
+from kanban.models import BoardMembership, Tag, TaskPriority, TaskTimer, TimerMode
 from kanban.tests.test_board_analytics_api import PASSWORD, BoardAnalyticsTestCase
 from kanban.tests.test_daily_analytics_api import DailyTimeTestCase, utc
 
@@ -59,7 +59,7 @@ class BoardTagBreakdownTests(BoardBreakdownTestCase):
     def test_same_named_tags_from_two_people_count_once(self):
         alice = User.objects.create_user(
             email="alice@example.com", password=PASSWORD, display_name="Alice")
-        self.board.collaborators.add(alice)
+        BoardMembership.objects.create(board=self.board, user=alice)
         task = self.add_tagged_task("Shared bug", 600, tags=["bug"])
         task.tags.add(self.tag("bug", user=alice))
 
@@ -133,7 +133,7 @@ class PersonalBreakdownTests(DailyTimeTestCase):
     def test_only_the_users_own_entries_count(self):
         other = User.objects.create_user(
             email="other@example.com", password=PASSWORD, display_name="Other")
-        self.board.collaborators.add(other)
+        BoardMembership.objects.create(board=self.board, user=other)
         self.add_entry(utc(9, 10), 600, user=other)
 
         breakdown = self.get_daily(start="2026-11-09", end="2026-11-09").json()["breakdown"]

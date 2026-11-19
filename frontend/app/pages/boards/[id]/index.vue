@@ -45,7 +45,7 @@
     </div>
 
     <template v-else-if="board">
-      <KanbanBoard :board="board" class="flex-1 min-h-0">
+      <KanbanBoard :board="board" class="flex-1 min-h-0" @membership-updated="() => refresh()">
         <template #actions>
           <div
             v-if="board.collaborators && board.collaborators.length > 0"

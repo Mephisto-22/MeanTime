@@ -5,10 +5,11 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import Client, TestCase, TransactionTestCase
 
 from kanban.event_schemas import BoardEvent, BoardEventType
-from kanban.models import Board, BoardColumn, Task
+from kanban.models import Board, BoardColumn, Task, BoardMembership
 from kanban.sse import format_sse_comment, format_sse_event, format_sse_retry
 from users.models import Friendship, FriendshipStatus, UserBlock
 
@@ -60,6 +61,13 @@ class BoardCollaborationTestMixin:
             position=0,
         )
 
+    def add_collaborator(self, user, role=BoardMembership.Role.EDITOR):
+        return BoardMembership.objects.create(
+            board=self.board,
+            user=user,
+            role=role,
+        )
+
     def auth_headers(self, email):
         response = self.client.post(
             "/api/auth/login",
@@ -76,8 +84,68 @@ class BoardCollaborationTestMixin:
 
 
 class BoardCollaborationApiTests(BoardCollaborationTestMixin, TestCase):
+    @patch("kanban.api.publish_board_event")
+    def test_collaborator_creation_and_role_changes_publish_after_commit(self, publish):
+        headers = self.auth_headers("owner@example.com")
+        for role in ("VIEWER", "EDITOR", "VIEWER"):
+            with self.subTest(role=role):
+                publish.reset_mock()
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(
+                        f"/api/kanban/boards/{self.board.id}/collaborators",
+                        data=json.dumps({"friend_id": self.friend.id, "role": role}),
+                        content_type="application/json",
+                        **headers,
+                    )
+                    publish.assert_not_called()
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(
+                        BoardMembership.objects.get(board=self.board, user=self.friend).role,
+                        role,
+                    )
+
+                publish.assert_called_once_with(
+                    board_id=self.board.id,
+                    actor_id=self.owner.id,
+                    event_type=BoardEventType.BOARD_COLLABORATOR_UPDATED,
+                    data={"user_id": self.friend.id, "role": role},
+                )
+
+    @patch("kanban.api.publish_board_event")
+    def test_unchanged_collaborator_role_does_not_publish(self, publish):
+        self.add_collaborator(self.friend)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/kanban/boards/{self.board.id}/collaborators",
+                data=json.dumps({"friend_id": self.friend.id, "role": "EDITOR"}),
+                content_type="application/json",
+                **self.auth_headers("owner@example.com"),
+            )
+        self.assertEqual(response.status_code, 200)
+        publish.assert_not_called()
+
+    @patch("kanban.api.publish_board_event")
+    def test_rolled_back_role_change_does_not_publish(self, publish):
+        self.add_collaborator(self.friend)
+        headers = self.auth_headers("owner@example.com")
+        with self.captureOnCommitCallbacks(execute=True):
+            with transaction.atomic():
+                response = self.client.post(
+                    f"/api/kanban/boards/{self.board.id}/collaborators",
+                    data=json.dumps({"friend_id": self.friend.id, "role": "VIEWER"}),
+                    content_type="application/json",
+                    **headers,
+                )
+                self.assertEqual(response.status_code, 200)
+                transaction.set_rollback(True)
+        self.assertEqual(
+            BoardMembership.objects.get(board=self.board, user=self.friend).role,
+            "EDITOR",
+        )
+        publish.assert_not_called()
+
     def test_shared_board_appears_in_collaborators_board_list(self):
-        self.board.collaborators.add(self.friend)
+        self.add_collaborator(self.friend)
 
         response = self.client.get(
             "/api/kanban/boards",
@@ -108,11 +176,14 @@ class BoardCollaborationApiTests(BoardCollaborationTestMixin, TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(
-            self.board.collaborators.filter(id=self.stranger.id).exists()
+            BoardMembership.objects.filter(
+                board=self.board,
+                user=self.stranger,
+            ).exists()
         )
 
     def test_owner_can_revoke_collaborator_access(self):
-        self.board.collaborators.add(self.friend)
+        self.add_collaborator(self.friend)
 
         response = self.client.delete(
             f"/api/kanban/boards/{self.board.id}/collaborators/{self.friend.id}",
@@ -121,7 +192,10 @@ class BoardCollaborationApiTests(BoardCollaborationTestMixin, TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(
-            self.board.collaborators.filter(id=self.friend.id).exists()
+            BoardMembership.objects.filter(
+                board=self.board,
+                user=self.friend,
+            ).exists()
         )
 
         denied = self.client.get(
@@ -132,7 +206,7 @@ class BoardCollaborationApiTests(BoardCollaborationTestMixin, TestCase):
         self.assertEqual(denied.status_code, 404)
 
     def test_block_in_either_direction_denies_shared_board_access(self):
-        self.board.collaborators.add(self.friend)
+        self.add_collaborator(self.friend)
 
         for blocker, blocked in (
             (self.owner, self.friend),
@@ -189,7 +263,7 @@ class BoardEventsApiTests(BoardCollaborationTestMixin, TransactionTestCase):
     """SSE endpoint tests use TransactionTestCase for response cleanup."""
 
     def test_collaborator_can_subscribe_to_board_events(self):
-        self.board.collaborators.add(self.friend)
+        self.add_collaborator(self.friend)
 
         response = self.client.get(
             f"/api/kanban/boards/{self.board.id}/events",
@@ -240,6 +314,7 @@ class BoardEventSchemaTests(TestCase):
                 "board.updated",
                 "board.deleted",
                 "board.access_revoked",
+                "board.collaborator_updated",
                 "column.created",
                 "column.updated",
                 "column.deleted",

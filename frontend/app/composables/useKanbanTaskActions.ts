@@ -16,6 +16,7 @@ import { sumEntryDurations } from '~/composables/useTaskTimer'
 export interface KanbanTaskActionsOptions {
   findTask: (taskId: string | number) => KanbanTaskDto | undefined
   availableTags: Ref<TagDto[]>
+  canEdit?: Ref<boolean> | ((taskId?: string | number) => boolean)
   onCreateTask?: (columnId: string | number, payload: Partial<KanbanTaskDto>) => Promise<void>
   createSnapshot?: () => () => void
   moveTaskLocally?: (task: KanbanTaskDto, destinationColumnId: string | number) => number | null
@@ -184,7 +185,16 @@ function computeAccumulatedSeconds(timer: TaskTimerDto): number {
 export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
   const notify = useNotifications()
 
+  const isEditAllowed = (taskId?: string | number): boolean => {
+    if (options.canEdit === undefined) return true
+    if (typeof options.canEdit === 'function') return options.canEdit(taskId)
+    return options.canEdit.value
+  }
+
   const createTag = async (payload: { name: string } | string): Promise<TagDto> => {
+    if (!isEditAllowed()) {
+      throw new Error('Viewer access does not allow creating tags for this board.')
+    }
     const name = typeof payload === 'string' ? payload : payload.name
     try {
       const created = await kanbanApi.createTag({ name })
@@ -206,6 +216,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
     taskId: string | number,
     payload: TaskUpdatePayload,
   ): Promise<boolean> => {
+    if (!isEditAllowed(taskId)) return false
     const targetTask = options.findTask(taskId)
     if (!targetTask) return false
 
@@ -307,6 +318,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
   }
 
   const saveTask = async (savePayload: TaskDialogSavePayload): Promise<void> => {
+    if (!isEditAllowed(savePayload.taskId ?? undefined)) return
     if (savePayload.mode === 'create' && savePayload.columnId != null) {
       if (options.onCreateTask) {
         await options.onCreateTask(savePayload.columnId, {
@@ -370,6 +382,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
     taskId: string | number,
     deleteOptions?: { cancelRecurrence?: boolean },
   ): Promise<void> => {
+    if (!isEditAllowed(taskId)) return
     const targetTask = options.findTask(taskId)
     if (!targetTask) return
 
@@ -444,6 +457,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
   }
 
   const handleTimerExpired = (task: KanbanTaskDto, _entry?: TaskTimeEntryDto): void => {
+    if (!isEditAllowed(task.id)) return
     const key = String(task.id)
     const lastAlertTime = recentAlerts.get(key)
     const now = Date.now()
@@ -458,6 +472,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
     taskId: string | number,
     defaultTimer?: Partial<TaskTimerDto>,
   ): Promise<void> => {
+    if (!isEditAllowed(taskId)) return
     const task = options.findTask(taskId)
     if (!task) return
 
@@ -483,6 +498,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
   }
 
   const pauseTimer = async (taskId: string | number): Promise<void> => {
+    if (!isEditAllowed(taskId)) return
     const task = options.findTask(taskId)
     if (!task || !task.timer) return
 
@@ -507,6 +523,7 @@ export function useKanbanTaskActions(options: KanbanTaskActionsOptions) {
     taskId: string | number,
     entry?: TaskTimeEntryDto,
   ): Promise<void> => {
+    if (!isEditAllowed(taskId)) return
     const key = String(taskId)
     const lastStopped = recentlyStoppedTasks.get(key)
     const now = Date.now()
