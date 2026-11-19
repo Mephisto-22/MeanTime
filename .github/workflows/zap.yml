@@ -1,0 +1,64 @@
+name: ZAP active security scan
+
+on:
+  push:
+    branches: [ZAP-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: ZAP active scan (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [web, api]
+    env:
+      COMPOSE_FILE: docker-compose.zap.yml
+      COMPOSE_PROJECT_NAME: meantime-zap-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare report directory
+        # The ZAP container runs as a non-root user.
+        run: mkdir -p zap-reports && chmod 777 zap-reports
+
+      - name: Build and wait for the disposable app
+        run: docker compose up -d --build --wait --wait-timeout 300 db redis backend frontend
+
+      - name: Active web scan (traditional and Ajax spiders)
+        if: matrix.target == 'web'
+        run: docker compose run --rm -T zap
+
+      - name: Active API scan (OpenAPI import)
+        if: matrix.target == 'api'
+        run: >-
+          docker compose run --rm -T zap
+          zap-api-scan.py
+          -t http://frontend:3000/api/openapi.json -f openapi
+          -O http://frontend:3000
+          -T 5
+          -z "-config ascan.maxScanDurationInMins=15"
+          -r api.html -J api.json
+
+      - name: Capture app logs
+        if: always()
+        run: docker compose logs --no-color > zap-reports/app.log 2>&1
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: zap-reports/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Remove disposable containers and data
+        if: always()
+        run: docker compose down --volumes --remove-orphans

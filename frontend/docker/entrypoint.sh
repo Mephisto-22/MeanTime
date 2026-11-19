@@ -40,11 +40,11 @@ if [ "$NEEDS_INSTALL" -eq 1 ]; then
   echo "$MANIFEST_HASH" > node_modules/.installed_hash
 fi
 
-# Sync to host mount if host hash differs or host node_modules is unpopulated
-NEEDS_HOST_SYNC=0
-if [ "$HOST_HASH" != "$MANIFEST_HASH" ] || [ ! -d "/host_node_modules/vue" ] || [ "$NEEDS_INSTALL" -eq 1 ]; then
-  NEEDS_HOST_SYNC=1
-fi
+# # Sync to host mount if host hash differs or host node_modules is unpopulated
+# NEEDS_HOST_SYNC=0
+# if [ "$HOST_HASH" != "$MANIFEST_HASH" ] || [ ! -d "/host_node_modules/vue" ] || [ "$NEEDS_INSTALL" -eq 1 ]; then
+#   NEEDS_HOST_SYNC=1
+# fi
 
 if [ "$NEEDS_HOST_SYNC" -eq 1 ] && [ -d "/host_node_modules" ]; then
   echo "Syncing container node_modules to host filesystem for IDE autocompletion..."

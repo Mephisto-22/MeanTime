@@ -1,0 +1,111 @@
+# Standalone, disposable scan stack. Do not combine with docker-compose.yml.
+name: meantime-zap
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: meantime_zap
+      POSTGRES_USER: meantime_zap
+      POSTGRES_PASSWORD: disposable-zap-password
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U meantime_zap -d meantime_zap"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - scan_database:/var/lib/postgresql
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.prod
+    environment:
+      POSTGRES_DB: meantime_zap
+      POSTGRES_USER: meantime_zap
+      POSTGRES_PASSWORD: disposable-zap-password
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      DJANGO_SECRET_KEY: disposable-zap-key-only-for-isolated-security-scans
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: backend,frontend,localhost
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      FRONTEND_URL: http://frontend:3000
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      DEFAULT_FROM_EMAIL: zap@meantime.local
+      GOOGLE_OAUTH_CLIENT_ID: ""
+      GOOGLE_OAUTH_CLIENT_SECRET: ""
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile.prod
+      args:
+        BACKEND_INTERNAL_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "Promise.all(['/', '/api/health', '/api/openapi.json'].map(p => fetch('http://localhost:3000' + p).then(r => { if (!r.ok) throw new Error(p + ': ' + r.status) }))).catch(e => { console.error(e); process.exit(1) })"
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    profiles: [scan]
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      frontend:
+        condition: service_healthy
+    volumes:
+      - ./zap-reports:/zap/wrk:rw
+    # Default local command; CI also runs zap-api-scan.py against the schema.
+    command:
+      - zap-full-scan.py
+      - -t
+      - http://frontend:3000
+      - -j
+      - -m
+      - "2"
+      - -T
+      - "5"
+      - -z
+      - "-config ascan.maxScanDurationInMins=15 -config ajaxSpider.maxDuration=2"
+      - -r
+      - web.html
+      - -J
+      - web.json
+
+volumes:
+  scan_database:

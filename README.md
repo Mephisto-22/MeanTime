@@ -95,6 +95,12 @@ docker compose up -d --build
 
 ---
 
+## Security Scanning
+
+Automated Docker-based ZAP active scans run on every push to `ZAP-test`.
+See [Security scanning](docs/security-scanning.md) for reports, scan behavior,
+and local commands.
+
 ## Repository Map
 
 ```
