@@ -110,7 +110,7 @@ describe('Google sign-in callback page', () => {
       accessToken: 'access-token', refreshToken: 'refresh-token',
     })
     expect(window.location.hash).toBe('')
-    await vi.waitFor(() => expect(useRouter().currentRoute.value.path).toBe('/'))
+    await vi.waitFor(() => expect(useRouter().currentRoute.value.path).toBe('/boards'))
   })
 
   it('rejects an incomplete link without calling the backend', async () => {

@@ -393,7 +393,7 @@ database changes, endpoint contracts, and manual tests.
 
 ### Boards
 
-- The boards page (`app/pages/index.vue`) lists the signed-in user's boards. **New board** and each card's **Edit** open `app/components/kanban/BoardFormDialog.vue`, which creates or updates the board through `kanbanApi`. After every change, the page fetches the list again.
+- The boards page (`app/pages/boards/index.vue`) lists the signed-in user's boards. **New board** and each card's **Edit** open `app/components/kanban/BoardFormDialog.vue`, which creates or updates the board through `kanbanApi`. After every change, the page fetches the list again.
 - When editing, the dialog's footer has **Delete board**. It asks for confirmation first, naming the board and warning that its columns and tasks are deleted too. Confirming calls `kanbanApi.deleteBoard`, which sends `DELETE /api/kanban/boards/{id}`. The backend deletes the board with its columns and tasks. It can't be undone.
 - Only a board's owner can delete it. For anyone else the endpoint returns 404, as if the board didn't exist.
 - Tests: `tests/components/board-delete.test.ts`, and `DeleteBoardTests` in `backend/kanban/tests/test_board_api.py`.

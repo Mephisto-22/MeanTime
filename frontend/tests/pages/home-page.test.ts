@@ -3,7 +3,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearNuxtData } from '#app'
 import { kanbanApi, type KanbanBoardDto, type TaskFeedItemDto, type TaskTimerDto } from '~/api/kanban'
-import HomePage from '~/pages/index.vue'
+import HomePage from '~/pages/boards/index.vue'
 import { useAuthStore } from '~/stores/auth'
 import {
   AppDialogStub,
@@ -24,7 +24,7 @@ let mountedWrappers: VueWrapper[] = []
 
 async function mountHomePage() {
   const wrapper = await mountSuspended(HomePage, {
-    route: '/',
+    route: '/boards',
     global: {
       stubs: {
         Dialog: AppDialogStub,

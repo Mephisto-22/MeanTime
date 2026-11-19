@@ -100,7 +100,7 @@
       v-model:visible="isShareDialogOpen"
       :board="board"
       @collaborators-updated="() => refresh()"
-      @left-board="() => navigateTo('/')"
+      @left-board="() => navigateTo('/boards')"
     />
   </div>
 </template>

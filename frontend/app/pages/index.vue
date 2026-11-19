@@ -1,344 +1,370 @@
 <template>
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-    <section class="lg:col-span-8 flex flex-col gap-6 min-w-0">
-      <!-- Header Toolbar -->
-      <Toolbar class="border-none bg-transparent p-0">
-        <template #start>
-          <div class="flex flex-col gap-1">
-            <h1 class="text-3xl font-extrabold tracking-tight text-surface-900 dark:text-surface-0">
-              Your boards
-            </h1>
-            <p class="text-sm text-surface-600 dark:text-surface-400">
-              Pick a board to open, or work directly from your docked Task Feed.
-            </p>
-          </div>
-        </template>
-        <template #end>
-          <Button
-            v-if="boards.length !== 0"
-            data-testid="new-board-button"
-            label="New board"
-            icon="pi pi-plus"
-            @click="openCreateDialog"
-          />
-        </template>
-      </Toolbar>
-
-      <!-- Loading (first load only; a re-fetch keeps showing the current boards) -->
-      <div
-        v-if="boardsStatus === 'pending' && boards.length === 0"
-        data-testid="boards-loading"
-        class="grid grid-cols-1 gap-5 sm:grid-cols-2"
-      >
-        <Skeleton
-          v-for="n in 3"
-          :key="n"
-          height="14rem"
-          border-radius="16px"
-        />
+  <div class="-my-12 -mx-4 sm:-mx-6 flex flex-col bg-surface-950 text-surface-0">
+    <header class="sticky top-0 z-20 border-b border-surface-800 bg-surface-900/90 backdrop-blur-sm px-4 sm:px-6 py-3.5">
+      <div class="mx-auto max-w-7xl">
+        <Toolbar class="border-none bg-transparent p-0">
+          <template #start>
+            <NuxtLink
+              to="/"
+              class="inline-flex items-center text-2xl font-black tracking-tight uppercase text-surface-0 no-underline focus-visible:rounded"
+              aria-label="MeanTime home"
+            >
+              MEAN<span class="text-primary-400">TIME</span>
+            </NuxtLink>
+          </template>
+          <template #end>
+            <NuxtLink v-slot="{ href, navigate }" to="/login" custom>
+              <Button
+                as="a"
+                :href="href"
+                label="Log in"
+                severity="secondary"
+                outlined
+                data-testid="landing-login"
+                @click="navigate"
+              />
+            </NuxtLink>
+          </template>
+        </Toolbar>
       </div>
+    </header>
 
-      <!-- Error -->
-      <div
-        v-else-if="boardsError"
-        data-testid="boards-error"
-        class="error-state-card"
-      >
-        <div class="flex flex-wrap items-center gap-3">
-          <span>We couldn't load your boards.</span>
-          <Button
-            label="Try again"
-            icon="pi pi-refresh"
-            severity="danger"
-            text
-            size="small"
-            @click="() => refreshBoards()"
-          />
+    <section
+      aria-labelledby="landing-title"
+      class="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.22),transparent_60%)]"
+    >
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div class="lg:col-span-5 flex flex-col items-start gap-6">
+          <h1 id="landing-title" class="hero-heading font-extrabold tracking-tight leading-[1.05] text-surface-0">
+            YOUR PLANS.
+            <span class="block text-primary-400">YOUR TIME.</span>
+          </h1>
+          <p class="landing-body text-lg text-surface-300 leading-relaxed max-w-[44ch]">
+            Side projects, daily routines, and shared ideas. Organize tasks on clear boards and track focused time at your own pace.
+          </p>
+          <NuxtLink v-slot="{ href, navigate }" to="/register" custom>
+            <Button
+              as="a"
+              :href="href"
+              label="Get started"
+              icon="pi pi-arrow-right"
+              icon-pos="right"
+              size="large"
+              data-testid="landing-register"
+              @click="navigate"
+            />
+          </NuxtLink>
         </div>
+
+        <figure class="lg:col-span-7 m-0" aria-label="Illustrated example task board. Not live data.">
+          <Card class="border border-primary-500/30 bg-surface-900 shadow-2xl shadow-primary-950/40 rounded-2xl">
+            <template #title>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <span class="text-lg font-bold text-surface-0">Your Everyday Board</span>
+                <Tag value="Board preview" severity="info" />
+              </div>
+            </template>
+            <template #content>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div class="rounded-xl border border-surface-800 bg-surface-950/70 p-3 flex flex-col gap-3">
+                  <div class="flex items-center justify-between text-sm font-semibold text-surface-200">
+                    <span>Up Next</span>
+                    <Tag value="2" severity="secondary" />
+                  </div>
+                  <LandingTaskSample :task="landingTasks.plan" />
+                  <LandingTaskSample :task="landingTasks.hobby" />
+                </div>
+                <div class="rounded-xl border border-surface-800 bg-surface-950/70 p-3 flex flex-col gap-3">
+                  <div class="flex items-center justify-between text-sm font-semibold text-surface-200">
+                    <span>In Motion</span>
+                    <Tag value="1" severity="info" />
+                  </div>
+                  <LandingTaskSample :task="landingTasks.focus" />
+                </div>
+              </div>
+            </template>
+          </Card>
+          <figcaption class="mt-3 text-sm text-surface-400">
+            Example workspace preview — no distractions included.
+          </figcaption>
+        </figure>
       </div>
-
-      <!-- Empty -->
-      <Panel
-        v-else-if="boards.length === 0"
-        data-testid="boards-empty"
-        class="border-dashed border-2 border-surface-200 dark:border-surface-800 rounded-2xl bg-surface-0/60 dark:bg-surface-900/60"
-      >
-        <div class="flex flex-col items-center justify-center gap-5 py-20 text-center">
-          <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-400 border border-primary-200/50 dark:border-primary-800/50 shadow-sm">
-            <i class="pi pi-th-large text-4xl" />
-          </div>
-          <div class="flex flex-col gap-1.5 max-w-sm">
-            <h2 class="text-xl font-bold text-surface-900 dark:text-surface-0">
-              You have no boards yet
-            </h2>
-            <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-              Create your first board to start tracking tasks and recording focused time sessions.
-            </p>
-          </div>
-          <Button
-            label="New board"
-            icon="pi pi-plus"
-            @click="openCreateDialog"
-          />
-        </div>
-      </Panel>
-
-      <!-- Boards Grid -->
-      <ul
-        v-else
-        class="grid grid-cols-1 gap-5 sm:grid-cols-2 list-none p-0 m-0"
-      >
-        <li
-          v-for="board in boards"
-          :key="board.id"
-        >
-          <KanbanBoardCard
-            :board="board"
-            @edit="openEditDialog"
-          />
-        </li>
-      </ul>
     </section>
 
-    <aside
-      data-testid="task-feed-rail"
-      class="lg:col-span-4 lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)] flex flex-col min-h-[420px] min-w-0"
+    <section
+      id="plan"
+      aria-labelledby="plan-title"
+      class="border-y border-surface-800 bg-surface-900/40"
     >
-      <KanbanTaskFeed
-        :tasks="feedTasks"
-        :user-tags="userTags"
-        :loading="feedStatus === 'pending'"
-        :error="feedError"
-        @retry="() => refreshFeed()"
-      />
-    </aside>
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center" data-reveal>
+        <div class="lg:col-span-5 flex flex-col items-start gap-4">
+          <h2 id="plan-title" class="section-heading font-extrabold tracking-tight leading-tight text-surface-0">
+            Big ideas.
+            <span class="block text-primary-400">Clear plan.</span>
+          </h2>
+          <p class="landing-body text-base sm:text-lg text-surface-300 leading-relaxed">
+            Your next project doesn't need another scattered list. Give every task a home, move it across columns, and always see what's next.
+          </p>
+        </div>
 
-    <KanbanBoardFormDialog
-      v-model:visible="isDialogOpen"
-      :board="boardBeingEdited"
-      @saved="refreshAll"
-      @deleted="refreshAll"
-    />
+        <div class="lg:col-span-7">
+          <Card class="border border-surface-800 bg-surface-900 rounded-2xl">
+            <template #title>
+              <span class="text-base font-bold text-surface-100">The Next Big Thing</span>
+            </template>
+            <template #content>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div
+                  v-for="column in columns"
+                  :key="column.title"
+                  class="rounded-xl border border-surface-800 bg-surface-950/70 p-3 flex flex-col gap-2.5 min-w-0"
+                >
+                  <h3 class="text-sm font-semibold text-surface-200">{{ column.title }}</h3>
+                  <LandingTaskSample :task="column.task" />
+                </div>
+              </div>
+            </template>
+          </Card>
+        </div>
+      </div>
+    </section>
 
-    <KanbanTaskDialog
-      v-if="!activeTask || canEditFeedTask(activeTask)"
-      v-model:visible="isTaskDialogOpen"
-      mode="edit"
-      :task="activeTask"
-      :column-id="activeTask?.columnId ?? null"
-      :board-id="activeTask?.boardId ?? null"
-      :board-title="activeTask?.boardTitle ?? null"
-      :columns="activeBoardColumns"
-      :available-tags="activeBoardTags"
-      @save="saveTask"
-      @delete="deleteTask"
-      @timer-expired="handleDialogTimerExpired"
-    />
-    <ViewerTaskDialog
-      v-else
-      v-model:visible="isTaskDialogOpen"
-      :task="activeTask"
-    />
+    <section id="focus" aria-labelledby="focus-title">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center" data-reveal>
+        <div class="lg:col-span-6 order-2 lg:order-1">
+          <Card class="border border-primary-500/30 bg-surface-900 shadow-xl shadow-primary-950/30 rounded-2xl">
+            <template #content>
+              <div class="flex flex-col gap-5">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-sm font-semibold text-surface-300">Active focus session</span>
+                  <Tag value="Count Down" severity="info" />
+                </div>
+                <div
+                  class="text-5xl sm:text-6xl font-extrabold tracking-tight text-surface-0 tabular-nums"
+                  aria-label="Example timer: 20 minutes remaining"
+                >
+                  20:00
+                </div>
+                <div class="h-2 w-full rounded-full bg-surface-800 overflow-hidden" aria-hidden="true">
+                  <div
+                    ref="focusProgressBar"
+                    class="focus-progress-fill h-full w-2/3 rounded-full bg-primary-500"
+                    :class="{ 'is-ready': progressReady, 'is-revealed': progressRevealed }"
+                  />
+                </div>
+                <LandingTaskSample :task="landingTasks.focus" />
+              </div>
+            </template>
+          </Card>
+        </div>
+
+        <div class="lg:col-span-6 order-1 lg:order-2 flex flex-col items-start gap-4">
+          <h2 id="focus-title" class="section-heading font-extrabold tracking-tight leading-tight text-surface-0">
+            Less spin.
+            <span class="block text-primary-400">More flow.</span>
+          </h2>
+          <p class="landing-body text-base sm:text-lg text-surface-300 leading-relaxed">
+            Pick a task and start a timer right from your board. Track count-up or count-down sessions so the work in front of you gets your full attention.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section
+      id="together"
+      aria-labelledby="together-title"
+      class="border-y border-surface-800 bg-surface-900/40"
+    >
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center" data-reveal>
+        <div class="lg:col-span-5 flex flex-col items-start gap-4">
+          <h2 id="together-title" class="section-heading font-extrabold tracking-tight leading-tight text-surface-0">
+            Your board.
+            <span class="block text-primary-400">Your crew.</span>
+          </h2>
+          <p class="landing-body text-base sm:text-lg text-surface-300 leading-relaxed">
+            Bring your collaborators into the picture. Connect with friends, share boards, and keep everyone moving in the same direction.
+          </p>
+        </div>
+
+        <div class="lg:col-span-7">
+          <Card class="border border-primary-500/30 bg-surface-900 shadow-xl shadow-primary-950/30 rounded-2xl">
+            <template #title>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <span class="text-base font-bold text-surface-100">Shared Board</span>
+                <Tag value="With collaborators" severity="info" />
+              </div>
+            </template>
+            <template #content>
+              <div class="flex flex-col gap-4 pt-1">
+                <p class="text-sm text-surface-300">
+                  Coordinate tasks, priorities, and time entries together in real time.
+                </p>
+                <div class="rounded-xl border border-surface-800 bg-surface-950/70 p-3">
+                  <LandingTaskSample :task="landingTasks.shared" />
+                </div>
+              </div>
+            </template>
+          </Card>
+        </div>
+      </div>
+    </section>
+
+    <section id="start" aria-labelledby="start-title" class="px-4 sm:px-6 py-16 lg:py-24">
+      <div class="mx-auto max-w-4xl">
+        <Card class="border border-primary-500/30 bg-gradient-to-br from-primary-950/60 via-surface-900 to-surface-900 rounded-2xl text-center">
+          <template #content>
+            <div class="flex flex-col items-center gap-6 py-6 px-4">
+              <h2 id="start-title" class="section-heading font-extrabold tracking-tight leading-tight text-surface-0">
+                Your plans.
+                <span class="text-primary-400">Your pace.</span>
+              </h2>
+              <p class="landing-body text-base sm:text-lg text-surface-300">
+                Make a little room for the projects that matter most.
+              </p>
+              <NuxtLink v-slot="{ href, navigate }" to="/register" custom>
+                <Button
+                  as="a"
+                  :href="href"
+                  label="Create your account"
+                  icon="pi pi-arrow-right"
+                  icon-pos="right"
+                  size="large"
+                  @click="navigate"
+                />
+              </NuxtLink>
+            </div>
+          </template>
+        </Card>
+      </div>
+    </section>
+
+    <footer class="border-t border-surface-800 bg-surface-950 px-4 sm:px-6 py-8">
+      <div class="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <span class="text-lg font-black tracking-tight uppercase text-surface-0">
+          MEAN<span class="text-primary-400">TIME</span>
+        </span>
+        <p class="text-sm text-surface-400 text-center">
+          Plan a little. Make time. Stay connected.
+        </p>
+        <a
+          href="#landing-title"
+          class="text-sm font-semibold text-primary-400 hover:text-primary-300 no-underline hover:underline"
+        >
+          Back to top ↑
+        </a>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  kanbanApi,
-  kanbanContextKey,
-  type KanbanBoardDto,
-  type KanbanColumnSummary,
-  type KanbanTaskDto,
-  type TagDto,
-  type TaskFeedItemDto,
-  type TaskTimeEntryDto,
-} from '~/api/kanban'
-import KanbanTaskDialog from '~/components/kanban/TaskDialog.vue'
-import KanbanTaskFeed from '~/components/kanban/TaskFeed.vue'
-import ViewerTaskDialog from '~/components/kanban/ViewerTaskDialog.vue'
-import { canEditBoard } from '~/composables/useBoardPermissions'
-import {
-  getBoardMembers,
-  isBoardShared,
-  sameId,
-  useKanbanTaskActions,
-} from '~/composables/useKanbanTaskActions'
-import { useTaskFeedSync } from '~/composables/useTaskFeedSync'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Tag from 'primevue/tag'
+import Toolbar from 'primevue/toolbar'
 import { useAuthStore } from '~/stores/auth'
+import { landingTasks } from '~/data/landingTasks'
+import LandingTaskSample from '~/components/LandingTaskSample.vue'
 
-const notify = useNotifications()
+definePageMeta({ public: true, layout: 'headless' })
+useSeoMeta({
+  title: 'MeanTime — Your plans. Your time.',
+  description: 'A home for everyday plans, side projects, and shared ideas. Organize tasks and make time at your own pace with MeanTime.',
+})
+
 const auth = useAuthStore()
+const focusProgressBar = ref<HTMLElement | null>(null)
+const progressReady = ref(false)
+const progressRevealed = ref(false)
+let progressObserver: IntersectionObserver | undefined
 
-// The backend is the source of truth: after every board create, edit, or delete
-// both boards and the Task Feed are fetched again in parallel.
-const [
-  {
-    data: boards,
-    status: boardsStatus,
-    error: boardsError,
-    refresh: refreshBoards,
-  },
-  {
-    data: feedTasks,
-    status: feedStatus,
-    error: feedError,
-    refresh: refreshFeed,
-  },
-  {
-    data: userTags,
-    error: userTagsError,
-    refresh: refreshUserTags,
-  },
-] = await Promise.all([
-  useAsyncData('kanban-boards', () => kanbanApi.listBoards(), {
-    default: () => [],
-    deep: true,
-  }),
-  useAsyncData('kanban-task-feed', () => kanbanApi.listTaskFeed(), {
-    default: () => [],
-    deep: true,
-  }),
-  useAsyncData('kanban-user-tags', () => kanbanApi.listUserTags(), {
-    default: () => [],
-  }),
-])
+const columns = [
+  { title: 'To Do', task: landingTasks.plan },
+  { title: 'In Progress', task: landingTasks.focus },
+  { title: 'Done', task: landingTasks.done },
+]
 
-const refreshAll = async (): Promise<void> => {
-  await Promise.all([refreshBoards(), refreshFeed(), refreshUserTags()])
-}
-
-// State for the board create/edit dialog. A null boardBeingEdited means creating a new board.
-const isDialogOpen = ref(false)
-const boardBeingEdited = ref<KanbanBoardDto | null>(null)
-
-function openCreateDialog(): void {
-  boardBeingEdited.value = null
-  isDialogOpen.value = true
-}
-
-function openEditDialog(board: KanbanBoardDto): void {
-  boardBeingEdited.value = board
-  isDialogOpen.value = true
-}
-
-const isTaskDialogOpen = ref(false)
-const activeTask = ref<TaskFeedItemDto | null>(null)
-const activeBoardTags = ref<TagDto[]>([])
-let tagRequestCounter = 0
-
-const activeBoard = computed(() => {
-  if (!activeTask.value) return undefined
-  return boards.value.find(board => sameId(board.id, activeTask.value?.boardId))
-})
-
-const activeBoardColumns = computed<KanbanColumnSummary[]>(() => {
-  if (activeBoard.value?.columns && activeBoard.value.columns.length > 0) {
-    return [...activeBoard.value.columns]
-      .sort((a, b) => a.position - b.position)
-      .map(col => ({ id: col.id, title: col.title }))
+onMounted(async () => {
+  if (
+    focusProgressBar.value &&
+    typeof IntersectionObserver !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: no-preference)').matches
+  ) {
+    progressReady.value = true
+    progressObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          progressRevealed.value = true
+          progressObserver?.disconnect()
+        }
+      },
+      { threshold: 0.5, rootMargin: '0px 0px -40% 0px' }
+    )
+    progressObserver.observe(focusProgressBar.value)
   }
-  if (activeTask.value) {
-    return [{ id: activeTask.value.columnId, title: activeTask.value.columnTitle }]
+
+  await auth.initializeSession()
+  if (auth.isAuthenticated) {
+    await navigateTo('/boards', { replace: true })
   }
-  return []
 })
 
-const activeBoardIsShared = computed(() => isBoardShared(activeBoard.value))
-const activeBoardMembers = computed(() => getBoardMembers(activeBoard.value))
-
-const canEditFeedTask = (task: KanbanTaskDto): boolean => {
-  const feedTask = task as TaskFeedItemDto
-  const board = boards.value.find(b => sameId(b.id, feedTask.boardId))
-  if (!board) return false
-  return canEditBoard(board, auth.user?.id)
-}
-
-const taskFeedSync = useTaskFeedSync({
-  boards,
-  feedTasks,
-  userTags,
-  activeTask,
+onBeforeUnmount(() => {
+  progressObserver?.disconnect()
 })
-
-const {
-  updateTask,
-  deleteTask,
-  saveTask,
-  createTag,
-  startTimer,
-  pauseTimer,
-  stopTimer,
-  setTaskTotal,
-  handleTimerExpired,
-} = useKanbanTaskActions({
-  canEdit: (taskId) => {
-    if (taskId == null) return activeTask.value ? canEditFeedTask(activeTask.value) : true
-    const feedTask = taskFeedSync.findFeedTask(taskId)
-    return feedTask ? canEditFeedTask(feedTask) : false
-  },
-  findTask: taskFeedSync.findFeedTask,
-  availableTags: activeBoardTags,
-  createSnapshot: taskFeedSync.createSnapshot,
-  moveTaskLocally: taskFeedSync.moveTaskLocally,
-  removeTaskLocally: taskFeedSync.removeTaskLocally,
-  onAfterTaskUpdate: taskFeedSync.onAfterTaskUpdate,
-  onAfterTagCreate: taskFeedSync.onAfterTagCreate,
-  onAfterTimerChange: taskFeedSync.onAfterTimerChange,
-  onAfterTaskTotalChange: taskFeedSync.onAfterTaskTotalChange,
-})
-
-const openEditTaskDialog = (task: KanbanTaskDto): void => {
-  const feedTask = task as TaskFeedItemDto
-  activeTask.value = feedTask
-  activeBoardTags.value = []
-  isTaskDialogOpen.value = true
-
-  const requestId = ++tagRequestCounter
-  void kanbanApi.listTags(feedTask.boardId).then(
-    (tags) => {
-      if (requestId !== tagRequestCounter) return
-      activeBoardTags.value = tags || []
-    },
-    (err) => {
-      if (requestId !== tagRequestCounter) return
-      notify.error(err, 'Unable to fetch tags')
-    },
-  )
-}
-
-const handleDialogTimerExpired = (entry: TaskTimeEntryDto): void => {
-  if (activeTask.value) {
-    handleTimerExpired(activeTask.value, entry)
-  }
-}
-
-provide(kanbanContextKey, {
-  canEdit: computed(() => activeTask.value ? canEditFeedTask(activeTask.value) : true),
-  canEditTask: canEditFeedTask,
-  columns: activeBoardColumns,
-  availableTags: computed(() => activeBoardTags.value),
-  isShared: activeBoardIsShared,
-  boardMembers: activeBoardMembers,
-  createTag,
-  openEditTaskDialog,
-  updateTask,
-  deleteTask,
-  startTimer,
-  pauseTimer,
-  stopTimer,
-  setTaskTotal,
-  onTimerExpired: handleTimerExpired,
-})
-
-watch(boardsError, (value) => {
-  if (value) notify.error(value, 'Unable to load boards')
-}, { immediate: true })
-
-watch(feedError, (value) => {
-  if (value) notify.error(value, 'Unable to load task feed')
-}, { immediate: true })
-
-watch(userTagsError, (value) => {
-  if (value) notify.error(value, 'Unable to load tags')
-}, { immediate: true })
 </script>
+
+<style scoped>
+.hero-heading {
+  font-size: clamp(2.5rem, 1.5rem + 3.5vw, 4.25rem);
+  text-wrap: balance;
+}
+
+.section-heading {
+  font-size: clamp(1.875rem, 1.25rem + 2vw, 2.75rem);
+  text-wrap: balance;
+}
+
+.landing-body {
+  text-wrap: pretty;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--p-primary-400);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .focus-progress-fill {
+    transform-origin: left;
+    transition: transform 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .focus-progress-fill.is-ready:not(.is-revealed) {
+    transform: scaleX(0.05);
+  }
+
+  .focus-progress-fill.is-revealed {
+    transform: scaleX(1);
+  }
+
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    @keyframes section-reveal {
+      from {
+        opacity: 0;
+        translate: 0 2rem;
+      }
+      to {
+        opacity: 1;
+        translate: 0 0;
+      }
+    }
+
+    [data-reveal] {
+      animation: section-reveal auto linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+</style>

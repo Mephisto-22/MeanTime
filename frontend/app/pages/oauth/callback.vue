@@ -45,7 +45,7 @@ onMounted(async () => {
   try {
     await auth.loginWithTokens({ access_token: accessToken, refresh_token: refreshToken })
     notify.success('Signed in with Google.')
-    await navigateTo('/', { replace: true })
+    await navigateTo('/boards', { replace: true })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unable to finish signing in. Please try again.'
     notify.error(err, 'Unable to finish signing in')
