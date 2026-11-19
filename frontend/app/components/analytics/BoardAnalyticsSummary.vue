@@ -66,6 +66,9 @@
       </template>
     </Card>
 
+    <!-- Time per tag and per priority -->
+    <TimeBreakdownCards :breakdown="analytics.breakdown" class="md:col-span-3" />
+
     <!-- How the board's time splits between the people who tracked it -->
     <Card data-testid="analytics-collaborators" class="md:col-span-3">
       <template #title>Time per collaborator</template>
@@ -86,6 +89,7 @@ import CollaboratorTimeList from '~/components/analytics/CollaboratorTimeList.vu
 import ColumnTimeShareChart from '~/components/analytics/ColumnTimeShareChart.vue'
 import RowLimitFooter, { DEFAULT_ROW_LIMIT } from '~/components/analytics/RowLimitFooter.vue'
 import TaskAverages from '~/components/analytics/TaskAverages.vue'
+import TimeBreakdownCards from '~/components/analytics/TimeBreakdownCards.vue'
 import { formatDurationBadge } from '~/composables/useTaskTimer'
 
 const props = defineProps<{

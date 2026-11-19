@@ -75,6 +75,9 @@
         </template>
       </Card>
 
+      <!-- The range's time per tag and per priority -->
+      <TimeBreakdownCards :breakdown="daily.breakdown" />
+
       <!-- The range's entries, by day: the chart's values without the chart. -->
       <Card data-testid="day-entries-card">
         <template #title>
@@ -138,6 +141,7 @@
 import {analyticsApi, type DayRange, type DayTimeDto} from '~/api/analytics'
 import DailyTimeChart from '~/components/analytics/DailyTimeChart.vue'
 import DayTimeEntries from '~/components/analytics/DayTimeEntries.vue'
+import TimeBreakdownCards from '~/components/analytics/TimeBreakdownCards.vue'
 import {formatDurationBadge} from '~/composables/useTaskTimer'
 import {addDays, countDays, formatDay, fromDay, toDay, todayIn} from '~/utils/days'
 
